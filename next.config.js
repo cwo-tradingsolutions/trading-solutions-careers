@@ -1,5 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Sale activado SOLO cuando el build corre dentro del contenedor
+  // (BUILD_TARGET=container, que pone el Dockerfile). En Vercel la variable no
+  // existe, el valor queda undefined y el build es idéntico al de siempre.
+  // "standalone" hace que Next copie a .next/standalone el servidor con sus
+  // dependencias ya resueltas, que es lo que Cloud Run necesita para arrancar
+  // sin node_modules completo.
+  output: process.env.BUILD_TARGET === "container" ? "standalone" : undefined,
   // react-pdf trae binarios de fuentes y módulos ESM que el bundler de Next
   // rompe si intenta empaquetarlos: se deja como dependencia externa.
   experimental: {

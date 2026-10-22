@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.env*
+*.patch
+*.tar
+*.tgz
+*.zip
+_aplicados
+_to_delete
+sql
+*.md
+!README.md
+.DS_Store
