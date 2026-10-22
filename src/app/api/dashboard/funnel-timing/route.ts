@@ -17,6 +17,7 @@
  * advertir cuánto de lo que muestra es aproximado.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import {
   STAGES,
@@ -38,6 +39,9 @@ function daysSince(dt?: string | null): number {
 }
 
 export async function GET(req: NextRequest) {
+  const authError = requireAdmin(req);
+  if (authError) return authError;
+
   try {
     const url = new URL(req.url);
     const vacancyFilter = url.searchParams.get("vacancy_id");

@@ -10,6 +10,7 @@
  *   - quality_scores: avg Elevare por vacante para cerradas
  */
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
@@ -58,6 +59,9 @@ function stageRank(s: string | null): number {
 }
 
 export async function GET(req: NextRequest) {
+  const authError = requireAdmin(req);
+  if (authError) return authError;
+
   try {
     const url = new URL(req.url);
     const vacancyFilter = url.searchParams.get('vacancy_id');

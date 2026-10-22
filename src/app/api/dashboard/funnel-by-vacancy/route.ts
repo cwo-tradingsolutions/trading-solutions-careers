@@ -11,6 +11,7 @@
  * estancan los candidatos en CADA vacante específica.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 // El orden y las etiquetas del funnel salen de la fuente única de verdad.
 // Antes había una copia acá que se quedó en los codes pre-v4: el funnel de
@@ -30,6 +31,9 @@ function stageRank(s: string | null): number {
 }
 
 export async function GET(req: NextRequest) {
+  const authError = requireAdmin(req);
+  if (authError) return authError;
+
   try {
     const url = new URL(req.url);
     const vacancyId = url.searchParams.get('vacancy_id');

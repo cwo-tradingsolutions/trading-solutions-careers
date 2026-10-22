@@ -14,6 +14,7 @@
  * para que el reclutador detecte cuellos de botella en segundos.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { STAGE_SLA_DAYS, STAGE_LABEL_SHORT, STAGE_CATEGORY } from "@/lib/stage-labels";
 
@@ -32,6 +33,9 @@ function daysSince(dt?: string | null): number {
 }
 
 export async function GET(req: NextRequest) {
+  const authError = requireAdmin(req);
+  if (authError) return authError;
+
   try {
     const url = new URL(req.url);
     const vacancyFilter = url.searchParams.get('vacancy_id');

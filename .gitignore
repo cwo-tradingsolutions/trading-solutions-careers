@@ -31,5 +31,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-package-lock.json
 .env*
+
+# package-lock.json SE VERSIONA a propósito (sacado del ignore el 21-oct-2026).
+# Sin lock, dos builds del mismo commit pueden traer dependencias distintas, y
+# Cloud Build clona sin él: `npm ci` falla y toca caer a `npm install`, que es
+# justo lo no reproducible. En una app con datos de candidatos el build tiene
+# que dar siempre lo mismo. wxm-app y Wellness-app ya lo versionaban.

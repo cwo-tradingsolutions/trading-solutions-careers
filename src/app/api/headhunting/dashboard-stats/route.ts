@@ -9,6 +9,7 @@
  *   - vacancy_id: filtrar por una vacante específica
  */
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 // Las etapas salen de la fuente única de verdad. Este archivo tenía sus
 // propias listas con codes pre-v4: contaba candidatos en etapas muertas y
@@ -22,6 +23,9 @@ import {
 } from "@/lib/stage-labels";
 
 export async function GET(req: NextRequest) {
+  const authError = requireAdmin(req);
+  if (authError) return authError;
+
   try {
     const url = new URL(req.url);
     const vacancyFilter = url.searchParams.get("vacancy_id");

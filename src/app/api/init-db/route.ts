@@ -1,14 +1,21 @@
 import { neon } from '@neondatabase/serverless';
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/admin-auth';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
-
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
+/**
+ * Crea el esquema de Neon y resiembra las vacantes.
+ *
+ * ES DESTRUCTIVO: hace `TRUNCATE vacancies RESTART IDENTITY CASCADE` antes de
+ * sembrar. Estuvo expuesto como GET sin autenticación y con CORS abierto, así
+ * que cualquiera que abriera la URL —o un rastreador que la siguiera— vaciaba
+ * la tabla y todo lo que cuelga de ella. Ahora es POST (un GET no debe cambiar
+ * estado, y es lo que permitía el disparo accidental) y exige admin.
+ */
+export async function GET() {
+  return NextResponse.json(
+    { error: 'Método no permitido. Esta operación es destructiva: usa POST con credenciales de admin.' },
+    { status: 405, headers: { Allow: 'POST' } },
+  );
 }
 
 type VacancySeed = {
@@ -295,7 +302,10 @@ const VACANCIES: VacancySeed[] = [
   },
 ];
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
+  const authError = requireAdmin(request);
+  if (authError) return authError;
+
   try {
     const sql = neon(process.env.DATABASE_URL!);
 
@@ -497,13 +507,12 @@ export async function GET(request: NextRequest) {
         vacancies_inserted: VACANCIES.length,
         vacancies: VACANCIES.map((v) => ({ id: v.id, slug: v.slug, title_en: v.title_en })),
       },
-      { headers: corsHeaders }
     );
   } catch (error) {
     console.error('Database initialization error:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Database initialization failed' },
-      { status: 500, headers: corsHeaders }
+      { status: 500 },
     );
   }
 }

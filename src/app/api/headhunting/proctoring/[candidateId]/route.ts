@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireAdmin } from '@/lib/admin-auth';
 
 /**
  * Returns signed URLs for all proctoring snapshots of a candidate.
  * Signed URLs expire in 1 hour.
  */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ candidateId: string }> },
 ) {
+  const authError = requireAdmin(req);
+  if (authError) return authError;
+
   try {
     const { candidateId } = await params;
 
