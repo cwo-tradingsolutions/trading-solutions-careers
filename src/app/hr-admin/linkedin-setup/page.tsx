@@ -26,14 +26,14 @@ export default function LinkedInSetupPage() {
   const webhookUrl = `${origin}/api/linkedin/webhook`;
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Top */}
-      <header className="bg-black text-white">
+    <div className="min-h-screen bg-ts-canvas">
+      <header className="bg-ts-ink text-white">
         <div className="max-w-4xl mx-auto px-6 py-10">
-          <Link href="/hr-admin" className="text-xs text-white/60 hover:text-white">
+          <Link href="/hr-admin" className="text-sm text-white/70 hover:text-white">
             ← Volver al HR Admin
           </Link>
-          <h1 className="text-3xl font-bold mt-4 tracking-tight">
+          <h1 className="text-3xl font-light mt-4 tracking-tight flex items-center gap-3">
+            <span className="ts-mark" aria-hidden />
             Conectar LinkedIn Trading Solutions
           </h1>
           <p className="text-white/70 mt-3 max-w-2xl">

@@ -137,10 +137,10 @@ export default function Trazabilidad() {
   const deLaVacante = (data?.candidatos ?? []).filter((c) => vacante === "todas" || c.vacante === vacante);
 
   return (
-    <div className="max-w-6xl mx-auto px-5 py-8">
+    <div className="max-w-ts mx-auto px-5 py-6">
       <div className="flex items-end gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold">Trazabilidad de contactos</h1>
+          <h1 className="text-3xl font-light tracking-tight">Trazabilidad de contactos</h1>
           <p className="text-sm text-gray-500 mt-0.5 max-w-2xl">
             Cada correo y cada WhatsApp con los candidatos activos. Gmail se lee solo; WhatsApp se importa desde el chat
             en la ficha de cada persona.
@@ -165,7 +165,7 @@ export default function Trazabilidad() {
         <button
           onClick={() => void auditarGmail(false)}
           disabled={auditando}
-          className="font-semibold px-3 py-1.5 rounded-lg bg-gray-900 text-white disabled:opacity-40"
+          className="font-medium px-3 py-1.5 rounded-ts-sm bg-ts-accent text-white disabled:opacity-40"
         >
           {auditando ? "Auditando Gmail…" : "Auditar Gmail"}
         </button>

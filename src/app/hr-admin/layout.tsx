@@ -7,5 +7,9 @@ export const metadata: Metadata = {
 };
 
 export default function HRAdminLayout({ children }: { children: React.ReactNode }) {
-  return <div className="min-h-screen bg-[#EBEBEB]">{children}</div>;
+  return (
+    <div data-ui="universe" className="min-h-screen bg-ts-canvas text-ts-ink">
+      {children}
+    </div>
+  );
 }

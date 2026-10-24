@@ -14,8 +14,8 @@ export default function Navbar() {
   return (
     <>
       <LanguageBanner />
-      <nav className="fixed top-8 w-full z-50 bg-white/90 backdrop-blur-md border-b border-gray-200/60 transition-all">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 flex items-center justify-between h-16">
+      <nav className="fixed top-8 w-full z-50 bg-ts-surface/90 backdrop-blur-md border-b border-[color:var(--ts-line)] transition-all">
+        <div className="max-w-ts mx-auto px-6 lg:px-10 flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -25,13 +25,13 @@ export default function Navbar() {
             />
           </Link>
           <div className="hidden md:flex items-center gap-8">
-            <Link href="/#culture" className="text-sm font-medium text-gray-600 hover:text-black transition-colors">
+            <Link href="/#culture" className="text-sm font-medium text-ts-secondary hover:text-ts-accent transition-colors">
               {t.nav.culture}
             </Link>
-            <Link href="/#departments" className="text-sm font-medium text-gray-600 hover:text-black transition-colors">
+            <Link href="/#departments" className="text-sm font-medium text-ts-secondary hover:text-ts-accent transition-colors">
               {t.nav.areas}
             </Link>
-            <Link href="/#experience" className="text-sm font-medium text-gray-600 hover:text-black transition-colors">
+            <Link href="/#experience" className="text-sm font-medium text-ts-secondary hover:text-ts-accent transition-colors">
               {t.nav.experience}
             </Link>
             <Link href="/vacantes" className="pill-btn pill-btn-primary text-sm !py-2.5 !px-5">
@@ -44,15 +44,15 @@ export default function Navbar() {
           </button>
         </div>
         {mobileOpen && (
-          <div className="md:hidden bg-white border-t border-gray-100 px-6 pb-6 pt-4">
+          <div className="md:hidden bg-ts-surface border-t border-[color:var(--ts-line)] px-6 pb-6 pt-4">
             <div className="flex flex-col gap-4">
-              <Link href="/#culture" onClick={() => setMobileOpen(false)} className="text-base font-medium text-gray-700">
+              <Link href="/#culture" onClick={() => setMobileOpen(false)} className="text-base font-medium text-ts-secondary">
                 {t.nav.culture}
               </Link>
-              <Link href="/#departments" onClick={() => setMobileOpen(false)} className="text-base font-medium text-gray-700">
+              <Link href="/#departments" onClick={() => setMobileOpen(false)} className="text-base font-medium text-ts-secondary">
                 {t.nav.areas}
               </Link>
-              <Link href="/#experience" onClick={() => setMobileOpen(false)} className="text-base font-medium text-gray-700">
+              <Link href="/#experience" onClick={() => setMobileOpen(false)} className="text-base font-medium text-ts-secondary">
                 {t.nav.experience}
               </Link>
               <Link href="/vacantes" onClick={() => setMobileOpen(false)} className="pill-btn pill-btn-primary text-sm justify-center mt-2">
