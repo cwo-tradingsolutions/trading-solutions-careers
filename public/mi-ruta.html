@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mi Ruta · Estatus — Trading Solutions (mock)</title>
+<meta name="robots" content="noindex,nofollow">
+<style>
+:root{
+  --void:#05070d; --void-2:#081420; --ink:#F5F7FA; --ink-2:rgba(245,247,250,.72); --ink-3:rgba(245,247,250,.48); --ink-4:rgba(245,247,250,.28);
+  --blue:#2F88EC; --blue-deep:#0A457F; --sky:#BBE7FF; --lime:#C7ED00;
+  --glass:rgba(255,255,255,.055); --glass-2:rgba(255,255,255,.085); --glass-hi:rgba(255,255,255,.14);
+  --stroke:rgba(255,255,255,.12); --stroke-2:rgba(255,255,255,.2);
+  --blur:saturate(180%) blur(40px);
+  --r-xl:36px; --r-lg:28px; --r-md:20px; --r-pill:999px;
+  --ease:cubic-bezier(.2,.8,.2,1); --dur:420ms;
+  --font:"SF Pro Display","SF Pro Text",-apple-system,BlinkMacSystemFont,"Helvetica Neue","Segoe UI",system-ui,sans-serif;
+  /* tiers */
+  --t-sem:#A9E4CF; --t-l1:#BBE7FF; --t-l2:#6FB4F5; --t-l3:#4C8DFF; --t-l4:#C8D0DA; --t-l5:#F3F6FB; --t-l6:#FFFFFF;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;min-height:100vh;background:var(--void);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;letter-spacing:-.005em;overflow-x:hidden}
+button,select{font:inherit;color:inherit}
+/* ---------- atmosphere ---------- */
+.atmo{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:
+  radial-gradient(1200px 700px at 78% -10%,var(--atmo-a,rgba(47,136,236,.38)),transparent 60%),
+  radial-gradient(900px 600px at -10% 30%,var(--atmo-b,rgba(10,69,127,.55)),transparent 60%),
+  radial-gradient(800px 500px at 60% 110%,var(--atmo-c,rgba(110,90,220,.18)),transparent 60%),
+  linear-gradient(180deg,#05070d 0%,#071019 50%,#05070d 100%);transition:background 800ms var(--ease)}
+.orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.55;animation:drift 28s var(--ease) infinite alternate}
+.orb.a{width:520px;height:520px;left:58%;top:8%;background:radial-gradient(circle,var(--orb-a,rgba(111,180,245,.55)),transparent 70%);transition:background 800ms var(--ease)}
+.orb.b{width:420px;height:420px;left:6%;top:52%;background:radial-gradient(circle,var(--orb-b,rgba(76,141,255,.35)),transparent 70%);animation-duration:36s;transition:background 800ms var(--ease)}
+.orb.c{width:160px;height:160px;left:40%;top:30%;background:radial-gradient(circle,var(--orb-c,rgba(199,237,0,.10)),transparent 70%);animation-duration:22s;transition:background 800ms var(--ease)}
+.grain{position:absolute;inset:0;opacity:.06;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+@keyframes drift{to{transform:translate3d(-60px,40px,0) scale(1.08)}}
+/* ---------- layout ---------- */
+.wrap{position:relative;z-index:1;max-width:1260px;margin:0 auto;padding:0 28px}
+.review{position:relative;z-index:2;text-align:center;font-size:12px;color:var(--ink-3);padding:8px 16px;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.25)}
+.review b{color:var(--ink-2);font-weight:600}
+.glass{background:linear-gradient(160deg,var(--tier-glass-2,var(--glass-2)),var(--tier-glass,var(--glass)) 60%);-webkit-backdrop-filter:var(--tier-blur,var(--blur));backdrop-filter:var(--tier-blur,var(--blur));border:1px solid var(--tier-stroke,var(--stroke));box-shadow:inset 0 1px 0 var(--tier-specular,rgba(255,255,255,.14)),inset 0 -1px 0 rgba(255,255,255,.03),0 30px 80px -30px rgba(0,0,0,.7);transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease)}
+/* header */
+header.top{position:sticky;top:12px;z-index:20;margin:16px auto 0;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 12px 10px 22px;border-radius:var(--r-pill)}
+.brand{display:flex;align-items:baseline;gap:10px;white-space:nowrap}
+.brand strong{font-weight:600;font-size:15px;letter-spacing:-.01em}
+.brand span{font-size:13px;color:var(--ink-3)}
+.tabs{display:flex;gap:2px;padding:4px;border-radius:var(--r-pill);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07)}
+.tab{border:0;background:transparent;padding:8px 16px;border-radius:var(--r-pill);font-size:13px;font-weight:500;color:var(--ink-2);cursor:pointer;transition:background var(--dur) var(--ease),color var(--dur) var(--ease);white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected=true]{background:rgba(255,255,255,.16);color:var(--ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 4px 16px rgba(0,0,0,.25)}
+.tab:focus-visible,.btn:focus-visible,.node:focus-visible,select:focus-visible,.chipbtn:focus-visible{outline:2px solid var(--sky);outline-offset:2px}
+.me{display:flex;align-items:center;gap:10px}
+.avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:600;background:linear-gradient(140deg,#6FB4F5,#0A457F);box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.avatar.demo{background:linear-gradient(140deg,rgba(255,255,255,.2),rgba(255,255,255,.05));color:var(--ink-2)}
+.me-txt{line-height:1.2}
+.me-txt small{display:block;font-size:11px;color:var(--ink-3)}
+.me-txt b{font-size:13px;font-weight:600}
+.demo-toggle{position:relative}
+.chipbtn{border:1px solid var(--stroke);background:rgba(255,255,255,.04);border-radius:var(--r-pill);padding:7px 12px;font-size:12px;color:var(--ink-3);cursor:pointer;display:flex;align-items:center;gap:6px}
+.chipbtn[aria-expanded=true]{color:var(--ink);border-color:var(--stroke-2)}
+.demo-pop{position:absolute;right:0;top:calc(100% + 10px);width:290px;padding:16px;border-radius:var(--r-md);display:none}
+.demo-pop.open{display:block}
+.demo-pop label{display:block;font-size:11px;color:var(--ink-3);margin-bottom:8px;text-transform:none}
+.demo-pop select{width:100%;padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.35);border:1px solid var(--stroke);appearance:none;font-size:13px}
+.demo-pop p{font-size:11px;color:var(--ink-3);margin:10px 0 0}
+.demo-flag{display:none;margin:14px auto 0;width:max-content;font-size:12px;color:var(--ink-2);padding:6px 14px;border-radius:var(--r-pill);border:1px dashed var(--stroke-2)}
+body.is-demo .demo-flag{display:block}
+/* type */
+.eyebrow{font-size:13px;font-weight:500;color:var(--ink-3);letter-spacing:.01em;display:flex;align-items:center;gap:8px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--lime);box-shadow:0 0 12px rgba(199,237,0,.7)}
+.display{font-weight:600;font-size:clamp(44px,7.2vw,96px);line-height:.98;letter-spacing:-.035em;margin:14px 0 0;background:linear-gradient(180deg,#fff 30%,rgba(255,255,255,.62));-webkit-background-clip:text;background-clip:text;color:transparent}
+.h2{font-weight:600;font-size:clamp(32px,4.4vw,56px);line-height:1.02;letter-spacing:-.03em;margin:10px 0 0}
+.h3{font-weight:600;font-size:22px;letter-spacing:-.02em;margin:0}
+.lead{font-size:clamp(17px,1.6vw,21px);color:var(--ink-2);max-width:620px;margin:18px 0 0;line-height:1.45;font-weight:400}
+.muted{color:var(--ink-3)}
+.screen-tag{font-size:11px;color:var(--ink-4);letter-spacing:.06em;text-transform:uppercase;margin-bottom:22px}
+/* screens */
+main{padding:40px 0 20px}
+.screen{display:none;animation:rise .7s var(--ease) both}
+.screen.active{display:block}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+/* ---------- A: home ---------- */
+.hero{display:grid;grid-template-columns:1.25fr .9fr;gap:28px;align-items:stretch}
+.hero-main{padding:52px 52px 44px;border-radius:var(--r-xl);position:relative;overflow:hidden;min-height:520px;display:flex;flex-direction:column}
+.hero-main::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,var(--tier-glow,rgba(111,180,245,.35)),transparent 65%);pointer-events:none}
+.status-line{display:flex;align-items:center;gap:14px;margin-top:auto;padding-top:36px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:var(--r-pill);font-size:13px;font-weight:500;background:rgba(255,255,255,.08);border:1px solid var(--stroke)}
+.pill.ghost{background:transparent;color:var(--ink-2)}
+.hero-side{display:grid;gap:28px;grid-template-rows:auto 1fr}
+.badge-card{border-radius:var(--r-xl);padding:36px;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;overflow:hidden}
+.badge-card .tier-name{font-size:34px;font-weight:600;letter-spacing:-.03em;margin-top:18px}
+.badge-card .tier-sub{font-size:14px;color:var(--ink-3);margin-top:4px}
+.progress-card{border-radius:var(--r-xl);padding:28px 30px;display:flex;flex-direction:column;gap:16px}
+.progress-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.progress-head b{font-size:20px;font-weight:600;letter-spacing:-.02em}
+.segs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg{height:6px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden;position:relative}
+.seg.on::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,var(--sky),#fff);border-radius:6px;transform-origin:left;animation:fill 1.1s var(--ease) both}
+.seg.on:nth-child(2)::after{animation-delay:.15s}
+@keyframes fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.crit{list-style:none;margin:0;padding:0;display:grid;gap:10px;font-size:14px}
+.crit li{display:flex;gap:10px;align-items:flex-start;color:var(--ink-2)}
+.ck{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;margin-top:1px;border:1px solid var(--stroke-2)}
+.ck.met{background:rgba(187,231,255,.16);border-color:rgba(187,231,255,.5)}
+.ck.met svg{display:block}
+.ck svg{display:none}
+/* badge */
+.badge{--c:var(--t-l2);--s:132px;width:var(--s);height:var(--s);border-radius:50%;position:relative;display:grid;place-items:center;flex:none}
+.badge::before{content:"";position:absolute;inset:0;border-radius:50%;padding:var(--tier-badge-pad,1.5px);background:conic-gradient(from 210deg,var(--c),var(--tier-metal,rgba(255,255,255,.9)),var(--c) 40%,rgba(255,255,255,.08) 70%,var(--c));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.badge .core{position:absolute;inset:7%;border-radius:50%;background:radial-gradient(circle at 35% 25%,rgba(255,255,255,.35),rgba(255,255,255,.04) 45%,rgba(0,0,0,.25) 100%),radial-gradient(circle at 50% 120%,color-mix(in srgb,var(--c) 55%,transparent),transparent 70%);box-shadow:inset 0 1px 1px var(--tier-specular,rgba(255,255,255,.5)),inset 0 -10px 30px rgba(0,0,0,.35),0 20px 60px -10px color-mix(in srgb,var(--c) 45%,transparent);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+.badge svg.glyph{position:relative;width:38%;height:38%;color:#fff;filter:drop-shadow(0 2px 8px color-mix(in srgb,var(--c) 70%,transparent))}
+.badge.lg{--s:188px}
+.badge.xl{--s:260px}
+.badge.sm{--s:56px}
+.badge.xs{--s:40px}
+.badge.dim{opacity:.38;filter:saturate(.4)}
+.badge .here{position:absolute;right:6%;top:6%;width:10px;height:10px;border-radius:50%;background:var(--lime);box-shadow:0 0 0 3px rgba(5,7,13,.9),0 0 14px rgba(199,237,0,.8)}
+/* continuum */
+.continuum{margin-top:28px;border-radius:var(--r-xl);padding:30px 34px}
+.cont-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;position:relative;margin-top:22px}
+.cont-row::before{content:"";position:absolute;left:7%;right:7%;top:28px;height:1px;background:linear-gradient(90deg,rgba(255,255,255,.35),rgba(255,255,255,.08))}
+.cont-item{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;position:relative}
+.cont-item b{font-size:14px;font-weight:600}
+.cont-item small{font-size:11px;color:var(--ink-3)}
+.cont-item.cur b{color:#fff}
+.cont-item.future b{color:var(--ink-3)}
+.cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:28px}
+.mini{border-radius:var(--r-lg);padding:26px 28px;min-height:180px;display:flex;flex-direction:column;gap:10px;transition:transform var(--dur) var(--ease),background var(--dur) var(--ease)}
+.mini:hover{transform:translateY(-3px);background:linear-gradient(160deg,rgba(255,255,255,.11),rgba(255,255,255,.05))}
+.mini .k{font-size:12px;color:var(--ink-3)}
+.mini p{margin:0;color:var(--ink-2);font-size:14px}
+.mini .go{margin-top:auto;font-size:13px;color:var(--sky);background:none;border:0;padding:0;text-align:left;cursor:pointer}
+/* ---------- B: map ---------- */
+.map-shell{margin-top:30px;border-radius:var(--r-xl);padding:28px 28px 20px;overflow:hidden}
+.map-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+.map-scroll svg{display:block;min-width:960px;width:100%;height:auto}
+.node{cursor:pointer}
+.node circle.ring{transition:r var(--dur) var(--ease),stroke var(--dur) var(--ease)}
+.node:hover circle.ring{stroke:#fff}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--ink-3);margin-top:14px;padding:0 6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.map-grid{display:grid;grid-template-columns:1fr 380px;gap:28px;margin-top:28px}
+.node-panel{border-radius:var(--r-lg);padding:28px;display:flex;gap:20px;align-items:flex-start}
+.fork-card{border-radius:var(--r-lg);padding:26px 28px}
+.fork{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.fork div{border-radius:16px;padding:14px;border:1px dashed var(--stroke-2);font-size:13px;color:var(--ink-2)}
+.fork b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
+/* ---------- C: detail ---------- */
+.detail{display:grid;grid-template-columns:.95fr 1.05fr;gap:28px;margin-top:30px}
+.near{border-radius:var(--r-xl);padding:44px;position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:flex-start}
+.near .pair{display:flex;align-items:center;gap:18px;margin:6px 0 28px}
+.near .arrow{width:60px;height:1px;background:linear-gradient(90deg,rgba(255,255,255,.6),rgba(255,255,255,.1));position:relative}
+.near .arrow::after{content:"";position:absolute;right:0;top:-3px;width:7px;height:7px;border-top:1px solid rgba(255,255,255,.4);border-right:1px solid rgba(255,255,255,.4);transform:rotate(45deg)}
+.ring-prog{position:relative;width:150px;height:150px;margin-top:8px}
+.ring-prog svg{transform:rotate(-90deg)}
+.ring-prog .rp-txt{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.ring-prog .rp-txt b{font-size:34px;font-weight:600;letter-spacing:-.03em;line-height:1}
+.ring-prog .rp-txt small{display:block;font-size:11px;color:var(--ink-3);margin-top:4px}
+.ring-arc{transition:stroke-dashoffset 1.2s var(--ease)}
+.steps{border-radius:var(--r-xl);padding:36px 38px;display:flex;flex-direction:column;gap:20px}
+.step{display:flex;gap:16px;padding:18px;border-radius:18px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}
+.step .ck{width:26px;height:26px}
+.step b{display:block;font-size:15px;font-weight:600}
+.step span{font-size:13px;color:var(--ink-3)}
+.step.pending{border-style:dashed;border-color:var(--stroke-2)}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
+.btn{border-radius:var(--r-pill);padding:12px 20px;font-size:14px;font-weight:500;cursor:pointer;border:1px solid var(--stroke-2);background:rgba(255,255,255,.06);transition:background var(--dur) var(--ease),transform var(--dur) var(--ease)}
+.btn:hover{background:rgba(255,255,255,.12)}
+.btn.primary{background:rgba(255,255,255,.92);color:#0a0f18;border-color:transparent}
+.btn.primary:hover{background:#fff;transform:translateY(-1px)}
+.note{font-size:12px;color:var(--ink-4);margin:0}
+/* ---------- D: celebrate ---------- */
+.stage{margin-top:30px;border-radius:var(--r-xl);min-height:620px;position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 28px}
+.stage .bloom{position:absolute;left:50%;top:44%;width:700px;height:700px;margin:-350px 0 0 -350px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--cel-c,#4C8DFF) 45%,transparent),transparent 62%);opacity:0;transform:scale(.6)}
+.stage .halo{position:absolute;left:50%;top:44%;width:300px;height:300px;margin:-150px 0 0 -150px;border-radius:50%;border:1px solid rgba(255,255,255,.25);opacity:0}
+.stage.play .bloom{animation:bloom 2.6s var(--ease) forwards}
+.stage.play .halo{animation:halo 2.4s var(--ease) .2s forwards}
+.stage.play .halo.h2{animation-delay:.6s}
+.stage.play .cel-badge{animation:arrive 1.6s var(--ease) both}
+.stage.play .cel-copy>*{animation:rise .9s var(--ease) both}
+.stage.play .cel-copy>*:nth-child(2){animation-delay:.6s}
+.stage.play .cel-copy>*:nth-child(3){animation-delay:.8s}
+.stage.play .cel-copy>*:nth-child(4){animation-delay:1s}
+@keyframes bloom{0%{opacity:0;transform:scale(.6)}40%{opacity:1}100%{opacity:.7;transform:scale(1)}}
+@keyframes halo{0%{opacity:.7;transform:scale(.7)}100%{opacity:0;transform:scale(2.2)}}
+@keyframes arrive{0%{opacity:0;transform:scale(.82) translateY(10px);filter:blur(8px)}100%{opacity:1;transform:none;filter:none}}
+.spark{position:absolute;width:3px;height:3px;border-radius:50%;background:#fff;opacity:0}
+.stage.play .spark{animation:spark 3s var(--ease) forwards}
+.spark.l{background:var(--lime)}
+@keyframes spark{0%{opacity:0;transform:translate(0,0)}20%{opacity:.9}100%{opacity:0;transform:translate(var(--dx),var(--dy))}}
+.cel-badge{position:relative;z-index:1}
+.cel-copy{position:relative;z-index:1;margin-top:34px;display:flex;flex-direction:column;align-items:center}
+.cel-copy .h2{max-width:920px}
+.cel-copy .lead{margin-left:auto;margin-right:auto}
+.preview-pill{position:absolute;top:22px;left:50%;transform:translateX(-50%);z-index:2}
+/* footer */
+footer{position:relative;z-index:1;text-align:center;padding:56px 20px 44px;font-size:12px;color:var(--ink-4)}
+footer b{color:var(--ink-3);font-weight:500}
+/* responsive */
+@media (max-width:1020px){
+  .hero,.detail,.map-grid{grid-template-columns:1fr}
+  .hero-main{min-height:auto;padding:40px 32px}
+  .cards3{grid-template-columns:1fr}
+  .hero-side{grid-template-columns:1fr 1fr;grid-template-rows:none}
+}
+@media (max-width:760px){
+  .wrap{padding:0 16px}
+  header.top{flex-wrap:wrap;border-radius:26px;padding:12px 14px;top:8px}
+  .tabs{order:3;width:100%;overflow-x:auto}
+  .tab{flex:1;padding:8px 10px}
+  .me-txt{display:none}
+  .hero-side{grid-template-columns:1fr}
+  .cont-row{grid-template-columns:repeat(5,minmax(70px,1fr));overflow-x:auto}
+  .continuum{padding:24px 18px;overflow-x:auto}
+  .cont-row{min-width:560px}
+  .near,.steps{padding:28px 22px}
+  .fork{grid-template-columns:1fr}
+  .stage{min-height:540px}
+  .badge.xl{--s:200px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+  .stage .halo{display:none}
+  .orb{animation:none}
+  .spark{display:none}
+  .stage .bloom{opacity:.7;transform:none}
+}
+
+/* ---------- premium-by-level (Kelly AJUSTA) ---------- */
+body{--atmo-a:rgba(47,136,236,.38);--atmo-b:rgba(10,69,127,.55);--atmo-c:rgba(110,90,220,.18);--orb-a:rgba(111,180,245,.55);--orb-b:rgba(76,141,255,.35);--orb-c:rgba(199,237,0,.10);--tier-specular:rgba(255,255,255,.14);--tier-badge-pad:1.5px;--tier-metal:rgba(255,255,255,.9)}
+body[data-tier="clasica"]{--tier-glass:rgba(169,228,207,.10);--tier-glass-2:rgba(120,200,170,.12);--tier-stroke:rgba(169,228,207,.28);--tier-stroke-2:rgba(200,240,220,.40);--tier-blur:saturate(160%) blur(32px);--tier-specular:rgba(220,255,240,.16);--tier-badge-pad:1.2px;--tier-metal:rgba(169,228,207,.75);--atmo-a:rgba(80,160,130,.35);--atmo-b:rgba(20,50,40,.48);--atmo-c:rgba(169,228,207,.18);--orb-a:rgba(169,228,207,.55);--orb-b:rgba(100,180,150,.35);--orb-c:rgba(199,237,0,.06);--t-sem:#A9E4CF}
+body[data-tier="clasica-alt"]{--tier-glass:rgba(187,231,255,.06);--tier-glass-2:rgba(187,231,255,.10);--tier-stroke:rgba(187,231,255,.20);--tier-stroke-2:rgba(187,231,255,.32);--tier-blur:saturate(170%) blur(36px);--tier-specular:rgba(255,255,255,.12);--tier-badge-pad:1.35px;--tier-metal:rgba(187,231,255,.70);--atmo-a:rgba(187,231,255,.30);--atmo-b:rgba(10,69,127,.48);--atmo-c:rgba(111,180,245,.14);--orb-a:rgba(187,231,255,.48);--orb-b:rgba(111,180,245,.32);--orb-c:rgba(199,237,0,.09)}
+body[data-tier="superior"]{--tier-glass:rgba(47,136,236,.08);--tier-glass-2:rgba(187,231,255,.12);--tier-stroke:rgba(111,180,245,.30);--tier-stroke-2:rgba(187,231,255,.42);--tier-blur:saturate(175%) blur(40px);--tier-specular:rgba(187,231,255,.18);--tier-badge-pad:1.5px;--tier-metal:#BBE7FF;--atmo-a:rgba(47,136,236,.32);--atmo-b:rgba(10,69,127,.52);--atmo-c:rgba(111,180,245,.14);--orb-a:rgba(111,180,245,.50);--orb-b:rgba(47,136,236,.32);--orb-c:rgba(199,237,0,.08);--t-l2:#2F88EC}
+body[data-tier="elite"]{--tier-glass:rgba(76,141,255,.09);--tier-glass-2:rgba(100,160,255,.13);--tier-stroke:rgba(140,185,255,.34);--tier-stroke-2:rgba(210,225,255,.45);--tier-blur:saturate(185%) blur(42px);--tier-specular:rgba(255,255,255,.18);--tier-badge-pad:1.75px;--tier-metal:#D0E0FF;--atmo-a:rgba(40,90,200,.34);--atmo-b:rgba(10,30,80,.55);--atmo-c:rgba(90,70,200,.16);--orb-a:rgba(76,141,255,.48);--orb-b:rgba(30,70,180,.32);--orb-c:rgba(199,237,0,.08);--t-l3:#4C8DFF}
+body[data-tier="prestigio"]{--tier-glass:rgba(200,210,220,.09);--tier-glass-2:rgba(232,238,244,.12);--tier-stroke:rgba(200,210,220,.34);--tier-stroke-2:rgba(232,238,244,.48);--tier-blur:saturate(155%) blur(44px);--tier-specular:rgba(255,255,255,.20);--tier-badge-pad:1.9px;--tier-metal:#E8EEF4;--atmo-a:rgba(200,210,220,.24);--atmo-b:rgba(30,36,48,.50);--atmo-c:rgba(180,190,205,.12);--orb-a:rgba(200,210,220,.38);--orb-b:rgba(107,116,128,.26);--orb-c:rgba(199,237,0,.08);--ink:#F5F7FA;--ink-2:rgba(245,247,250,.78);--t-l4:#C8D0DA}
+body[data-tier="referente"]{--tier-glass:rgba(255,255,255,.08);--tier-glass-2:rgba(243,246,251,.12);--tier-stroke:rgba(255,255,255,.28);--tier-stroke-2:rgba(248,250,252,.42);--tier-blur:saturate(150%) blur(46px);--tier-specular:rgba(255,255,255,.22);--tier-badge-pad:2.1px;--tier-metal:#F8FAFC;--atmo-a:rgba(255,255,255,.18);--atmo-b:rgba(30,36,48,.48);--atmo-c:rgba(200,210,220,.12);--orb-a:rgba(255,255,255,.36);--orb-b:rgba(200,210,220,.28);--orb-c:rgba(199,237,0,.06);--ink:#F5F7FA;--ink-2:rgba(245,247,250,.78);--t-l5:#F3F6FB;--t-l6:#FFFFFF}
+body[data-tier="prestigio"] .badge .core,body[data-tier="referente"] .badge .core{background:radial-gradient(circle at 32% 22%,rgba(255,255,255,.45),rgba(255,255,255,.06) 42%,rgba(0,0,0,.35) 100%),radial-gradient(circle at 50% 120%,color-mix(in srgb,var(--c) 50%,transparent),transparent 70%)}
+body[data-tier="referente"] .display{background:linear-gradient(180deg,#FFFFFF 25%,rgba(243,246,251,.72));-webkit-background-clip:text;background-clip:text}
+body[data-tier="referente"] .pill{border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.08)}
+body[data-tier="prestigio"] header.top,body[data-tier="referente"] header.top{box-shadow:inset 0 1px 0 var(--tier-specular),0 20px 50px -28px rgba(0,0,0,.55)}
+body[data-tier="referente"] .hero-main::after{background:radial-gradient(circle,rgba(255,255,255,.28),transparent 65%)}
+
+</style>
+</head>
+<body data-tier="superior">
+<div class="atmo" aria-hidden="true"><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div><div class="grain"></div></div>
+
+<div class="review"><b>Mock diseño · AJUSTA Kelly · no prod</b> · premium por nivel · copy Bernabé v0.3.5 · Clásica→Referente · sin salarios ni bandas</div>
+
+<div class="wrap">
+  <header class="top glass">
+    <div class="brand"><strong>Trading Solutions</strong><span>Mi Ruta</span></div>
+    <nav class="tabs" role="tablist" aria-label="Pantallas">
+      <button class="tab" role="tab" aria-selected="true" aria-controls="s-home" id="t-home">Inicio</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="s-map" id="t-map">Mapa de ruta</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="s-next" id="t-next">Siguiente paso</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="s-cel" id="t-cel">Momentos</button>
+    </nav>
+    <div class="me">
+      <div class="avatar" id="avatar" aria-hidden="true">AO</div>
+      <div class="me-txt"><small id="me-label">Tu perfil</small><b id="me-name">Andrea Orejarena</b></div>
+      <div class="demo-toggle">
+        <button class="chipbtn" id="demoBtn" aria-expanded="false" aria-controls="demoPop">Modo demo HR</button>
+        <div class="demo-pop glass" id="demoPop">
+          <label for="demoSel">Vista</label>
+          <select id="demoSel">
+            <option value="me">Tu perfil (sesión)</option>
+            <option value="ops-sem">Ejemplo: Operaciones SEM</option>
+            <option value="ppl-l1a">Ejemplo: People L1A</option>
+            <option value="ops-l2c">Ejemplo: Operaciones L2C</option>
+            <option value="ops-l3e">Ejemplo: Operaciones L3E</option>
+            <option value="ops-l4b">Ejemplo: Prestigio Gestión L4B</option>
+            <option value="ops-l4e">Ejemplo: Prestigio Experta L4E</option>
+            <option value="ops-l5">Ejemplo: Referente</option>
+          </select>
+          <p>Solo para presentaciones de People. Son ejemplos por rol y nivel, sin personas reales.</p>
+        </div>
+      </div>
+    </div>
+  </header>
+  <div class="demo-flag" id="demoFlag">Modo demo HR · <span id="demoFlagTxt"></span> · <button class="chipbtn" style="display:inline;padding:2px 10px" id="demoExit">Volver a tu perfil</button></div>
+
+  <main>
+    <!-- A -->
+    <section class="screen active" id="s-home" role="tabpanel" aria-labelledby="t-home">
+      <div class="screen-tag">A · Inicio Mi Ruta</div>
+      <div class="hero">
+        <div class="hero-main glass">
+          <div class="eyebrow"><span class="dot"></span><span id="h-eyebrow">Tu lugar en Mi Ruta</span></div>
+          <h1 class="display" id="h-title">Continúas<br>en ruta.</h1>
+          <p class="lead" id="h-lead">Eres Superior. Lo estás logrando: cada paso te acerca a Elite, lista para roles de esa categoría.</p>
+          <div class="status-line">
+            <span class="pill" id="h-pill">Superior · grado II</span>
+            <span class="pill ghost" id="h-since">Desde marzo 2026</span>
+          </div>
+        </div>
+        <div class="hero-side">
+          <div class="badge-card glass">
+            <div class="badge lg" id="h-badge"></div>
+            <div class="tier-name" id="h-tier">Superior</div>
+            <div class="tier-sub" id="h-tier-sub">Hacia III</div>
+          </div>
+          <div class="progress-card glass">
+            <div class="progress-head"><b id="p-title">Hacia III</b><span class="muted" id="p-count">2 de 3 criterios</span></div>
+            <div class="segs" id="p-segs"></div>
+            <ul class="crit" id="p-crit"></ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="continuum glass">
+        <div class="eyebrow">Tu estatus en la ruta oficial</div>
+        <div class="cont-row" id="cont"></div>
+      </div>
+
+      <div class="cards3">
+        <div class="mini glass"><span class="k">Tu siguiente paso</span><h3 class="h3" id="m1-t">III · elige tu camino.</h3><p id="m1-p">Tu líder te acompaña. Pedir mi siguiente paso cuando quieras.</p><button class="go" data-go="next">Ver qué falta →</button></div>
+        <div class="mini glass"><span class="k">Dos caminos, mismo orgullo</span><h3 class="h3">Liderar equipos o profundizar.</h3><p>En el grado III eliges: liderar equipos o profundizar. Las dos llegan a Elite — lista para roles de esa categoría.</p><button class="go" data-go="map">Ver el mapa →</button></div>
+        <div class="mini glass"><span class="k">Tus momentos</span><h3 class="h3" id="m3-t">Llegaste a Superior.</h3><p id="m3-p">Marzo 2026 · L2A. Un momento que vale la pena recordar.</p><button class="go" data-go="cel">Revivir →</button></div>
+      </div>
+    </section>
+
+    <!-- B -->
+    <section class="screen" id="s-map" role="tabpanel" aria-labelledby="t-map">
+      <div class="screen-tag">B · Mapa de ruta</div>
+      <div class="eyebrow"><span class="dot"></span><span id="map-eyebrow">Línea Operaciones · tu mapa de categorías</span></div>
+      <h2 class="h2">Tu ruta, completa.</h2>
+      <p class="lead">Tu categoría dice en qué liga estás. Tu grado, el paso dentro de ella. Toca cualquiera y mira qué significa para ti.</p>
+      <div class="map-shell glass">
+        <div class="map-scroll"><svg id="map" viewBox="0 0 1240 470" role="img" aria-label="Mapa de ruta de SEM a L6 con dos caminos en L2C"></svg></div>
+        <div class="legend">
+          <span><i style="background:rgba(187,231,255,.6)"></i>Recorrido</span>
+          <span><i style="background:var(--lime)"></i>Estás aquí</span>
+          <span><i style="border:1px dashed rgba(255,255,255,.6)"></i>Siguiente</span>
+          <span><i style="background:rgba(255,255,255,.15)"></i>Por delante</span>
+        </div>
+      </div>
+      <div class="map-grid">
+        <div class="node-panel glass" id="nodePanel" aria-live="polite"></div>
+        <div class="fork-card glass">
+          <span class="eyebrow">En L2C eliges cómo crecer</span>
+          <div class="fork">
+            <div><b>Liderar equipos</b>Gestión · L3A/B → L4A/B → L5. Lista para roles de esta categoría.</div>
+            <div><b>Profundizar</b>Experta · L3E → L4E (cima de oficio). Lista para roles de esta categoría.</div>
+          </div>
+          <p class="note" style="margin-top:14px">Si cambias de vía, conservas tu nivel y tu estatus.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- C -->
+    <section class="screen" id="s-next" role="tabpanel" aria-labelledby="t-next">
+      <div class="screen-tag">C · Detalle del siguiente paso</div>
+      <div class="detail">
+        <div class="near glass">
+          <div class="eyebrow"><span class="dot"></span><span id="n-eyebrow">Te falta poco</span></div>
+          <h2 class="h2" id="n-title">Hacia III.</h2>
+          <p class="lead" id="n-lead">Ya cumples 2 de 3 criterios. Sigues siendo Superior, a un paso de elegir cómo crecer.</p>
+          <div class="pair" style="margin-top:30px">
+            <div class="badge sm" id="n-from"></div><div class="arrow"></div><div class="badge sm" id="n-to"></div>
+            <span class="muted" id="n-pair" style="font-size:13px">L2B → L2C</span>
+          </div>
+          <div class="ring-prog">
+            <svg viewBox="0 0 150 150" width="150" height="150" aria-hidden="true">
+              <defs><linearGradient id="rg" x1="0" x2="1"><stop offset="0" stop-color="#BBE7FF"/><stop offset="1" stop-color="#fff"/></linearGradient></defs>
+              <circle cx="75" cy="75" r="64" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="6"/>
+              <circle class="ring-arc" id="n-arc" cx="75" cy="75" r="64" fill="none" stroke="url(#rg)" stroke-width="6" stroke-linecap="round" stroke-dasharray="402" stroke-dashoffset="402"/>
+            </svg>
+            <div class="rp-txt"><div><b id="n-count">2/3</b><small>criterios</small></div></div>
+          </div>
+        </div>
+        <div class="steps glass">
+          <div><span class="eyebrow">Lo que ya lograste</span><h3 class="h3" style="margin-top:8px" id="n-steps-t">Tu avance en esta etapa.</h3></div>
+          <div id="n-steps" style="display:grid;gap:12px"></div>
+          <div class="actions">
+            <button class="btn primary">Pedir mi siguiente paso</button>
+            <button class="btn">Hablar con mi líder</button>
+            <button class="btn">Ver criterios completos</button>
+          </div>
+          
+        </div>
+      </div>
+    </section>
+
+    <!-- D -->
+    <section class="screen" id="s-cel" role="tabpanel" aria-labelledby="t-cel">
+      <div class="screen-tag">D · Momento de celebración</div>
+      <div class="stage glass" id="stage">
+        <span class="pill ghost preview-pill" id="cel-preview">Vista previa · así se sentirá tu llegada a Elite</span>
+        <div class="bloom"></div><div class="halo"></div><div class="halo h2"></div>
+        <div id="sparks"></div>
+        <div class="cel-badge"><div class="badge xl" id="cel-badge"></div></div>
+        <div class="cel-copy">
+          <div class="eyebrow" id="cel-eyebrow">Nuevo estatus · L3</div>
+          <h2 class="h2" id="cel-title">Te damos la bienvenida a Elite.</h2>
+          <p class="lead" id="cel-lead">Tu trabajo habló por ti. Hoy celebramos esta categoría — ya estás lista para roles Elite.</p>
+          <div class="actions" style="justify-content:center;margin-top:28px">
+            <button class="btn primary">Guardar en mis momentos</button>
+            <button class="btn">Agradecer a mi líder</button>
+            <button class="btn" id="replay">Repetir</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer><b>Mock diseño · AJUSTA Kelly · no prod</b><br>Trading Solutions · Mi Ruta · premium por nivel · copy Bernabé v0.3.5 · Clásica→Referente · L4E techo Prestigio · no Casi Referente · perfiles ficticios</footer>
+
+<script>
+(()=>{
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* Escala A — STATUS_TAGS (Kelly). Rename 4ª/5ª aquí si cambia Prestigio/Referente. */
+const STATUS_TAGS={CLASICA:'Clásica',SUPERIOR:'Superior',ELITE:'Elite',PRESTIGIO:'Prestigio',REFERENTE:'Referente'};
+/* Official level → category key */
+const CAT_OF={SEM:'CLASICA',L1:'CLASICA',L2:'SUPERIOR',L3:'ELITE',L4:'PRESTIGIO',L5:'REFERENTE',L6:'REFERENTE'};
+/* Grade → Roman within category */
+const ROMAN={SEM:'I',L1A:'II',L1B:'III',L2A:'I',L2B:'II',L2C:'III',L3A:'I',L3B:'II',L3E:'III',L4A:'I',L4B:'II',L4E:'III',L5:'',L6:''};
+const TIERS=[
+  {k:'CLASICA',levels:['SEM','L1'],name:STATUS_TAGS.CLASICA,vibe:'Entras a la categoría',c:'var(--t-sem)',glow:'rgba(169,228,207,.28)',tier:'clasica',g:`<defs><linearGradient id="gS" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#E8FFF6"/><stop offset="50%" stop-color="#A9E4CF"/><stop offset="100%" stop-color="#5FAE96"/></linearGradient></defs><path d="M32 52 V28" stroke="url(#gS)" stroke-width="2.2" stroke-linecap="round"/><path d="M32 34c0-10 8-16 18-16 0 10-8 16-18 16Z" fill="url(#gS)"/><path d="M32 38c0-8-7-13-16-13 0 8 7 13 16 13Z" fill="url(#gS)" opacity=".9"/><circle cx="38" cy="24" r="1.3" fill="#fff" opacity=".8"/>`},
+  {k:'SUPERIOR',levels:['L2'],name:STATUS_TAGS.SUPERIOR,vibe:'Ya subiste de categoría',c:'#2F88EC',glow:'rgba(47,136,236,.28)',tier:'superior',g:`<defs><linearGradient id="gC" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stop-color="#2F88EC"/><stop offset="55%" stop-color="#BBE7FF"/><stop offset="100%" stop-color="#fff"/></linearGradient></defs><path d="M18 36 L32 22 L46 36" fill="none" stroke="url(#gC)" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 46 L32 32 L46 46" fill="none" stroke="url(#gC)" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" opacity=".72"/><path d="M24 30 L32 22 L36 26" fill="none" stroke="#BBE7FF" stroke-width="1.4" stroke-linecap="round" opacity=".5"/>`},
+  {k:'ELITE',levels:['L3'],name:STATUS_TAGS.ELITE,vibe:'Altura profesional',c:'var(--t-l3)',glow:'rgba(76,141,255,.30)',tier:'elite',g:`<defs><linearGradient id="dT" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fff"/><stop offset="40%" stop-color="#C8DCFF"/><stop offset="100%" stop-color="#4C8DFF"/></linearGradient><linearGradient id="dL" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9EC0FF"/><stop offset="100%" stop-color="#1E4FA8"/></linearGradient><linearGradient id="dR" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#E8F0FF"/><stop offset="100%" stop-color="#2F6FE0"/></linearGradient><linearGradient id="dB" x1=".5" y1="0" x2=".5" y2="1"><stop offset="0%" stop-color="#6AA0FF"/><stop offset="100%" stop-color="#0A457F"/></linearGradient></defs><polygon points="32,8 48,28 32,28" fill="url(#dT)"/><polygon points="32,8 16,28 32,28" fill="url(#dL)" opacity=".92"/><polygon points="16,28 32,28 32,56" fill="url(#dB)"/><polygon points="48,28 32,28 32,56" fill="url(#dR)"/><path d="M32 8 L48 28 L32 56 L16 28 Z" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1"/><path d="M20 24 L28 14" stroke="#fff" stroke-width="1.5" stroke-linecap="round" opacity=".7"/><circle cx="26" cy="16" r="1.2" fill="#fff"/>`},
+  {k:'PRESTIGIO',levels:['L4'],name:STATUS_TAGS.PRESTIGIO,vibe:'Categoría alta',c:'#C8D0DA',glow:'rgba(200,210,220,.28)',tier:'prestigio',g:`<defs><radialGradient id="st" cx="40%" cy="35%" r="65%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="45%" stop-color="#C8D0DA"/><stop offset="100%" stop-color="#6B7480"/></radialGradient></defs><path d="M32 6 L37.2 22.2 L54 24.2 L41.5 35.4 L45.2 52 L32 43.6 L18.8 52 L22.5 35.4 L10 24.2 L26.8 22.2 Z" fill="url(#st)" stroke="rgba(255,255,255,.7)" stroke-width="1"/><path d="M28 14 L34 12" stroke="#fff" stroke-width="1.4" stroke-linecap="round" opacity=".75"/><circle cx="30" cy="12" r="1.1" fill="#fff"/>`},
+  {k:'REFERENTE',levels:['L5','L6'],name:STATUS_TAGS.REFERENTE,vibe:'Cima de la escala',c:'#FFFFFF',glow:'rgba(255,255,255,.28)',tier:'referente',g:`<defs><radialGradient id="sun" cx="50%" cy="45%" r="50%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="45%" stop-color="#F8FAFC"/><stop offset="100%" stop-color="#C8D0DA"/></radialGradient><linearGradient id="hz" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="100%" stop-color="#C8D0DA"/></linearGradient></defs><circle cx="32" cy="30" r="11" fill="url(#sun)" stroke="rgba(255,255,255,.85)" stroke-width="1"/><g stroke="rgba(255,255,255,.8)" stroke-width="2" stroke-linecap="round"><path d="M32 12 V8"/><path d="M14 30 H10"/><path d="M54 30 H50"/><path d="M19.5 17.5 L16.5 14.5"/><path d="M44.5 17.5 L47.5 14.5"/></g><path d="M8 44 H56" stroke="url(#hz)" stroke-width="2.4" stroke-linecap="round"/><path d="M14 44c4-7 10-11 18-11s14 4 18 11" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1.5"/><circle cx="28" cy="26" r="1.4" fill="#FFFFFF" opacity=".9"/>`}
+];
+
+function levelKey(code){if(!code)return 'SEM'; if(code==='SEM'||code==='L5'||code==='L6')return code; return code.slice(0,2);}
+const tierOf = code => {if(TIERS.find(t=>t.k===code)) return TIERS.find(t=>t.k===code); const cat=CAT_OF[levelKey(code)]||'CLASICA'; return TIERS.find(t=>t.k===cat)||TIERS[0];};
+const tierIdx = code => TIERS.indexOf(tierOf(code));
+
+function nextCatName(P){
+  const order=['CLASICA','SUPERIOR','ELITE','PRESTIGIO','REFERENTE'];
+  const cur=tierOf(P.grade);
+  const i=order.indexOf(cur.k);
+  if(i<0||i>=order.length-1) return null;
+  return STATUS_TAGS[order[i+1]]||TIERS[i+1].name;
+}
+function logroLead(P){
+  const cur=tierOf(P.grade).name;
+  if(P.grade==='L4E') return 'Eres '+STATUS_TAGS.PRESTIGIO+' · cima de tu oficio. Lo estás logrando en profundidad — lista para roles de esta categoría.';
+  if(P.grade==='L5'||P.grade==='L6') return 'Eres '+STATUS_TAGS.REFERENTE+'. Cima de la escala. Tu criterio ya orienta el camino.';
+  const nxt=nextCatName(P);
+  if(!nxt) return 'Eres '+cur+'. Lo estás logrando.';
+  // Casi… grades still use same pattern toward next category
+  return 'Eres '+cur+'. Lo estás logrando: cada paso te acerca a '+nxt+', lista para roles de esa categoría.';
+}
+
+function gradeLabel(g){const t=tierOf(g); const r=ROMAN[g]||''; return r? (t.name+' · grado '+r) : t.name;}
+
+
+/* Official grades (Talía) — common lane + fork at L2C */
+const COMMON=['SEM','L1A','L1B','L2A','L2B','L2C'];
+const GEST=['L3A','L3B','L4A','L4B','L5','L6'];
+const EXP=['L3E','L4E'];
+const GRADE_INFO={
+  SEM:'Semillero: aprendices SENA y practicantes. Fuera de banda.',
+  L1A:'Primer grado profesional. Construyes base y autonomía.',L1B:'Autonomía en tu rol. Último grado de Clásica.',
+  L2A:'Profesional. Dominas tu proceso.',L2B:'Profesional con criterio propio. Apoyas a otras personas.',L2C:'Dos caminos: eliges Gestión o Experta.',
+  L3A:'Gestión · lideras un equipo.',L3B:'Gestión · lideras con más alcance.',L3E:'Experta · referente en tu oficio.',
+  L4A:'Gestión · lideras un área.',L4B:'Gestión · alcance ampliado del área.',L4E:'Experta · máxima profundidad técnica.',
+  L5:'C-Level. Liderazgo de la compañía.',L6:'Dirección General. Fuera de banda.'
+};
+
+const PROFILES={
+  me:{demo:false,name:'Andrea Orejarena',initials:'AO',line:'Operaciones',grade:'L2B',track:'common',next:'L2C',since:'Desde marzo 2026',
+      title:'Continúas<br>en ruta.',lead:'Eres Superior. Lo estás logrando: cada paso te acerca a Elite, lista para roles de esa categoría.',
+      crit:[['Tiempo en el grado','Cumplido · 12 meses',1],['Desempeño alto en 2 ciclos','Cumplido · sep 2026',1],['Proyecto de transferencia de conocimiento','En curso con tu líder',0]],
+      moment:['Te damos la bienvenida a Superior.','Marzo 2026 · grado I. Un momento que vale la pena recordar.']},
+  'ops-l2c':{demo:true,label:'Ejemplo: Operaciones L2C',initials:'L2C',line:'Operaciones',grade:'L2C',track:'common',next:'L3',since:'Ejemplo de rol',
+      title:'Casi<br>Elite.',lead:'Eliges con tu líder: liderar o profundizar. Las dos llegan a Elite.',
+      crit:[['Tiempo en L2C','Cumplido',1],['Desempeño alto en 2 ciclos','Cumplido',1],['Lista para roles de Elite','En camino',0]],
+      moment:['Te damos la bienvenida a este paso.','Ejemplo · L2C. Un paso que pocos dan.']},
+  'ppl-l1a':{demo:true,label:'Ejemplo: People L1A',initials:'L1A',line:'People',grade:'L1A',track:'common',next:'L1B',since:'Ejemplo de rol',
+      title:'Ya estás<br>en movimiento.',lead:'Eres Clásica · grado II. Cada logro suma autonomía en tu rol.',
+      crit:[['Tiempo en el grado','Cumplido',1],['Desempeño sólido o superior','En evaluación',0],['Formación base de People','En curso',0]],
+      moment:['Te damos la bienvenida a Clásica.','Ejemplo · grado II. El viaje ya empezó.']},
+  'ops-sem':{demo:true,label:'Ejemplo: Operaciones SEM',initials:'SEM',line:'Operaciones',grade:'SEM',track:'common',next:'L1A',since:'Ejemplo de rol',
+      title:'Empiezas<br>el viaje.',lead:'Eres Clásica. Entras a la categoría — con un equipo que te acompaña.',
+      crit:[['Plan de aprendizaje','Cumplido',1],['Cierre de práctica o etapa SENA','En curso',0],['Evidencia de rol de entrada','En camino',0]],
+      moment:['Te damos la bienvenida.','Ejemplo · SEM. Tu primer día en la ruta.']},
+  'ops-l3e':{demo:true,label:'Ejemplo: Operaciones L3E',initials:'L3E',line:'Operaciones',grade:'L3E',track:'E',next:'L4E',since:'Ejemplo de rol',
+      title:'Altura<br>profesional.',lead:'Eres Elite. Lo estás logrando: cada paso te acerca a Prestigio, lista para roles de esa categoría.',
+      crit:[['Tiempo en el grado','Cumplido',1],['Desempeño alto en 2 ciclos','Cumplido',1],['Lista para roles Prestigio Experta','En camino',0]],
+      moment:['Te damos la bienvenida a Elite.','Ejemplo · L3E. Altura profesional por la vía Experta.']},
+  'ops-l4b':{demo:true,label:'Ejemplo: Prestigio Gestión L4B',initials:'L4B',line:'Operaciones',grade:'L4B',track:'G',next:'L5',since:'Ejemplo de rol',
+      title:'Prestigio ·<br>lideras un área.',lead:'Eres Prestigio. Lo estás logrando: cada paso te acerca a Referente, lista para roles de esa categoría.',
+      crit:[['Tiempo en el grado','Cumplido',1],['Desempeño alto en 2 ciclos','Cumplido',1],['Alcance de área','En camino',0]],
+      moment:['Te damos la bienvenida a Prestigio.','Ejemplo · L4B. Gestión · Casi Referente.']},
+  'ops-l4e':{demo:true,label:'Ejemplo: Prestigio Experta L4E',initials:'L4E',line:'Operaciones',grade:'L4E',track:'E',next:'L4E',since:'Ejemplo de rol',
+      title:'Prestigio ·<br>cima de tu oficio.',lead:'Celebramos la profundidad de tu oficio.',
+      crit:[['Tiempo en el grado','Cumplido',1],['Desempeño alto en 2 ciclos','Cumplido',1],['Reconocimiento de Comité','Cumplido',1]],
+      moment:['Te damos la bienvenida a Prestigio.','Ejemplo · L4E. Cima técnica · mismo estatus Prestigio.']},
+  'ops-l5':{demo:true,label:'Ejemplo: Referente',initials:'L5',line:'Operaciones',grade:'L5',track:'G',next:'L6',since:'Ejemplo de rol',
+      title:'Referente.',lead:'Cima de la escala. Tu criterio ya orienta el camino. Sin grados internos.',
+      crit:[['Mandato de liderazgo','Cumplido',1],['Resultados de compañía','En ciclo',0],['Sucesión activa','En curso',0]],
+      moment:['Te damos la bienvenida a Referente.','Ejemplo · L5. Liderazgo de la compañía.']}
+};
+let P=PROFILES.me;
+
+const $=s=>document.querySelector(s);
+const badge=(el,code,{here=false,dim=false}={})=>{const t=tierOf(code);el.style.setProperty('--c',t.c);el.classList.toggle('dim',dim);
+  el.innerHTML='<div class="core"></div><svg class="glyph" viewBox="0 0 64 64" fill="none" aria-hidden="true">'+t.g+'</svg>'+(here?'<span class="here" title="Estás aquí"></span>':'');el.setAttribute('aria-label','Estatus '+t.name);return el;};
+const check='<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#BBE7FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3 4.7-5"/></svg>';
+
+
+
+
+/* Bernabé v0.2 + Talía: Casi/Hacia Escala A; L4E never Casi Referente; never promise promo */
+function isLastGrade(g){
+  return g==='L1B'||g==='L2C'||g==='L3B'||g==='L3E'||g==='L4B'||g==='L4E';
+}
+function nextRoman(g){
+  const order=['SEM','L1A','L1B','L2A','L2B','L2C','L3A','L3B','L3E','L4A','L4B','L4E','L5','L6'];
+  /* Hacia within category uses II/III */
+  const map={SEM:'II',L1A:'III',L2A:'II',L2B:'III',L3A:'II',L4A:'II'};
+  return map[g]||'';
+}
+function tierSubCopy(P,n){
+  if(P.grade==='L2C') return 'Casi '+STATUS_TAGS.ELITE;
+  if(P.grade==='L4B') return 'Casi '+STATUS_TAGS.REFERENTE;
+  if(P.grade==='L4E') return STATUS_TAGS.PRESTIGIO+' · cima de tu oficio';
+  if(P.grade==='L3B'||P.grade==='L3E') return 'Casi '+STATUS_TAGS.PRESTIGIO;
+  if(P.grade==='L1B') return 'Casi '+STATUS_TAGS.SUPERIOR;
+  if(P.grade==='L5'||P.grade==='L6') return STATUS_TAGS.REFERENTE;
+  const nr=nextRoman(P.grade);
+  return nr? ('Hacia '+nr) : ('Hacia '+(P.next||''));
+}
+
+/* next-step: "Casi X" only when next changes status AND not L4E techo Experta */
+function nextInfo(){
+  const cur=tierOf(P.grade), nxtCode=P.next, nxtTier=nxtCode?tierOf(nxtCode):cur;
+  const changes=nxtCode && nxtTier.k!==cur.k;
+  let label;
+  if(P.grade==='L4E') label=STATUS_TAGS.PRESTIGIO+' · cima de tu oficio';
+  else if(P.grade==='L5'||P.grade==='L6') label=STATUS_TAGS.REFERENTE;
+  else if(P.grade==='L2C') label='Casi '+STATUS_TAGS.ELITE;
+  else if(P.grade==='L4B') label='Casi '+STATUS_TAGS.REFERENTE;
+  else if(P.grade==='L3B'||P.grade==='L3E') label='Casi '+STATUS_TAGS.PRESTIGIO;
+  else if(P.grade==='L1B') label='Casi '+STATUS_TAGS.SUPERIOR;
+  else {
+    const nr=nextRoman(P.grade);
+    label=nr?('Hacia '+nr):('Hacia '+(nxtCode||''));
+  }
+  const pair = P.grade+' → '+(nxtCode?(nxtCode.length===2?nxtCode+(P.grade==='L2C'?' (A o E)':''):nxtCode):'—');
+  return {cur,nxtTier,changes,label,pair};
+}
+
+
+function renderHome(){
+  const t=tierOf(P.grade), n=nextInfo(), met=P.crit.filter(c=>c[2]).length;
+  $('#h-eyebrow').textContent='Tu lugar en Mi Ruta';
+  $('#h-title').innerHTML=P.title; $('#h-lead').textContent=logroLead(P);
+  $('#h-pill').textContent=t.name+' · '+gradeLabel(P.grade); $('#h-since').textContent=P.since;
+  document.querySelector('.hero-main').style.setProperty('--tier-glow',t.glow);
+  badge($('#h-badge'),P.grade,{here:true}); $('#h-tier').textContent=t.name; $('#h-tier-sub').textContent=tierSubCopy(P,n);
+  $('#p-title').textContent=n.label; $('#p-count').textContent=met+' de '+P.crit.length+' criterios';
+  $('#p-segs').innerHTML=P.crit.map(c=>'<div class="seg'+(c[2]?' on':'')+'"></div>').join('');
+  $('#p-crit').innerHTML=P.crit.map(c=>'<li><span class="ck'+(c[2]?' met':'')+'">'+check+'</span><span>'+c[0]+'<br><small class="muted">'+c[1]+'</small></span></li>').join('');
+  const ci=tierIdx(P.grade);
+  $('#cont').innerHTML=''; TIERS.forEach((tt,i)=>{const d=document.createElement('div');d.className='cont-item'+(i===ci?' cur':i>ci?' future':'');
+    const b=document.createElement('div');b.className='badge sm';badge(b,tt.k,{here:i===ci,dim:i>ci});d.appendChild(b);
+    d.insertAdjacentHTML('beforeend','<b>'+tt.name+'</b><small>'+tt.k+(tt.k==='SEM'||tt.k==='L6'?'':'')+'</small>');$('#cont').appendChild(d);});
+  $('#m1-t').textContent=P.grade==='L4E'?(STATUS_TAGS.PRESTIGIO+' · cima de tu oficio.'):P.grade==='L2C'?'III · elige tu camino.':(n.changes?n.label+'.':(P.next?P.next+'.':n.label+'.'));
+  $('#m1-p').textContent=(function(left){return left===0?'Tu líder te acompaña. Pedir mi siguiente paso cuando quieras.':left===1?'Te falta un criterio. Tu líder te acompaña. Pedir mi siguiente paso cuando quieras.':'Te faltan '+left+' criterios. Tu líder te acompaña. Pedir mi siguiente paso cuando quieras.';})(P.crit.length-met);
+  $('#m3-t').textContent=P.moment[0]; $('#m3-p').textContent=P.moment[1];
+}
+
+/* ---------- map ---------- */
+const POS={SEM:[70,250],L1A:[190,250],L1B:[285,250],L2A:[395,250],L2B:[485,250],L2C:[575,250],
+  L3A:[690,165],L3B:[785,165],L4A:[890,165],L4B:[985,165],L5:[1085,165],L6:[1180,165],L3E:[735,360],L4E:[935,360]};
+const BANDS=[['CLASICA',20,280],['SUPERIOR',290,520],['ELITE',530,760],['PRESTIGIO',770,1000],['REFERENTE',1010,1225]];
+const ORDER=[...COMMON,'L3A','L3B','L4A','L4B','L5','L6'];
+function stateOf(g){
+  const path = P.track==='E' ? [...COMMON,...EXP] : ORDER;
+  const ci=path.indexOf(P.grade), gi=path.indexOf(g);
+  if(g===P.grade) return 'cur';
+  if(gi>-1 && gi<ci) return 'done';
+  if(P.grade==='L2C' && (g==='L3A'||g==='L3E')) return 'next';
+  if(gi===ci+1 && gi>-1) return 'next';
+  return 'ahead';
+}
+function renderMap(){
+  const svg=$('#map'), ns='http://www.w3.org/2000/svg';
+  let h='<defs><linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="rgba(187,231,255,.7)"/><stop offset="1" stop-color="rgba(187,231,255,.15)"/></linearGradient><filter id="gl"><feGaussianBlur stdDeviation="6"/></filter></defs>';
+  BANDS.forEach(([k,x1,x2],i)=>{const t=tierOf(k),cur=tierIdx(P.grade)===i;
+    h+='<rect x="'+x1+'" y="40" width="'+(x2-x1)+'" height="400" rx="22" fill="rgba(255,255,255,'+(cur?.06:.022)+')" stroke="rgba(255,255,255,'+(cur?.18:.05)+')"/>';
+    h+='<text x="'+((x1+x2)/2)+'" y="72" text-anchor="middle" font-size="15" font-weight="600" fill="'+(cur?'#fff':'rgba(245,247,250,.6)')+'">'+t.name+'</text>';
+    h+='<text x="'+((x1+x2)/2)+'" y="92" text-anchor="middle" font-size="11" fill="rgba(245,247,250,.38)">'+k+'</text>';});
+  const line=(a,b)=>{const[x1,y1]=POS[a],[x2,y2]=POS[b];const done=stateOf(b)==='done'||stateOf(b)==='cur';
+    const d=y1===y2?'M'+x1+' '+y1+' L'+x2+' '+y2:'M'+x1+' '+y1+' C'+(x1+70)+' '+y1+' '+(x2-70)+' '+y2+' '+x2+' '+y2;
+    return '<path d="'+d+'" fill="none" stroke="'+(done?'rgba(187,231,255,.75)':'rgba(255,255,255,.16)')+'" stroke-width="'+(done?2:1.2)+'" '+(done?'':'stroke-dasharray="3 6"')+'/>';};
+  for(let i=0;i<COMMON.length-1;i++) h+=line(COMMON[i],COMMON[i+1]);
+  h+=line('L2C','L3A'); for(let i=0;i<GEST.length-1;i++) h+=line(GEST[i],GEST[i+1]);
+  h+=line('L2C','L3E'); h+=line('L3E','L4E');
+  h+='<text x="660" y="200" font-size="11" fill="rgba(245,247,250,.5)">Vía Gestión</text>';
+  h+='<text x="690" y="420" font-size="11" fill="rgba(245,247,250,.5)">Vía Experta</text>';
+  h+='<text x="575" y="224" text-anchor="middle" font-size="11" fill="rgba(245,247,250,.5)">Dos caminos</text>';
+  Object.keys(POS).forEach(g=>{const[x,y]=POS[g],s=stateOf(g);
+    const fill=s==='done'?'rgba(187,231,255,.55)':s==='cur'?'rgba(255,255,255,.95)':'rgba(255,255,255,.07)';
+    const stroke=s==='next'?'rgba(255,255,255,.7)':s==='ahead'?'rgba(255,255,255,.2)':'rgba(255,255,255,.6)';
+    h+='<g class="node" tabindex="0" role="button" data-g="'+g+'" aria-label="'+gradeLabel(g)+' · '+tierOf(g).name+'">';
+    if(s==='cur') h+='<circle cx="'+x+'" cy="'+y+'" r="22" fill="rgba(187,231,255,.35)" filter="url(#gl)"/>';
+    h+='<circle class="ring" cx="'+x+'" cy="'+y+'" r="'+(s==='cur'?13:10)+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="1.4" '+(s==='next'?'stroke-dasharray="3 3"':'')+'/>';
+    if(s==='cur') h+='<circle cx="'+(x+11)+'" cy="'+(y-11)+'" r="4" fill="#C7ED00" stroke="#05070d" stroke-width="2"/>';
+    h+='<text x="'+x+'" y="'+(y+(y===165?-22:34))+'" text-anchor="middle" font-size="12" font-weight="'+(s==='cur'?700:500)+'" fill="'+(s==='ahead'?'rgba(245,247,250,.45)':'#fff')+'">'+g+'</text>';
+    if(s==='cur') h+='<text x="'+x+'" y="'+(y+52)+'" text-anchor="middle" font-size="11" fill="#C7ED00">Estás aquí</text>';
+    h+='</g>';});
+  svg.innerHTML=h;
+  svg.querySelectorAll('.node').forEach(n=>{const f=()=>showNode(n.dataset.g);n.addEventListener('click',f);n.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();f();}});});
+  $('#map-eyebrow').textContent='Línea '+P.line+' · tu mapa de categorías';
+  showNode(P.grade);
+}
+function showNode(g){
+  const t=tierOf(g),s=stateOf(g),lab={cur:'Estás aquí',done:'Recorrido',next:'Tu siguiente paso',ahead:'Por delante'}[s];
+  const p=$('#nodePanel');p.innerHTML='';const b=document.createElement('div');b.className='badge';b.style.setProperty('--s','84px');badge(b,g,{here:s==='cur',dim:s==='ahead'});p.appendChild(b);
+  p.insertAdjacentHTML('beforeend','<div><span class="eyebrow">'+lab+'</span><h3 class="h3" style="margin-top:6px;font-size:26px">'+t.name+' · '+gradeLabel(g)+'</h3><p class="muted" style="margin:8px 0 0">'+GRADE_INFO[g]+'</p><p class="note" style="margin-top:10px">'+t.vibe+'.</p></div>');
+}
+
+/* ---------- detail ---------- */
+function renderNext(){
+  const n=nextInfo(),met=P.crit.filter(c=>c[2]).length,tot=P.crit.length;
+  $('#n-title').textContent=n.label+'.';
+  $('#n-eyebrow').textContent=P.grade==='L4E'?(STATUS_TAGS.PRESTIGIO+' · cima de tu oficio'):(n.changes?'Tu siguiente categoría':'Avanzas dentro de '+n.cur.name);
+  let lead='Ya cumples '+met+' de '+tot+' criterios. ';
+  if(P.grade==='L4E') lead+='Estás en la cima técnica de Prestigio. Referente es otro camino — y eso también se celebra.';
+  else if(n.changes) lead+='Al completarlos llegas a '+n.nxtTier.name+'. '+(P.grade==='L2B'?'A un paso de elegir cómo crecer.':'');
+  else lead+='Sigues siendo '+n.cur.name+' y continúas avanzando. '+(P.grade==='L2B'?'A un paso de elegir cómo crecer.':'');
+  $('#n-lead').textContent=lead;
+  badge($('#n-from'),P.grade);
+  const toCode=P.next||P.grade;
+  badge($('#n-to'),toCode,{dim:!!P.next}); $('#n-pair').textContent=n.pair;
+  $('#n-count').textContent=met+'/'+tot;
+  const arc=$('#n-arc'); arc.style.strokeDashoffset=402; requestAnimationFrame(()=>requestAnimationFrame(()=>arc.style.strokeDashoffset=402*(1-met/tot)));
+  $('#n-steps').innerHTML=P.crit.map(c=>'<div class="step'+(c[2]?'':' pending')+'"><span class="ck'+(c[2]?' met':'')+'">'+check+'</span><div><b>'+c[0]+'</b><span>'+c[1]+'</span></div></div>').join('');
+}
+
+/* ---------- celebrate ---------- */
+function renderCel(){
+  const n=nextInfo(); const target = n.changes ? n.nxtTier : TIERS[Math.min(tierIdx(P.grade)+1,6)];
+  badge($('#cel-badge'),target.k);
+  $('#stage').style.setProperty('--cel-c',target.c);
+  $('#cel-preview').textContent='Vista previa · así se sentirá tu llegada a '+target.name;
+  $('#cel-eyebrow').textContent='Nuevo estatus · '+target.k;
+  $('#cel-title').textContent='Te damos la bienvenida a '+target.name+'.'; /* Bernabé */
+  const leads={SEM:'Eres Clásica. Entras a la categoría.',L1:'Eres Clásica. Ya estás en movimiento.',L2:'Eres Superior. Tu trabajo ya habla por ti.',L3:'Tu trabajo habló por ti. Hoy celebramos esta categoría — ya estás lista para roles Elite.',L4:'Tu oficio ya tiene peso. Lista para roles de esta categoría.',L5:'Referente. Cima de la escala. Sin grados internos.',L6:'Referente. Cima de la escala. Sin grados internos.'};
+  $('#cel-lead').textContent=leads[target.k];
+  const sp=$('#sparks'); sp.innerHTML='';
+  if(!reduce){for(let i=0;i<18;i++){const s=document.createElement('span');s.className='spark'+(i%6===0?' l':'');const a=Math.random()*Math.PI*2,r=140+Math.random()*220;
+    s.style.left='50%';s.style.top='44%';s.style.setProperty('--dx',Math.cos(a)*r+'px');s.style.setProperty('--dy',Math.sin(a)*r+'px');s.style.animationDelay=(.3+Math.random()*.8)+'s';sp.appendChild(s);}}
+}
+function play(){const st=$('#stage');st.classList.remove('play');void st.offsetWidth;renderCel();st.classList.add('play');}
+$('#replay').addEventListener('click',play);
+
+/* ---------- tabs ---------- */
+const tabs=[...document.querySelectorAll('.tab')];
+function go(id){tabs.forEach(t=>{const on=t.getAttribute('aria-controls')===id;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));
+  if(id==='s-next')renderNext(); if(id==='s-cel')play(); if(id==='s-map')renderMap();
+  window.scrollTo({top:0,behavior:reduce?'auto':'smooth'});}
+tabs.forEach((t,i)=>{t.addEventListener('click',()=>go(t.getAttribute('aria-controls')));
+  t.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='ArrowLeft'){const j=(i+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;tabs[j].focus();go(tabs[j].getAttribute('aria-controls'));}});});
+document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>go({next:'s-next',map:'s-map',cel:'s-cel'}[b.dataset.go])));
+
+/* ---------- profile / demo HR ---------- */
+const demoBtn=$('#demoBtn'),pop=$('#demoPop'),sel=$('#demoSel');
+demoBtn.addEventListener('click',()=>{const o=!pop.classList.contains('open');pop.classList.toggle('open',o);demoBtn.setAttribute('aria-expanded',o);});
+document.addEventListener('click',e=>{if(!e.target.closest('.demo-toggle')){pop.classList.remove('open');demoBtn.setAttribute('aria-expanded',false);}});
+function applyTier(){const t=tierOf(P.grade);document.body.dataset.tier=t.tier||'superior';}
+function setProfile(k){P=PROFILES[k];sel.value=k;document.body.classList.toggle('is-demo',P.demo);
+  $('#me-label').textContent=P.demo?'Modo demo HR':'Tu perfil';$('#me-name').textContent=P.demo?P.label:P.name;
+  $('#avatar').textContent=P.initials;$('#avatar').classList.toggle('demo',P.demo);$('#demoFlagTxt').textContent=P.demo?P.label:'';
+  applyTier();renderHome();const a=document.querySelector('.screen.active').id;if(a!=='s-home')go(a);}
+sel.addEventListener('change',()=>{setProfile(sel.value);pop.classList.remove('open');demoBtn.setAttribute('aria-expanded',false);});
+$('#demoExit').addEventListener('click',()=>setProfile('me'));
+setProfile('me');
+const q=new URLSearchParams(location.search);if(q.get('p')&&PROFILES[q.get('p')])setProfile(q.get('p'));if(q.get('tab'))go('s-'+q.get('tab'));
+})();
+</script>
+</body>
+</html>
