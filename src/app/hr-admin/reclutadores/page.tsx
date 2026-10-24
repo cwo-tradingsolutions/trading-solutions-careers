@@ -179,11 +179,11 @@ export default function EquipoDeTalent() {
   );
 
   return (
-    <div className="max-w-[1180px] mx-auto px-5 py-7">
+    <div className="max-w-ts mx-auto px-5 py-6">
       <div className="flex flex-wrap items-end gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-[2px] text-gray-500">Talent · Trading Solutions</div>
-          <h1 className="text-[32px] font-extrabold tracking-tight leading-none mt-1">Equipo y dueños de vacante</h1>
+          <div className="text-sm font-medium text-ts-muted">Talent · Trading Solutions</div>
+          <h1 className="text-[32px] font-light tracking-tight leading-none mt-1">Equipo y dueños de vacante</h1>
           <p className="text-sm text-gray-500 mt-2 max-w-[70ch]">
             El dueño responde por el proceso: sus métricas, sus correos y su agenda. El apoyo puede operar la vacante
             igual, sin aparecer frente al candidato.

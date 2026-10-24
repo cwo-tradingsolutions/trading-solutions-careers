@@ -1,296 +1,337 @@
+@import "../styles/universe-tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ════════════════════════════════════════════════════════════
-   TS Design System · alineado con tradingsolutions.com
-   y reportes editoriales Talento Q1 2026
+   Universe digital system
+   Tokens live in src/styles/universe-tokens.css.
+   Display ~300. Body ~500. Inter / system-ui.
    ════════════════════════════════════════════════════════════ */
-:root {
-  /* Negros y grises (neutros profundos · NO neón) */
-  --ts-black: #0a0a0a;
-  --ts-near-black: #1a1a1a;
-  --ts-dark: #2a2a2a;
-  --ts-gray-90: #404040;
-  --ts-gray-60: #737373;
-  --ts-gray-40: #a3a3a3;
-  --ts-gray-20: #d4d4d4;
-  --ts-gray-10: #e8e8e8;
-  --ts-gray-05: #f5f5f5;
-  --ts-white: #ffffff;
-  /* Status colors (corporativos · sin neón) */
-  --ts-red: #c41818;
-  --ts-red-bg: #fef5f5;
-  --ts-red-border: #fcc;
-  --ts-green: #1a7d3e;
-  --ts-green-bg: #e8f5ee;
-  --ts-green-border: #c8e6d2;
-  --ts-amber: #b45309;
-  --ts-amber-bg: #fef4e8;
-  --ts-amber-border: #fbd9b2;
-  --ts-blue: #1e40af;
-  --ts-blue-bg: #eef3ff;
-  --ts-blue-border: #d4dffd;
-}
 
 @layer base {
   html { scroll-behavior: smooth; }
   body {
-    font-family: 'Open Sauce Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #fafafa;
-    color: var(--ts-black);
-    font-weight: 400;
+    font-family: var(--ts-font-sans);
+    background: var(--ts-canvas);
+    color: var(--ts-ink);
+    font-weight: 500;
     line-height: 1.5;
-    letter-spacing: -0.005em;
+    letter-spacing: -0.011em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 }
 
-/* Utility classes alineadas con el sistema de reportes */
 @layer utilities {
+  /* Quiet label. Sentence case — no tracked capitals. */
   .ts-eyebrow {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 2.5px;
-    text-transform: uppercase;
-    color: var(--ts-gray-60);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ts-ink-secondary);
+  }
+  .ts-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ts-ink-secondary);
+  }
+  .ts-kicker-on-dark { color: rgba(255, 255, 255, 0.82); }
+  /* Lima dot. Only place this on a dark surface. */
+  .ts-mark {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--ts-highlight);
+    display: inline-block;
+    flex-shrink: 0;
   }
   .ts-display {
-    font-weight: 900;
+    font-weight: 300;
     letter-spacing: -0.03em;
     line-height: 0.95;
   }
   .ts-heading {
-    font-weight: 800;
+    font-weight: 300;
     letter-spacing: -0.02em;
-    line-height: 1.1;
+    line-height: 1.15;
   }
   .ts-tabular { font-variant-numeric: tabular-nums; }
 }
 
 @layer components {
   .pill-btn {
-    @apply inline-flex items-center gap-2 px-7 py-3.5 rounded-full font-medium text-sm transition-all duration-300 cursor-pointer border-none;
+    @apply inline-flex items-center gap-2 px-7 py-3.5 font-medium text-sm transition-all duration-300 cursor-pointer border-none;
+    border-radius: var(--ts-radius-md);
   }
-  .pill-btn-primary { @apply bg-black text-white hover:bg-neutral-800; }
-  .pill-btn-outline { @apply bg-white text-black border border-black hover:bg-black hover:text-white; }
-  .pill-btn-white { @apply bg-white text-black hover:bg-gray-100; }
+  .pill-btn-primary {
+    background: var(--ts-accent);
+    color: var(--ts-surface);
+  }
+  .pill-btn-primary:hover { background: var(--ts-accent-hover); }
+  .pill-btn-outline {
+    background: var(--ts-surface);
+    color: var(--ts-ink);
+    border: 1px solid var(--ts-ink);
+  }
+  .pill-btn-outline:hover {
+    background: var(--ts-ink);
+    color: var(--ts-surface);
+  }
+  .pill-btn-white {
+    background: var(--ts-surface);
+    color: var(--ts-ink);
+  }
+  .pill-btn-white:hover { background: var(--ts-canvas); }
 
   .tag {
-    @apply inline-flex px-3.5 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200;
+    @apply inline-flex px-3 py-1 text-xs font-medium border;
+    border-radius: var(--ts-radius-sm);
+    background: var(--ts-canvas);
+    color: var(--ts-ink-secondary);
+    border-color: var(--ts-line);
   }
 
   .input-field {
-    @apply w-full px-4 py-3.5 bg-gray-100 border-2 border-transparent rounded-xl text-sm font-sans transition-all outline-none focus:border-black focus:bg-white;
+    @apply w-full px-4 py-3.5 text-sm font-sans transition-all outline-none;
+    border-radius: var(--ts-radius-sm);
+    background: var(--ts-canvas);
+    border: 1px solid transparent;
+    color: var(--ts-ink);
+  }
+  .input-field:focus {
+    border-color: var(--ts-accent);
+    background: var(--ts-surface);
   }
 
   .filter-chip {
-    @apply px-4 py-2 rounded-full text-sm font-medium border border-gray-300 bg-white text-gray-600 cursor-pointer transition-all hover:bg-black hover:text-white hover:border-black;
+    @apply px-4 py-2 text-sm font-medium cursor-pointer transition-all;
+    border-radius: var(--ts-radius-sm);
+    border: 1px solid var(--ts-line);
+    background: var(--ts-surface);
+    color: var(--ts-ink-secondary);
   }
-  .filter-chip.active { @apply bg-black text-white border-black; }
+  .filter-chip:hover {
+    border-color: var(--ts-accent);
+    color: var(--ts-accent);
+  }
+  .filter-chip.active {
+    background: var(--ts-accent);
+    color: var(--ts-surface);
+    border-color: var(--ts-accent);
+  }
 
   .section-title {
     font-size: clamp(1.8rem, 4vw, 3.2rem);
     line-height: 1.1;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    font-weight: 300;
+    letter-spacing: -0.03em;
   }
 
   .hero-text {
-    font-size: clamp(2.5rem, 6vw, 5rem);
-    line-height: 1.05;
-    font-weight: 800;
-    letter-spacing: -0.03em;
+    font-size: clamp(2.6rem, 6vw, 5rem);
+    line-height: 1.02;
+    font-weight: 300;
+    letter-spacing: -0.035em;
   }
 
   .stat-number {
     font-size: clamp(2.5rem, 5vw, 4rem);
-    font-weight: 800;
+    font-weight: 300;
     letter-spacing: -0.03em;
     line-height: 1;
   }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   HR PANEL · lenguaje visual del sistema operativo
-   28-ago-2026 · Kelly eligió esta dirección sobre la de careers.
+   HR shell · data-ui="universe"
+   The public site does not set this attribute. Inside the shell the
+   same tokens apply with slightly denser controls, and the utility
+   overrides restyle the existing Tailwind classes in one pass.
 
-   POR QUÉ ESTÁ ACOTADO A [data-ui="apple"]
-   La página pública y el panel comparten esta hoja y la config de
-   Tailwind. La página de empleo tiene que seguir siendo la de la marca
-   —Open Sauce Sans, esquinas rectas, negro pleno—, así que todo esto
-   cuelga de un atributo que solo pone el panel. Sacarlo devuelve el
-   panel a como estaba, sin tocar nada más.
-
-   POR QUÉ REDEFINE UTILIDADES DE TAILWIND
-   El panel tiene ~800 lugares con bg-white, border-gray-200, rounded-lg
-   escritos a mano en 8.500 líneas. Redefinir qué significan esas clases
-   dentro del panel cambia las pantallas de una vez y de forma pareja;
-   convertirlas una por una habría tomado semanas y dejado mitad y mitad
-   durante el camino. Cada regla gana por especificidad (0,2,0), no con
-   !important, así que una clase puesta después en el JSX sigue mandando.
-
-   Es un solo tema, claro, a propósito: el panel se usa de día en una
-   oficina y no tiene modo oscuro.
+   Primary actions (button.bg-black / a.bg-black) pick up Aqua.
+   Large dark surfaces that are div.bg-black stay Void via --ts-black.
+   Lima is not applied here as a page fill.
    ══════════════════════════════════════════════════════════════════ */
 
-[data-ui="apple"] {
-  --sup:        #ffffff;   /* tarjetas */
-  --sup-1:      #fbfbfc;   /* tarjeta apenas hundida */
-  --fondo:      #f2f2f4;   /* fondo de página */
-  --texto:      #0a0a0a;   /* el negro de Trading Solutions, sin cambios */
-  --texto-2:    #6e6e73;
-  --texto-3:    #8e8e93;
-  --sep:        rgba(10, 10, 10, 0.09);
-  --relleno:    rgba(10, 10, 10, 0.05);
-  --barra:      rgba(255, 255, 255, 0.72);
+[data-ui="universe"] {
+  --sup: var(--ts-surface);
+  --sup-1: var(--ts-canvas);
+  --fondo: var(--ts-canvas);
+  --texto: var(--ts-ink);
+  --texto-2: var(--ts-muted);
+  --texto-3: var(--ts-muted);
+  --sep: var(--ts-line);
+  --relleno: rgba(8, 20, 32, 0.05);
+  --barra: var(--ts-surface);
 
-  /* Los colores de estado son los de la marca. No se tocan: son los que
-     dicen si un candidato está dentro o fuera del SLA. */
-  --ok:    #1a7d3e;  --ok-t:    #e6f3ec;
-  --alerta:#b45309;  --alerta-t:#fbf0e2;
-  --mal:   #c41818;  --mal-t:   #fbeaea;
+  --ok: var(--ts-green);
+  --ok-t: var(--ts-green-bg);
+  --alerta: var(--ts-amber);
+  --alerta-t: var(--ts-amber-bg);
+  --mal: var(--ts-red);
+  --mal-t: var(--ts-red-bg);
 
-  --sombra-1: 0 1px 2px rgba(10,10,10,.05), 0 8px 24px -12px rgba(10,10,10,.16);
+  --sombra-1: 0 1px 2px rgba(8, 20, 32, 0.05), 0 8px 24px -12px rgba(8, 20, 32, 0.16);
 
-  background: var(--fondo);
-  color: var(--texto);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-               "Helvetica Neue", Helvetica, Arial, sans-serif;
-  letter-spacing: -0.01em;
+  background: var(--ts-canvas);
+  color: var(--ts-ink);
+  font-family: var(--ts-font-sans);
+  font-weight: 500;
+  letter-spacing: -0.011em;
 }
 
-/* ── Superficies ── */
-[data-ui="apple"] .bg-white     { background-color: var(--sup); }
-[data-ui="apple"] .bg-gray-50   { background-color: var(--sup-1); }
-[data-ui="apple"] .bg-gray-100  { background-color: var(--relleno); }
+[data-ui="universe"] .bg-white     { background-color: var(--sup); }
+[data-ui="universe"] .bg-gray-50   { background-color: var(--sup-1); }
+[data-ui="universe"] .bg-gray-100  { background-color: var(--relleno); }
+[data-ui="universe"] .bg-black     { background-color: var(--ts-ink); }
 
-/* ── Separadores: hairline, no borde ── */
-[data-ui="apple"] .border-gray-100,
-[data-ui="apple"] .border-gray-200,
-[data-ui="apple"] .border-gray-300 { border-color: var(--sep); }
-
-/* ── Texto secundario ── */
-[data-ui="apple"] .text-gray-400 { color: var(--texto-3); }
-[data-ui="apple"] .text-gray-500,
-[data-ui="apple"] .text-gray-600 { color: var(--texto-2); }
-
-/* ── Radios: más suaves y más parejos ── */
-[data-ui="apple"] .rounded         { border-radius: 7px; }
-[data-ui="apple"] .rounded-md      { border-radius: 8px; }
-[data-ui="apple"] .rounded-lg      { border-radius: 10px; }
-[data-ui="apple"] .rounded-xl      { border-radius: 13px; }
-[data-ui="apple"] .rounded-2xl     { border-radius: 17px; }
-[data-ui="apple"] .rounded-t-xl { border-radius: 13px 13px 0 0; }
-[data-ui="apple"] .rounded-b-xl { border-radius: 0 0 13px 13px; }
-/* rounded-full se deja igual: avatares y píldoras siguen siendo redondos */
-
-/* ── Profundidad: la sombra reemplaza al borde ── */
-[data-ui="apple"] .shadow-sm,
-[data-ui="apple"] .shadow,
-[data-ui="apple"] .shadow-md,
-[data-ui="apple"] .shadow-lg { box-shadow: var(--sombra-1); }
-
-/* ── Tipografía de las etiquetas ──
-   Se conserva la versalita porque está escrita en 198 lugares, pero se
-   afloja: el espaciado de 2.5px era de un sistema de reportes impresos y
-   en pantalla obliga a deletrear. */
-[data-ui="apple"] .ts-eyebrow {
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--texto-3);
+/* Solid black buttons and links are primary actions → Aqua.
+   div.bg-black (modal headers, marks) stays Void from the rule above. */
+[data-ui="universe"] :is(button, a).bg-black:not(:disabled) {
+  background-color: var(--ts-accent);
 }
-[data-ui="apple"] .ts-heading,
-[data-ui="apple"] .ts-display {
-  font-weight: 700;
-  letter-spacing: -0.026em;
+[data-ui="universe"] :is(button, a).bg-black:not(:disabled):hover {
+  background-color: var(--ts-accent-hover);
 }
 
-/* ── Botones ── */
-[data-ui="apple"] .pill-btn {
-  border-radius: 9px;
-  padding: 7px 15px;
-  font-size: 13.5px;
+[data-ui="universe"] .border-gray-100,
+[data-ui="universe"] .border-gray-200,
+[data-ui="universe"] .border-gray-300 { border-color: var(--sep); }
+
+[data-ui="universe"] .text-gray-400 { color: var(--texto-3); }
+[data-ui="universe"] .text-gray-500,
+[data-ui="universe"] .text-gray-600 { color: var(--texto-2); }
+[data-ui="universe"] .text-gray-900,
+[data-ui="universe"] .text-black { color: var(--ts-ink); }
+
+[data-ui="universe"] .rounded         { border-radius: var(--ts-radius-sm); }
+[data-ui="universe"] .rounded-md      { border-radius: var(--ts-radius-sm); }
+[data-ui="universe"] .rounded-lg      { border-radius: var(--ts-radius-md); }
+[data-ui="universe"] .rounded-xl      { border-radius: var(--ts-radius-md); }
+[data-ui="universe"] .rounded-2xl     { border-radius: var(--ts-radius-lg); }
+[data-ui="universe"] .rounded-3xl     { border-radius: var(--ts-radius-xl); }
+[data-ui="universe"] .rounded-t-xl { border-radius: var(--ts-radius-md) var(--ts-radius-md) 0 0; }
+[data-ui="universe"] .rounded-b-xl { border-radius: 0 0 var(--ts-radius-md) var(--ts-radius-md); }
+
+[data-ui="universe"] .shadow-sm,
+[data-ui="universe"] .shadow,
+[data-ui="universe"] .shadow-md,
+[data-ui="universe"] .shadow-lg { box-shadow: var(--sombra-1); }
+
+/* Drop spaced all-caps labels inside the shell. */
+[data-ui="universe"] .uppercase {
+  text-transform: none;
+  letter-spacing: 0;
+}
+[data-ui="universe"] .ts-eyebrow {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--texto-2);
+}
+[data-ui="universe"] h1,
+[data-ui="universe"] h2,
+[data-ui="universe"] .ts-heading,
+[data-ui="universe"] .ts-display {
+  font-weight: 300;
+  letter-spacing: -0.03em;
+}
+
+[data-ui="universe"] .pill-btn {
+  border-radius: var(--ts-radius-sm);
+  padding: 7px 14px;
+  font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.006em;
 }
-[data-ui="apple"] .pill-btn-primary { background: var(--texto); color: var(--sup); font-weight: 600; }
-[data-ui="apple"] .pill-btn-outline { background: var(--relleno); color: var(--texto); border: none; }
-[data-ui="apple"] .pill-btn-outline:hover { background: rgba(10,10,10,.09); color: var(--texto); }
+[data-ui="universe"] .pill-btn-primary {
+  background: var(--ts-accent);
+  color: var(--ts-surface);
+  font-weight: 500;
+}
+[data-ui="universe"] .pill-btn-primary:hover { background: var(--ts-accent-hover); }
+[data-ui="universe"] .pill-btn-outline {
+  background: var(--relleno);
+  color: var(--texto);
+  border: none;
+}
+[data-ui="universe"] .pill-btn-outline:hover {
+  background: rgba(8, 20, 32, 0.09);
+  color: var(--texto);
+}
 
-[data-ui="apple"] .tag {
-  border-radius: 6px;
+[data-ui="universe"] .tag {
+  border-radius: var(--ts-radius-sm);
   padding: 2px 8px;
-  font-size: 11.5px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   background: var(--relleno);
   border: none;
   color: var(--texto-2);
 }
-[data-ui="apple"] .input-field {
-  border-radius: 9px;
+[data-ui="universe"] .input-field {
+  border-radius: var(--ts-radius-sm);
   background: var(--relleno);
   border: 1px solid transparent;
-  padding: 9px 13px;
+  padding: 8px 12px;
 }
-[data-ui="apple"] .filter-chip {
-  border-radius: 9px;
+[data-ui="universe"] .filter-chip {
+  border-radius: var(--ts-radius-sm);
   border-color: var(--sep);
   font-weight: 500;
 }
 
-/* ── Barra superior translúcida ── */
-[data-ui="apple"] .ts-barra {
+[data-ui="universe"] .ts-barra {
   background: var(--barra);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
   border-bottom: 1px solid var(--sep);
 }
 
-/* ── Control segmentado, en vez de pestañas subrayadas ── */
-[data-ui="apple"] .ts-seg {
+[data-ui="universe"] .ts-seg {
   background: var(--relleno);
-  border-radius: 11px;
+  border-radius: var(--ts-radius-sm);
   padding: 2px;
   gap: 2px;
 }
-[data-ui="apple"] .ts-seg-item {
-  border-radius: 9px;
-  padding: 7px 13px;
+[data-ui="universe"] .ts-seg-item {
+  border-radius: 6px;
+  padding: 6px 12px;
   font-size: 13px;
   font-weight: 500;
   color: var(--texto-2);
   letter-spacing: -0.006em;
   transition: background .15s, color .15s;
 }
-[data-ui="apple"] .ts-seg-item:hover { color: var(--texto); }
-[data-ui="apple"] .ts-seg-item[aria-current="true"] {
+[data-ui="universe"] .ts-seg-item:hover { color: var(--texto); }
+[data-ui="universe"] .ts-seg-item[aria-current="true"] {
   background: var(--sup);
-  color: var(--texto);
-  font-weight: 600;
-  box-shadow: 0 1px 2px rgba(10,10,10,.10);
+  color: var(--ts-accent);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(8, 20, 32, 0.1);
 }
 
-/* ── Cabecera de etapa del funnel · opción C ──
-   El contraste lo pone el peso de la letra y un fondo apenas marcado, no
-   una barra negra: cinco barras negras seguidas se comen el tablero y
-   compiten con los nombres de los candidatos, que es lo que hay que leer. */
-[data-ui="apple"] .ts-etapa {
+[data-ui="universe"] .ts-etapa {
   background: var(--relleno);
   border-bottom: 1px solid var(--sep);
 }
-[data-ui="apple"] .ts-etapa-nombre {
-  font-size: 14.5px;
-  font-weight: 600;
+[data-ui="universe"] .ts-etapa-nombre {
+  font-size: 14px;
+  font-weight: 500;
   letter-spacing: -0.018em;
   line-height: 1.2;
   color: var(--texto);
 }
-[data-ui="apple"] .ts-etapa-conteo {
-  font-size: 12.5px;
-  font-weight: 600;
+[data-ui="universe"] .ts-etapa-conteo {
+  font-size: 12px;
+  font-weight: 500;
   color: var(--texto);
   background: var(--sup);
   border: 1px solid var(--sep);
@@ -300,7 +341,23 @@
   padding: 0 8px;
   font-variant-numeric: tabular-nums;
 }
-[data-ui="apple"] .ts-etapa-duenio {
+[data-ui="universe"] .ts-etapa-duenio {
   font-size: 12px;
   color: var(--texto-3);
+}
+
+/* Tables: canvas header, medium labels, no tracked capitals. */
+[data-ui="universe"] table {
+  color: var(--ts-ink);
+}
+[data-ui="universe"] table thead,
+[data-ui="universe"] table thead th {
+  background: var(--ts-canvas);
+  color: var(--ts-ink-secondary);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+[data-ui="universe"] table tbody tr {
+  border-color: var(--ts-line);
 }

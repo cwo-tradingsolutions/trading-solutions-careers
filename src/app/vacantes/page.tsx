@@ -63,19 +63,19 @@ function VacantesContent() {
     <>
       <Navbar />
       <div className="pt-28">
-        <section className="py-12 md:py-16 bg-white min-h-screen">
-          <div className="max-w-7xl mx-auto px-6 lg:px-10">
+        <section className="py-12 md:py-16 bg-ts-canvas min-h-screen">
+          <div className="max-w-ts mx-auto px-6 lg:px-10">
             {/* Header */}
             <div className="mb-10">
               <Link
                 href="/"
-                className="flex items-center gap-2 text-sm text-gray-500 hover:text-black mb-6 transition-colors"
+                className="flex items-center gap-2 text-sm text-ts-muted hover:text-ts-accent mb-6 transition-colors"
               >
                 <ArrowLeft size={16} />
                 {t.jobs.backHome}
               </Link>
               <h1 className="section-title mb-2">{t.jobs.pageTitle}</h1>
-              <p className="text-gray-500">{t.jobs.pageSubtitle}</p>
+              <p className="text-ts-secondary">{t.jobs.pageSubtitle}</p>
             </div>
 
             {/* Search */}
@@ -95,7 +95,7 @@ function VacantesContent() {
             {/* Filters */}
             <div className="mb-10 space-y-4">
               <div className="flex flex-wrap gap-3">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider self-center mr-2">
+                <span className="text-sm font-medium text-ts-muted self-center mr-2">
                   {t.jobs.deptLabel}
                 </span>
                 <button
@@ -115,7 +115,7 @@ function VacantesContent() {
                 ))}
               </div>
               <div className="flex flex-wrap gap-3">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider self-center mr-2">
+                <span className="text-sm font-medium text-ts-muted self-center mr-2">
                   {t.jobs.modeLabel}
                 </span>
                 <button
@@ -155,16 +155,16 @@ function VacantesContent() {
                   <Link
                     key={job.id}
                     href={`/vacantes/${job.id}`}
-                    className="bg-white rounded-2xl p-7 border border-gray-200 hover:border-black hover:-translate-y-1 hover:shadow-lg transition-all duration-300"
+                    className="bg-ts-surface rounded-ts-lg p-7 border border-[color:var(--ts-line)] hover:border-ts-accent hover:-translate-y-1 transition-all duration-300"
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div>
-                        <h3 className="font-bold text-lg mb-1">{job.title[locale]}</h3>
-                        <p className="text-sm text-gray-500">{deptName(job.dept)}</p>
+                        <h3 className="font-medium text-lg mb-1">{job.title[locale]}</h3>
+                        <p className="text-sm text-ts-muted">{deptName(job.dept)}</p>
                       </div>
                       <span className="tag">{job.level}</span>
                     </div>
-                    <p className="text-sm text-gray-600 mb-5 leading-relaxed">
+                    <p className="text-sm text-ts-secondary mb-5 leading-relaxed">
                       {job.description[locale].substring(0, 120)}...
                     </p>
                     <div className="flex flex-wrap gap-2 mb-5">
@@ -183,7 +183,7 @@ function VacantesContent() {
                           {modeName(job.mode)}
                         </span>
                       </div>
-                      <ArrowUpRight size={16} className="text-gray-400" />
+                      <ArrowUpRight size={16} className="text-ts-accent" />
                     </div>
                   </Link>
                 ))}

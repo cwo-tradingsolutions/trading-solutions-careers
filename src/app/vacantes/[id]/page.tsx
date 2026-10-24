@@ -144,17 +144,20 @@ export default function JobDetailPage() {
       <Navbar />
 
       {/* Hero header */}
-      <div className="bg-black text-white pt-32 pb-12">
+      <div className="bg-ts-ink text-white pt-32 pb-12">
         <div className="max-w-4xl mx-auto px-6 lg:px-10">
           <Link
             href="/vacantes"
-            className="flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-8 transition-colors"
+            className="flex items-center gap-2 text-sm text-white/60 hover:text-white mb-8 transition-colors"
           >
             <ArrowLeft size={16} />
             {t.jobs.backToJobs}
           </Link>
-          <span className="tag mb-4 bg-white/15 text-white border-transparent">{deptName(job.dept)}</span>
-          <h1 className="text-3xl md:text-4xl font-bold mt-4 mb-3 tracking-tight">{job.title[locale]}</h1>
+          <span className="tag mb-4 bg-white/10 text-white border-transparent inline-flex items-center gap-2">
+            <span className="ts-mark" aria-hidden />
+            {deptName(job.dept)}
+          </span>
+          <h1 className="text-3xl md:text-5xl font-light mt-4 mb-3 tracking-tight">{job.title[locale]}</h1>
           <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400">
             <span className="flex items-center gap-1.5">
               <MapPin size={14} />
@@ -169,19 +172,20 @@ export default function JobDetailPage() {
       </div>
 
       {/* Content */}
-      <div className="bg-white py-12">
+      <div className="bg-ts-canvas py-12">
         <div className="max-w-4xl mx-auto px-6 lg:px-10">
+          <div className="bg-ts-surface rounded-ts-lg border border-[color:var(--ts-line)] p-8 md:p-10">
           <div className="mb-10">
-            <p className="text-gray-600 leading-relaxed text-base">{job.description[locale]}</p>
+            <p className="text-ts-secondary leading-relaxed text-base font-medium">{job.description[locale]}</p>
             <p className="mt-4 font-bold text-xl">{job.salary}</p>
           </div>
 
           <div className="mb-10">
-            <h3 className="font-bold text-lg mb-5">{t.jobs.whatYouDo}</h3>
+            <h3 className="font-light text-2xl mb-5">{t.jobs.whatYouDo}</h3>
             <div className="space-y-3">
               {job.responsibilities[locale].map((r, i) => (
                 <div key={i} className="flex gap-3">
-                  <div className="w-5 h-5 rounded-full bg-black flex-shrink-0 flex items-center justify-center mt-0.5">
+                  <div className="w-5 h-5 rounded-full bg-ts-accent flex-shrink-0 flex items-center justify-center mt-0.5">
                     <Check size={10} className="text-white" strokeWidth={3} />
                   </div>
                   <p className="text-sm text-gray-600">{r}</p>
@@ -191,11 +195,11 @@ export default function JobDetailPage() {
           </div>
 
           <div className="mb-10">
-            <h3 className="font-bold text-lg mb-5">{t.jobs.whatWeSeek}</h3>
+            <h3 className="font-light text-2xl mb-5">{t.jobs.whatWeSeek}</h3>
             <div className="space-y-3">
               {job.requirements[locale].map((r, i) => (
                 <div key={i} className="flex gap-3">
-                  <div className="w-1.5 h-1.5 rounded-full bg-black flex-shrink-0 mt-2" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-ts-accent flex-shrink-0 mt-2" />
                   <p className="text-sm text-gray-600">{r}</p>
                 </div>
               ))}
@@ -215,6 +219,7 @@ export default function JobDetailPage() {
             {t.jobs.applyBtn}
             <ArrowUpRight size={16} strokeWidth={2.5} />
           </button>
+          </div>
         </div>
       </div>
 
@@ -322,7 +327,7 @@ export default function JobDetailPage() {
         >
           <div className="bg-white rounded-2xl max-w-[480px] w-full">
             <div className="p-10 text-center">
-              <div className="w-16 h-16 bg-black rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="w-16 h-16 bg-ts-accent rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle size={28} className="text-white" />
               </div>
               <h3 className="text-2xl font-bold mb-3">{t.jobs.successTitle}</h3>

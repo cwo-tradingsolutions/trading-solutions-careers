@@ -4,7 +4,7 @@ import FunnelTiming from "@/components/FunnelTiming";
 import RubricasPanel from "@/components/RubricasPanel";
 import NueveBoxPanel from "@/components/NueveBoxPanel";
 import BateriaDashboard from "@/components/BateriaDashboard";
-import { LOGO_TS_SIMBOLO } from "@/lib/brand";
+import { LOGO_TS_SIMBOLO, LOGO_TS_CLASE_EN_OSCURO } from "@/lib/brand";
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
@@ -196,63 +196,58 @@ export default function HRAdminPage() {
   }, [searchOpen]);
 
   return (
-    // data-ui enciende el lenguaje visual del panel (ver globals.css). La
-    // página pública NO lo lleva: sigue siendo la de la marca.
-    <div data-ui="apple" className="min-h-screen">
-      {/* Barra superior · translúcida, se queda fija sobre el contenido */}
-      <header className="ts-barra sticky top-0 z-50">
-        <div className="max-w-[1440px] mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* Logo TS oficial */}
+    // data-ui="universe" vive en el layout de /hr-admin (globals.css).
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-50 text-white" style={{ background: "var(--ts-ink)" }}>
+        <div className="max-w-ts mx-auto px-5 h-14 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <img
               src={LOGO_TS_SIMBOLO}
               alt="Trading Solutions"
-              className="h-[22px] w-auto"
+              className={`h-[22px] w-auto ${LOGO_TS_CLASE_EN_OSCURO}`}
             />
-            <span className="text-[14px] font-semibold tracking-[-0.012em]">HR Panel</span>
+            <span className="text-[14px] font-medium flex items-center gap-2">
+              <span className="ts-mark" aria-hidden />
+              HR Panel
+            </span>
           </div>
-          <div className="flex items-center gap-2.5">
-            {/* Buscador global */}
+          <div className="flex items-center gap-1">
             <button
               onClick={() => setSearchOpen(true)}
-              className="flex items-center gap-2 bg-[var(--relleno)] hover:bg-[rgba(10,10,10,0.09)] text-[var(--texto-2)] hover:text-[var(--texto)] text-[12px] font-medium px-3 py-1.5 rounded-full transition-colors"
+              className="flex items-center gap-2 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
               title="Buscar candidatos (Cmd+K)"
             >
               <Search className="w-3.5 h-3.5" />
               <span>Buscar</span>
-              <kbd className="text-[9px] font-mono bg-[var(--relleno)] border border-[var(--sep)] rounded px-1 py-0.5 ml-1">⌘K</kbd>
+              <kbd className="text-[9px] font-mono bg-white/10 border border-white/15 rounded px-1 py-0.5 ml-1">⌘K</kbd>
             </button>
-            {/* Importar */}
             <button
               onClick={() => setImportOpen(true)}
-              className="flex items-center gap-1.5 text-[var(--texto-2)] hover:text-[var(--texto)] text-[12px] font-medium px-3 py-1.5 rounded-full hover:bg-[var(--relleno)] transition-colors"
+              className="flex items-center gap-1.5 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
               title="Importar candidatos desde Excel"
             >
               <Download className="w-3.5 h-3.5" style={{ transform: 'rotate(180deg)' }} />
               <span>Importar</span>
             </button>
-            {/* Gmail audit */}
             <button
               onClick={() => setGmailAuditOpen(true)}
-              className="flex items-center gap-1.5 text-[var(--texto-2)] hover:text-[var(--texto)] text-[12px] font-medium px-3 py-1.5 rounded-full hover:bg-[var(--relleno)] transition-colors"
+              className="flex items-center gap-1.5 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
               title="Auditar Gmail vs ATS"
             >
               <Mail className="w-3.5 h-3.5" />
               <span>Auditar Gmail</span>
             </button>
-            {/* Decision nudges */}
             <button
               onClick={() => setDecisionsOpen(true)}
-              className="flex items-center gap-1.5 text-[var(--texto-2)] hover:text-[var(--texto)] text-[12px] font-medium px-3 py-1.5 rounded-full hover:bg-[var(--relleno)] transition-colors"
+              className="flex items-center gap-1.5 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
               title="Pedir decisión a CWO/Hiring Manager"
             >
               <Hand className="w-3.5 h-3.5" />
               <span>Decisiones</span>
             </button>
-            {/* Agendar entrevista — pill negra estilo TS con borde blanco */}
             <button
               onClick={() => setScheduleOpen(true)}
-              className="flex items-center gap-1.5 bg-[var(--texto)] text-white hover:opacity-90 text-[12px] font-semibold px-3.5 py-1.5 rounded-full transition-colors"
+              className="flex items-center gap-1.5 bg-ts-accent hover:bg-[var(--ts-accent-hover)] text-white text-[12px] font-medium px-3.5 py-1.5 rounded-ts-sm transition-colors"
               title="Agendar entrevista"
             >
               <Calendar className="w-3.5 h-3.5" />
@@ -260,7 +255,7 @@ export default function HRAdminPage() {
             </button>
             <button
               onClick={() => setSettingsOpen(true)}
-              className="text-[var(--texto-3)] hover:text-[var(--texto)] p-1.5"
+              className="text-white/70 hover:text-white p-1.5"
               title="Settings · metas del dashboard"
             >
               <SettingsIcon className="w-[18px] h-[18px]" />
@@ -269,30 +264,30 @@ export default function HRAdminPage() {
               href="https://mail.google.com/mail/u/0/#drafts"
               target="_blank"
               rel="noreferrer"
-              className="text-[var(--texto-3)] hover:text-[var(--texto)] relative p-1.5"
+              className="text-white/70 hover:text-white relative p-1.5"
               title={draftsPending > 0 ? `${draftsPending} drafts esperando tu revisión en Gmail (últimas 48h)` : 'Sin drafts pendientes'}
             >
               <Mail className="w-[18px] h-[18px]" />
               {draftsPending > 0 ? (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center px-1 ring-2 ring-white tabular-nums">
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-ts-highlight text-ts-ink text-[9px] font-medium flex items-center justify-center px-1 ring-2 ring-[var(--ts-ink)] tabular-nums">
                   {draftsPending > 99 ? '99+' : draftsPending}
                 </span>
               ) : null}
             </a>
             <button
               onClick={() => setReferralsOpen(true)}
-              className="text-[var(--texto-3)] hover:text-[var(--texto)] relative p-1.5"
+              className="text-white/70 hover:text-white relative p-1.5"
               title={referralsPending > 0 ? `${referralsPending} hojas de vida pendientes de revisar` : 'Sin notificaciones nuevas'}
             >
               <Bell className="w-[18px] h-[18px]" />
               {referralsPending > 0 ? (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-1 ring-2 ring-white tabular-nums">
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-ts-accent text-white text-[9px] font-medium flex items-center justify-center px-1 ring-2 ring-[var(--ts-ink)] tabular-nums">
                   {referralsPending > 99 ? '99+' : referralsPending}
                 </span>
               ) : null}
             </button>
-            <div className="flex items-center gap-2 pl-2 ml-1 border-l border-[var(--sep)]">
-              <Avatar name="Kelly Castañeda" size={28} />
+            <div className="flex items-center gap-2 pl-2 ml-1 border-l border-white/15">
+              <Avatar name="Kelly Castañeda" size={28} className="ring-2 ring-white/40" />
               <span className="text-[12px] font-medium hidden sm:inline">Kelly Castañeda</span>
             </div>
             <button
@@ -304,7 +299,7 @@ export default function HRAdminPage() {
                 }
               }}
               title="Cerrar sesión"
-              className="flex items-center gap-1.5 text-[var(--texto-3)] hover:text-[var(--texto)] text-[12px] font-medium px-2.5 py-1.5 rounded-full hover:bg-[var(--relleno)] transition-colors"
+              className="flex items-center gap-1.5 text-white/70 hover:text-white text-[12px] font-medium px-2.5 py-1.5 rounded-ts-sm hover:bg-white/10 transition-colors"
             >
               <LogOut className="w-[14px] h-[14px]" />
             </button>
@@ -314,8 +309,8 @@ export default function HRAdminPage() {
 
       {/* Secciones · control segmentado en vez de pestañas subrayadas:
           ocupa menos alto y deja claro que son excluyentes. */}
-      <nav className="sticky top-14 z-40 ts-barra">
-        <div className="max-w-[1440px] mx-auto px-4 py-2">
+      <nav className="sticky top-14 z-40 bg-ts-surface border-b border-[color:var(--ts-line)]">
+        <div className="max-w-ts mx-auto px-3 py-1.5">
           <div className="ts-seg flex overflow-x-auto">
             {TABS.map(({ id, label, icon: Icon }) => (
               <button
@@ -335,7 +330,7 @@ export default function HRAdminPage() {
         </div>
       </nav>
 
-      <main className="max-w-[1440px] mx-auto px-6 py-7 pb-16">
+      <main className="max-w-ts mx-auto px-5 py-5 pb-12">
         {tab === "dashboard" && <Dashboard setTab={setTab} />}
         {tab === "requisiciones" && <RequisitionsInbox />}
         {tab === "vacantes" && <Vacantes />}
@@ -378,7 +373,7 @@ export default function HRAdminPage() {
                 try { await fetch('/api/hr-admin/login', { method: 'DELETE' }); } catch {}
                 window.location.href = '/hr-admin/login';
               }}
-              className="w-full bg-black hover:bg-gray-800 text-white text-sm font-bold py-2.5 rounded-full inline-flex items-center justify-center gap-2"
+              className="w-full bg-ts-accent hover:bg-[var(--ts-accent-hover)] text-white text-sm font-medium py-2.5 rounded-ts-sm inline-flex items-center justify-center gap-2"
             >
               Volver a iniciar sesión
             </button>
@@ -421,7 +416,7 @@ function tsImageForArea(area?: string | null): string {
  */
 function TSHeroBanner({ image = TS_IMG.hero, title = "Talent that moves the world", subtitle = "Where vision meets execution." }: { image?: string; title?: string; subtitle?: string }) {
   return (
-    <div className="relative -mx-6 -mt-5 mb-5 overflow-hidden" style={{ height: 200 }}>
+    <div className="relative -mx-5 -mt-5 mb-5 overflow-hidden rounded-ts-md" style={{ height: 180 }}>
       {/* Imagen de fondo */}
       <div
         className="absolute inset-0 bg-cover bg-center"
@@ -434,14 +429,15 @@ function TSHeroBanner({ image = TS_IMG.hero, title = "Talent that moves the worl
       <div
         className="absolute inset-0"
         style={{
-          background: 'linear-gradient(135deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.65) 100%)',
+          background: 'linear-gradient(135deg, rgba(var(--ts-ink-rgb),0.82) 0%, rgba(var(--ts-ink-rgb),0.45) 55%, rgba(var(--ts-ink-rgb),0.72) 100%)',
         }}
       />
       {/* Línea horizontal estilo TS site */}
       <div className="absolute inset-0 flex items-center px-8">
-        <div className="max-w-[1440px] w-full mx-auto">
-          <div className="flex items-baseline gap-3">
-            <h1 className="text-white font-display font-bold text-4xl md:text-5xl tracking-[-0.03em] leading-[0.95]">
+        <div className="max-w-ts w-full mx-auto">
+          <div className="flex items-center gap-3">
+            <span className="ts-mark" aria-hidden />
+            <h1 className="text-white font-display font-light text-4xl md:text-5xl tracking-[-0.03em] leading-[0.95]">
               {title}
             </h1>
           </div>
@@ -460,18 +456,19 @@ function TSHeroBanner({ image = TS_IMG.hero, title = "Talent that moves the worl
  */
 function TSSectionBanner({ image, title, subtitle, icon }: { image: string; title: string; subtitle?: string; icon?: string }) {
   return (
-    <div className="relative -mx-6 mb-4 overflow-hidden" style={{ height: 120 }}>
+    <div className="relative -mx-5 mb-4 overflow-hidden rounded-ts-md" style={{ height: 112 }}>
       <div
         className="absolute inset-0 bg-cover bg-center"
         style={{ backgroundImage: `url(${image})` }}
       />
-      <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 100%)' }} />
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(var(--ts-ink-rgb),0.88) 0%, rgba(var(--ts-ink-rgb),0.4) 100%)' }} />
       <div className="absolute inset-0 flex items-center px-8">
-        <div className="max-w-[1440px] w-full mx-auto">
+        <div className="max-w-ts w-full mx-auto">
           <div className="flex items-center gap-3">
+            <span className="ts-mark" aria-hidden />
             {icon && <span className="text-3xl">{icon}</span>}
             <div>
-              <h2 className="text-white font-display font-bold text-2xl tracking-[-0.02em] leading-tight">{title}</h2>
+              <h2 className="text-white font-display font-light text-2xl tracking-[-0.02em] leading-tight">{title}</h2>
               {subtitle && <p className="text-white/70 text-xs font-medium mt-0.5">{subtitle}</p>}
             </div>
           </div>

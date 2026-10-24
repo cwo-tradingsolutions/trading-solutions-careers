@@ -37,7 +37,7 @@ export default function HRLoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex font-sans" style={{ background: "#000" }}>
+    <div className="min-h-screen flex font-sans bg-ts-ink">
       {/* ── Lado izquierdo: hero TS full-bleed ── */}
       <div className="hidden md:flex md:w-1/2 lg:w-3/5 relative overflow-hidden">
         <div
@@ -51,7 +51,7 @@ export default function HRLoginPage() {
           className="absolute inset-0"
           style={{
             background:
-              "linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.7) 100%)",
+              "linear-gradient(135deg, rgba(var(--ts-ink-rgb),0.72) 0%, rgba(var(--ts-ink-rgb),0.28) 50%, rgba(var(--ts-ink-rgb),0.78) 100%)",
           }}
         />
         {/* Contenido superpuesto — estilo hero del sitio TS */}
@@ -61,10 +61,11 @@ export default function HRLoginPage() {
           </div>
 
           <div>
-            <div className="text-[10px] tracking-[3px] uppercase font-semibold opacity-70 mb-3">
+            <div className="ts-kicker ts-kicker-on-dark mb-3">
+              <span className="ts-mark" aria-hidden />
               Talent Acquisition · Internal Tool
             </div>
-            <h1 className="font-bold text-5xl lg:text-6xl tracking-[-0.03em] leading-[0.95]">
+            <h1 className="font-light text-5xl lg:text-6xl tracking-[-0.03em] leading-[0.95]">
               Talent that<br />moves the world.
             </h1>
             <div className="flex items-center gap-3 mt-5 max-w-md">
@@ -82,7 +83,7 @@ export default function HRLoginPage() {
       </div>
 
       {/* ── Lado derecho: form ── */}
-      <div className="flex-1 flex items-center justify-center p-6 bg-white">
+      <div className="flex-1 flex items-center justify-center p-6 bg-ts-canvas">
         <form onSubmit={submit} className="w-full max-w-sm">
           {/* Logo móvil — solo visible en mobile */}
           <div className="md:hidden flex flex-col items-center mb-8">
@@ -90,18 +91,18 @@ export default function HRLoginPage() {
           </div>
 
           <div className="mb-7">
-            <div className="text-[10px] tracking-[2.5px] uppercase font-semibold text-gray-500 mb-2">
+            <div className="text-sm font-medium text-ts-muted mb-2">
               HR Admin
             </div>
-            <h2 className="text-3xl font-bold tracking-[-0.02em] leading-tight">
+            <h2 className="text-3xl font-light tracking-[-0.02em] leading-tight text-ts-ink">
               Bienvenida.
             </h2>
-            <p className="text-sm text-gray-500 mt-2">
+            <p className="text-sm text-ts-secondary mt-2">
               Acceso restringido · Equipo de Talent Acquisition.
             </p>
           </div>
 
-          <label className="block text-[11px] font-semibold text-gray-700 uppercase tracking-wider mb-2">
+          <label className="block text-sm font-medium text-ts-secondary mb-2">
             Clave de acceso
           </label>
           <div className="relative">
@@ -109,7 +110,7 @@ export default function HRLoginPage() {
             <input
               type="password"
               autoFocus
-              className="w-full border border-gray-300 rounded-full px-10 py-3 text-sm focus:border-black focus:outline-none transition-colors"
+              className="w-full border border-[color:var(--ts-line)] rounded-ts-sm px-10 py-3 text-sm bg-ts-surface focus:border-ts-accent focus:outline-none transition-colors"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -125,7 +126,7 @@ export default function HRLoginPage() {
           <button
             type="submit"
             disabled={!password || loading}
-            className="w-full bg-black hover:bg-gray-800 text-white text-sm font-semibold rounded-full mt-5 py-3 flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full bg-ts-accent hover:bg-[var(--ts-accent-hover)] text-white text-sm font-medium rounded-ts-sm mt-5 py-3 flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {loading ? "Verificando…" : (
               <>
@@ -138,7 +139,7 @@ export default function HRLoginPage() {
           <div className="mt-8 pt-6 border-t border-gray-100">
             <p className="text-[11px] text-gray-400 text-center leading-relaxed">
               ¿Sin acceso? Contacta a{" "}
-              <a className="text-black hover:underline font-medium" href="mailto:jointheteam@tradingsolutions.com">
+              <a className="text-ts-accent hover:underline font-medium" href="mailto:jointheteam@tradingsolutions.com">
                 jointheteam@tradingsolutions.com
               </a>
             </p>

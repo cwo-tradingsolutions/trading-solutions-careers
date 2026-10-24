@@ -1,0 +1,75 @@
+/**
+ * Trading Solutions Universe — shared digital tokens.
+ *
+ * One module for the public Careers site and the HR shell. In components,
+ * use var(--ts-*) or the Tailwind theme keys (bg-ts-canvas, text-ts-ink,
+ * bg-ts-accent, rounded-ts-md, max-w-ts). Do not scatter raw hex in new UI.
+ *
+ * Open Sauce Two is not in this repo. The stand-in is Inter, then system-ui.
+ * Do not claim SF Pro.
+ *
+ * Lima (--ts-highlight) is a small fill on dark surfaces only: a dot, a
+ * badge, a short mark. Never a large background behind body text.
+ *
+ * Extending this to wxm-app later:
+ *   1. Copy this file (src/styles/universe-tokens.css).
+ *   2. Import it once from that app's root layout, before other CSS.
+ *   3. Map the same variables in Tailwind theme.extend — colors, fontFamily,
+ *      borderRadius, maxWidth — the way tailwind.config.ts does here.
+ *   4. Load Inter (or Open Sauce Two, if that app actually vendors it).
+ *   5. Keep status colors (red / green / amber) out of brand chrome.
+ */
+
+:root {
+  /* Brand */
+  --ts-canvas: #f7f7f7; /* Stalactite */
+  --ts-surface: #ffffff;
+  --ts-ink: #081420; /* Void */
+  --ts-ink-rgb: 8, 20, 32;
+  --ts-ink-secondary: #212121; /* Affenpinscher */
+  --ts-accent: #2f88ec; /* Aqua */
+  --ts-accent-hover: #1d6fc4;
+  --ts-highlight: #c7ed00; /* lima */
+
+  /* UI neutrals derived from Void, not a second palette */
+  --ts-line: rgba(8, 20, 32, 0.1);
+  --ts-muted: #5c6570;
+
+  /* Radii: 8 / 16 / 24 / 32 */
+  --ts-radius-sm: 8px;
+  --ts-radius-md: 16px;
+  --ts-radius-lg: 24px;
+  --ts-radius-xl: 32px;
+
+  /* Public measure. HR shell uses the same cap and tighter padding. */
+  --ts-content-max: 1180px;
+
+  --ts-font-sans: var(--font-inter), Inter, system-ui, sans-serif;
+  --ts-font-display: var(--font-inter), Inter, system-ui, sans-serif;
+
+  /* Legacy names now alias Universe so older var(--ts-*) call sites follow. */
+  --ts-black: var(--ts-ink);
+  --ts-near-black: var(--ts-ink-secondary);
+  --ts-dark: #1c2834;
+  --ts-gray-90: #243140;
+  --ts-gray-60: var(--ts-muted);
+  --ts-gray-40: #8b939c;
+  --ts-gray-20: #d5d8dc;
+  --ts-gray-10: #e6e8eb;
+  --ts-gray-05: var(--ts-canvas);
+  --ts-white: var(--ts-surface);
+
+  /* Status signals. Not brand chrome — do not use amber for actions or fills. */
+  --ts-red: #c41818;
+  --ts-red-bg: #fef5f5;
+  --ts-red-border: #fcc;
+  --ts-green: #1a7d3e;
+  --ts-green-bg: #e8f5ee;
+  --ts-green-border: #c8e6d2;
+  --ts-amber: #b45309;
+  --ts-amber-bg: #fef4e8;
+  --ts-amber-border: #fbd9b2;
+  --ts-blue: var(--ts-accent);
+  --ts-blue-bg: #e8f3fd;
+  --ts-blue-border: #c5dff8;
+}
