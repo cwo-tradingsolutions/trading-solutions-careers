@@ -316,7 +316,7 @@ body[data-tier="referente"] .hero-main::after{background:radial-gradient(circle,
       <div class="cards3">
         <div class="mini glass"><span class="k">Tu siguiente paso</span><h3 class="h3" id="m1-t">III · elige tu camino.</h3><p id="m1-p">Tu líder te acompaña. Pedir mi siguiente paso cuando quieras.</p><button class="go" data-go="next">Ver qué falta →</button></div>
         <div class="mini glass"><span class="k">Dos caminos, mismo orgullo</span><h3 class="h3">Liderar equipos o profundizar.</h3><p>En el grado III eliges: liderar equipos o profundizar. Las dos llegan a Elite — lista para roles de esa categoría.</p><button class="go" data-go="map">Ver el mapa →</button></div>
-        <div class="mini glass"><span class="k">Tus momentos</span><h3 class="h3" id="m3-t">Llegaste a Superior.</h3><p id="m3-p">Marzo 2026 · L2A. Un momento que vale la pena recordar.</p><button class="go" data-go="cel">Revivir →</button></div>
+        <div class="mini glass"><span class="k">Tus momentos</span><h3 class="h3" id="m3-t">Te damos la bienvenida a Superior.</h3><p id="m3-p">Marzo 2026 · L2A. Un momento que vale la pena recordar.</p><button class="go" data-go="cel">Revivir →</button></div>
       </div>
     </section>
 
@@ -384,7 +384,7 @@ body[data-tier="referente"] .hero-main::after{background:radial-gradient(circle,
 
     <!-- D -->
     <section class="screen" id="s-cel" role="tabpanel" aria-labelledby="t-cel">
-      <div class="screen-tag">D · Momento de celebración</div>
+      <div class="screen-tag">D · Celebración</div>
       <div class="stage glass" id="stage">
         <span class="pill ghost preview-pill" id="cel-preview">Vista previa · así se sentirá tu llegada a Elite</span>
         <div class="bloom"></div><div class="halo"></div><div class="halo h2"></div>
@@ -437,7 +437,7 @@ function nextCatName(P){
 }
 function logroLead(P){
   const cur=tierOf(P.grade).name;
-  if(P.grade==='L4E') return 'Eres '+STATUS_TAGS.PRESTIGIO+' · cima de tu oficio. Lo estás logrando en profundidad — lista para roles de esta categoría.';
+  if(P.grade==='L4E') return P.lead||('Celebramos la profundidad de tu oficio.');
   if(P.grade==='L5'||P.grade==='L6') return 'Eres '+STATUS_TAGS.REFERENTE+'. Cima de la escala. Tu criterio ya orienta el camino.';
   const nxt=nextCatName(P);
   if(!nxt) return 'Eres '+cur+'. Lo estás logrando.';
@@ -622,7 +622,7 @@ function renderNext(){
   $('#n-title').textContent=n.label+'.';
   $('#n-eyebrow').textContent=P.grade==='L4E'?(STATUS_TAGS.PRESTIGIO+' · cima de tu oficio'):(n.changes?'Tu siguiente categoría':'Avanzas dentro de '+n.cur.name);
   let lead='Ya cumples '+met+' de '+tot+' criterios. ';
-  if(P.grade==='L4E') lead+='Estás en la cima técnica de Prestigio. Referente es otro camino — y eso también se celebra.';
+  if(P.grade==='L4E') lead=(P.lead||'Celebramos la profundidad de tu oficio.')+' Referente es otro camino — y eso también se celebra.';
   else if(n.changes) lead+='Al completarlos llegas a '+n.nxtTier.name+'. '+(P.grade==='L2B'?'A un paso de elegir cómo crecer.':'');
   else lead+='Sigues siendo '+n.cur.name+' y continúas avanzando. '+(P.grade==='L2B'?'A un paso de elegir cómo crecer.':'');
   $('#n-lead').textContent=lead;
