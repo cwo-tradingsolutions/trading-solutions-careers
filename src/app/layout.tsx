@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import "@fontsource/open-sauce-two/300.css";
+import "@fontsource/open-sauce-two/500.css";
+import "@fontsource/open-sauce-two/600.css";
 import { LanguageProvider } from "@/i18n/context";
 import "./globals.css";
 
 /**
- * Open Sauce Two is not vendored here. Inter is the Universe stand-in,
- * with system-ui behind it via --ts-font-sans. Do not claim SF Pro.
+ * Open Sauce Two (OFL) is loaded at Light 300, Medium 500, and SemiBold 600.
+ * Inter then system-ui are the fallback if that face fails. Do not claim SF Pro.
  */
 const inter = Inter({
   subsets: ["latin"],

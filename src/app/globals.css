@@ -16,8 +16,8 @@
     font-family: var(--ts-font-sans);
     background: var(--ts-canvas);
     color: var(--ts-ink);
-    font-weight: 500;
-    line-height: 1.5;
+    font-weight: var(--ts-weight-body);
+    line-height: 1.55;
     letter-spacing: -0.011em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -54,13 +54,13 @@
     flex-shrink: 0;
   }
   .ts-display {
-    font-weight: 300;
-    letter-spacing: -0.03em;
-    line-height: 0.95;
+    font-weight: var(--ts-weight-display);
+    letter-spacing: -0.042em;
+    line-height: 1.05;
   }
   .ts-heading {
-    font-weight: 300;
-    letter-spacing: -0.02em;
+    font-weight: var(--ts-weight-display);
+    letter-spacing: -0.03em;
     line-height: 1.15;
   }
   .ts-tabular { font-variant-numeric: tabular-nums; }
@@ -68,22 +68,25 @@
 
 @layer components {
   .pill-btn {
-    @apply inline-flex items-center gap-2 px-7 py-3.5 font-medium text-sm transition-all duration-300 cursor-pointer border-none;
+    @apply inline-flex items-center gap-2 px-5 py-3 text-sm cursor-pointer border-none;
+    font-weight: var(--ts-weight-body);
     border-radius: var(--ts-radius-md);
+    transition: background var(--ts-dur) var(--ts-ease), color var(--ts-dur) var(--ts-ease), border-color var(--ts-dur) var(--ts-ease), transform var(--ts-dur) var(--ts-ease);
   }
+  .pill-btn:active { transform: scale(0.98); }
   .pill-btn-primary {
     background: var(--ts-accent);
     color: var(--ts-surface);
   }
   .pill-btn-primary:hover { background: var(--ts-accent-hover); }
   .pill-btn-outline {
-    background: var(--ts-surface);
+    background: transparent;
     color: var(--ts-ink);
-    border: 1px solid var(--ts-ink);
+    border: 1px solid var(--ts-hairline);
   }
   .pill-btn-outline:hover {
-    background: var(--ts-ink);
-    color: var(--ts-surface);
+    background: var(--ts-surface);
+    border-color: var(--ts-ink-mute);
   }
   .pill-btn-white {
     background: var(--ts-surface);
@@ -112,34 +115,56 @@
   }
 
   .filter-chip {
-    @apply px-4 py-2 text-sm font-medium cursor-pointer transition-all;
-    border-radius: var(--ts-radius-sm);
-    border: 1px solid var(--ts-line);
+    @apply px-3.5 py-1.5 text-sm cursor-pointer;
+    font-weight: var(--ts-weight-body);
+    border-radius: var(--ts-radius-pill);
+    border: 1px solid var(--ts-hairline);
     background: var(--ts-surface);
-    color: var(--ts-ink-secondary);
+    color: var(--ts-ink-soft);
+    transition: background var(--ts-dur) var(--ts-ease), color var(--ts-dur) var(--ts-ease), border-color var(--ts-dur) var(--ts-ease);
   }
   .filter-chip:hover {
     border-color: var(--ts-accent);
     color: var(--ts-accent);
   }
   .filter-chip.active {
-    background: var(--ts-accent);
-    color: var(--ts-surface);
-    border-color: var(--ts-accent);
+    background: var(--ts-accent-soft);
+    color: var(--ts-accent-deep);
+    border-color: transparent;
+  }
+
+  .ts-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: var(--ts-radius-pill);
+    font-size: 12px;
+    font-weight: var(--ts-weight-body);
+    background: var(--ts-canvas);
+    color: var(--ts-ink-secondary);
+    border: 1px solid var(--ts-hairline);
+  }
+  .ts-pill-accent {
+    background: var(--ts-accent-soft);
+    color: var(--ts-accent-deep);
+    border-color: transparent;
+  }
+  .ts-scrim {
+    background: color-mix(in srgb, var(--ts-ink) 48%, transparent);
   }
 
   .section-title {
-    font-size: clamp(1.8rem, 4vw, 3.2rem);
+    font-size: clamp(1.8rem, 4vw, 2.75rem);
     line-height: 1.1;
-    font-weight: 300;
+    font-weight: var(--ts-weight-display);
     letter-spacing: -0.03em;
   }
 
   .hero-text {
-    font-size: clamp(2.6rem, 6vw, 5rem);
-    line-height: 1.02;
-    font-weight: 300;
-    letter-spacing: -0.035em;
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    line-height: 1.08;
+    font-weight: var(--ts-weight-display);
+    letter-spacing: -0.042em;
   }
 
   .stat-number {
@@ -148,6 +173,18 @@
     letter-spacing: -0.03em;
     line-height: 1;
   }
+}
+
+/* Public display headlines stay Open Sauce Two Light.
+   Unlayered so body weight 500 and any utility cannot thicken them.
+   Large type is never bold. */
+h1.hero-text,
+h1.section-title,
+h1.ts-display,
+h1.ts-heading {
+  font-family: "Open Sauce Two", var(--font-inter), Inter, system-ui, sans-serif;
+  font-weight: 300;
+  font-synthesis: none;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -285,9 +322,42 @@
   padding: 8px 12px;
 }
 [data-ui="universe"] .filter-chip {
+  border-radius: var(--ts-radius-pill);
+  border-color: var(--ts-hairline);
+  font-weight: var(--ts-weight-body);
+  background: var(--ts-surface);
+}
+[data-ui="universe"] .filter-chip.active {
+  background: var(--ts-accent-soft);
+  color: var(--ts-accent-deep);
+  border-color: transparent;
+}
+
+/* HR sidebar. Dark chrome, Summer Sun only as the small mark. */
+.ts-sidebar {
+  background: var(--ts-ink);
+  color: color-mix(in srgb, var(--ts-surface) 88%, transparent);
+  width: var(--ts-sidebar);
+}
+.ts-side-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
   border-radius: var(--ts-radius-sm);
-  border-color: var(--sep);
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: var(--ts-weight-body);
+  color: color-mix(in srgb, var(--ts-surface) 62%, transparent);
+  transition: background var(--ts-dur) var(--ts-ease), color var(--ts-dur) var(--ts-ease);
+}
+.ts-side-link:hover {
+  background: color-mix(in srgb, var(--ts-surface) 6%, transparent);
+  color: var(--ts-surface);
+}
+.ts-side-link[aria-current="page"] {
+  background: color-mix(in srgb, var(--ts-accent) 22%, transparent);
+  color: var(--ts-surface);
 }
 
 [data-ui="universe"] .ts-barra {

@@ -5,8 +5,8 @@
  * use var(--ts-*) or the Tailwind theme keys (bg-ts-canvas, text-ts-ink,
  * bg-ts-accent, rounded-ts-md, max-w-ts). Do not scatter raw hex in new UI.
  *
- * Open Sauce Two is not in this repo. The stand-in is Inter, then system-ui.
- * Do not claim SF Pro.
+ * Open Sauce Two is loaded from @fontsource/open-sauce-two (300/500/600).
+ * Inter, then system-ui, are the fallback. Do not claim SF Pro.
  *
  * Lima (--ts-highlight) is a small fill on dark surfaces only: a dot, a
  * badge, a short mark. Never a large background behind body text.
@@ -21,31 +21,64 @@
  */
 
 :root {
-  /* Brand */
+  /* Brand — Digital System names. Reference these, not raw hex. */
   --ts-canvas: #f7f7f7; /* Stalactite */
   --ts-surface: #ffffff;
-  --ts-ink: #081420; /* Void */
+  --ts-surface-2: #e8e8e8; /* Wispy Clouds */
+  --ts-ink: #081420; /* dark chrome depth used by the merged shell */
   --ts-ink-rgb: 8, 20, 32;
   --ts-ink-secondary: #212121; /* Affenpinscher */
-  --ts-accent: #2f88ec; /* Aqua */
+  --ts-ink-soft: #5a5a5a;
+  --ts-ink-mute: #8a8a8a;
+  --ts-accent: #2f88ec; /* Aqua Wash */
   --ts-accent-hover: #1d6fc4;
-  --ts-highlight: #c7ed00; /* lima */
+  --ts-accent-deep: #0a457f; /* Burnt Ash */
+  --ts-accent-soft: #bbe7ff; /* Tinted Aqua */
+  --ts-highlight: #c7ed00; /* Summer Sun — fill only, on dark, small doses */
+  --ts-hairline: #e4e4e4;
 
-  /* UI neutrals derived from Void, not a second palette */
+  /* UI neutrals derived from the dark chrome, not a second palette */
   --ts-line: rgba(8, 20, 32, 0.1);
   --ts-muted: #5c6570;
+  --ts-shadow: 0 1px 2px rgba(8, 20, 32, 0.04), 0 8px 24px rgba(8, 20, 32, 0.06);
 
-  /* Radii: 8 / 16 / 24 / 32 */
+  /* Radii: 8 / 16 / 24 / pill. xl stays for panels that already use it. */
   --ts-radius-sm: 8px;
   --ts-radius-md: 16px;
   --ts-radius-lg: 24px;
   --ts-radius-xl: 32px;
+  --ts-radius-pill: 999px;
+  --ts-panel: 28px;
 
-  /* Public measure. HR shell uses the same cap and tighter padding. */
+  /* Measure */
   --ts-content-max: 1180px;
+  --ts-header: 74px;
+  --ts-sidebar: 240px;
 
-  --ts-font-sans: var(--font-inter), Inter, system-ui, sans-serif;
-  --ts-font-display: var(--font-inter), Inter, system-ui, sans-serif;
+  /* Space — 4px scale */
+  --ts-space-1: 4px;
+  --ts-space-2: 8px;
+  --ts-space-3: 12px;
+  --ts-space-4: 16px;
+  --ts-space-6: 24px;
+  --ts-space-8: 32px;
+  --ts-space-12: 48px;
+  --ts-space-24: 96px;
+
+  /*
+   * Open Sauce Two when the face is installed or later vendored.
+   * Inter (next/font) then system-ui until then. Not SF Pro.
+   */
+  --ts-font: "Open Sauce Two", var(--font-inter), Inter, system-ui, sans-serif;
+  --ts-font-sans: var(--ts-font);
+  --ts-font-display: var(--ts-font);
+  --ts-weight-display: 300;
+  --ts-weight-body: 500;
+  --ts-weight-accent: 600;
+
+  /* Motion */
+  --ts-ease: cubic-bezier(0.62, 0, 0.38, 1);
+  --ts-dur: 200ms;
 
   /* Legacy names now alias Universe so older var(--ts-*) call sites follow. */
   --ts-black: var(--ts-ink);
@@ -59,7 +92,10 @@
   --ts-gray-05: var(--ts-canvas);
   --ts-white: var(--ts-surface);
 
-  /* Status signals. Not brand chrome — do not use amber for actions or fills. */
+  /* Status signals. Not brand chrome — do not use these for actions or fills.
+     Success is --ts-green. Warning is --ts-amber.
+     Alert (--ts-alert) is the quiet “Crítico” mark: readable, lower chroma
+     than --ts-red, and meant for a dot or a small chip, not a card wash. */
   --ts-red: #c41818;
   --ts-red-bg: #fef5f5;
   --ts-red-border: #fcc;
@@ -69,6 +105,9 @@
   --ts-amber: #b45309;
   --ts-amber-bg: #fef4e8;
   --ts-amber-border: #fbd9b2;
+  --ts-alert: #7a4f4f;
+  --ts-alert-bg: #f6f1f1;
+  --ts-alert-border: #e7dcdc;
   --ts-blue: var(--ts-accent);
   --ts-blue-bg: #e8f3fd;
   --ts-blue-border: #c5dff8;

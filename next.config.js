@@ -27,6 +27,12 @@ const nextConfig = {
       { protocol: "https", hostname: "cdn.prod.website-files.com" },
     ],
   },
+  async rewrites() {
+    return [
+      // Demo only. Clara's Momentos HTML stays a static file, outside the ATS.
+      { source: "/mi-ruta", destination: "/mi-ruta.html" },
+    ];
+  },
 };
 
 module.exports = nextConfig;

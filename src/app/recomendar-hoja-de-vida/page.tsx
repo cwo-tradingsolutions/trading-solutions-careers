@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Send, ArrowRight, CheckCircle2, AlertTriangle, FileText } from "lucide-react";
-
-const TS_HERO = "https://cdn.prod.website-files.com/68fb7b9474bf8f90808cd50f/691645b652c1e9091b25f59c_FotosWeb_TradingSolutions-14_4_11zon.webp";
-const TS_LOGO = "https://cdn.prod.website-files.com/68fb7b9474bf8f90808cd50f/6913594489519813fe9e620e_logo%20web-03.png";
+import { Send, CheckCircle2, AlertTriangle, FileText } from "lucide-react";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 export default function RecomendarHojaDeVidaPage() {
   const [phase, setPhase] = useState<'form' | 'submitting' | 'success'>('form');
@@ -79,69 +78,36 @@ export default function RecomendarHojaDeVidaPage() {
 
   if (phase === 'success') {
     return (
-      <div className="min-h-screen flex font-sans bg-white">
-        <div className="hidden md:block md:w-1/2 lg:w-2/5 relative overflow-hidden">
-          <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${TS_HERO})` }} />
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.35) 100%)' }} />
-          <div className="relative z-10 p-10 text-white h-full flex flex-col justify-end">
-            <img src={TS_LOGO} alt="Trading Solutions" className="h-9 w-auto mb-auto" />
-            <h1 className="text-4xl font-bold tracking-[-0.03em] leading-[0.95]">Gracias por confiar<br />en alguien.</h1>
-          </div>
-        </div>
+      <div className="min-h-screen bg-ts-canvas text-ts-ink flex flex-col">
+        <Navbar />
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="max-w-md text-center">
-            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-emerald-100 flex items-center justify-center">
-              <CheckCircle2 className="w-7 h-7 text-emerald-600" />
+            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-ts-accent-soft flex items-center justify-center">
+              <CheckCircle2 className="w-7 h-7 text-ts-accent-deep" />
             </div>
-            <h2 className="text-2xl font-bold tracking-tight mb-2">Recomendación recibida</h2>
+            <h1 className="ts-heading font-light text-3xl mb-3">Gracias por confiar en alguien.</h1>
+            <h2 className="text-lg mb-2">Recomendación recibida</h2>
             <p className="text-sm text-gray-600 leading-relaxed">
               Gracias <strong>{referrerName.split(' ')[0]}</strong>. Recibimos la hoja de vida de{' '}
               <strong>{candidateName}</strong>. El equipo de Talent Acquisition la revisará y, si hay match con alguna vacante actual o futura, nos pondremos en contacto directamente con la persona.
             </p>
-            <p className="text-xs text-gray-500 mt-4">
+            <p className="text-xs text-ts-muted mt-4">
               Si querés recomendar a otra persona, podés volver a abrir esta página.
             </p>
           </div>
         </div>
+        <Footer />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex font-sans bg-white">
-      {/* Lado izquierdo: hero */}
-      <div className="hidden md:flex md:w-1/2 lg:w-2/5 relative overflow-hidden">
-        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${TS_HERO})`, transform: 'scale(1.05)' }} />
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.7) 100%)' }} />
-        <div className="relative z-10 flex flex-col justify-between p-10 text-white w-full">
-          <img src={TS_LOGO} alt="Trading Solutions" className="h-9 w-auto" />
-          <div>
-            <div className="text-[10px] tracking-[3px] uppercase font-semibold opacity-70 mb-3">
-              Talent Recommendation
-            </div>
-            <h1 className="font-bold text-4xl lg:text-5xl tracking-[-0.03em] leading-[0.95]">
-              ¿Conocés talento?<br />Recomendalo.
-            </h1>
-            <div className="flex items-center gap-3 mt-5 max-w-md">
-              <div className="h-[1px] flex-1 bg-white/30" />
-              <p className="text-sm font-medium opacity-80">
-                Cada hoja de vida que llega por acá la revisamos en menos de 5 días.
-              </p>
-            </div>
-          </div>
-          <div className="text-[11px] opacity-60">© Trading Solutions · 2026</div>
-        </div>
-      </div>
-
-      {/* Lado derecho: form */}
-      <div className="flex-1 overflow-y-auto">
-        <form onSubmit={handleSubmit} className="max-w-2xl mx-auto p-6 sm:p-10">
-          <div className="md:hidden mb-6">
-            <img src={TS_LOGO} alt="Trading Solutions" className="h-10 w-auto invert" />
-          </div>
-
-          <div className="text-[10px] tracking-[2.5px] uppercase font-semibold text-gray-500 mb-2">Recomienda talento</div>
-          <h2 className="text-3xl font-bold tracking-[-0.02em] leading-tight mb-2">Comparte una hoja de vida.</h2>
+    <div className="min-h-screen bg-ts-canvas text-ts-ink flex flex-col">
+      <Navbar />
+      <div className="flex-1">
+        <form onSubmit={handleSubmit} className="max-w-2xl mx-auto px-6 py-12">
+          <p className="text-[13px] text-ts-accent mb-3">Recomienda talento</p>
+          <h1 className="ts-display font-light text-4xl mb-3">¿Conocés talento? Recomendalo.</h1>
           <p className="text-sm text-gray-600 mb-8">
             Para evitar el caos por WhatsApp y email, usamos esta página. La revisaremos pronto y te avisamos si avanzamos.
           </p>
@@ -171,7 +137,7 @@ export default function RecomendarHojaDeVidaPage() {
             <Input value={linkedinUrl} onChange={setLinkedinUrl} placeholder="https://linkedin.com/in/ana-lopez" />
           </Field>
           <Field label="Hoja de vida (PDF, máx 5MB)">
-            <label className="flex items-center gap-3 px-3 py-2.5 border-2 border-dashed border-gray-300 hover:border-black rounded-lg cursor-pointer transition-colors">
+            <label className="flex items-center gap-3 px-3 py-2.5 border border-dashed border-ts-hairline hover:border-ts-accent rounded-ts-sm cursor-pointer bg-ts-surface">
               <FileText className="w-4 h-4 text-gray-500 flex-shrink-0" />
               <input
                 type="file"
@@ -200,7 +166,7 @@ export default function RecomendarHojaDeVidaPage() {
               <select
                 value={relationship}
                 onChange={e => setRelationship(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-black"
+                className="w-full border border-ts-hairline rounded-ts-sm px-3 py-2.5 text-sm bg-ts-surface focus:outline-none focus:border-ts-accent"
               >
                 <option value="">— Elegir —</option>
                 <option value="ex-companero">Ex-compañero/a de trabajo</option>
@@ -230,7 +196,7 @@ export default function RecomendarHojaDeVidaPage() {
               placeholder="Cuéntanos brevemente sobre esta persona — su trayectoria, lo que la destaca, por qué crees que encaja con TS…"
               rows={4}
               maxLength={2000}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black resize-none"
+              className="w-full border border-ts-hairline rounded-ts-sm px-3 py-2 text-sm bg-ts-surface focus:outline-none focus:border-ts-accent resize-none"
             />
           </Field>
 
@@ -244,13 +210,12 @@ export default function RecomendarHojaDeVidaPage() {
           <button
             type="submit"
             disabled={phase === 'submitting' || !candidateName || !referrerName}
-            className="w-full bg-black hover:bg-gray-800 text-white text-sm font-semibold rounded-full mt-6 py-3.5 flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="pill-btn pill-btn-primary w-full justify-center mt-6 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {phase === 'submitting' ? 'Enviando…' : (
               <>
                 <Send className="w-4 h-4" />
                 Enviar recomendación
-                <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
@@ -260,13 +225,14 @@ export default function RecomendarHojaDeVidaPage() {
           </p>
         </form>
       </div>
+      <Footer />
     </div>
   );
 }
 
 function SectionTitle({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <h3 className={`text-[10px] uppercase tracking-[2px] font-semibold text-gray-500 mb-3 pb-2 border-b border-gray-100 ${className}`}>
+    <h3 className={`text-[13px] text-ts-ink-soft mb-3 pb-2 border-b border-ts-hairline ${className}`}>
       {children}
     </h3>
   );
@@ -275,7 +241,7 @@ function SectionTitle({ children, className = '' }: { children: React.ReactNode;
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div className="mb-3">
-      <label className="block text-[11px] uppercase tracking-wider font-semibold text-gray-700 mb-1.5">
+      <label className="block text-[13px] text-ts-secondary mb-1.5">
         {label} {required && <span className="text-red-600">*</span>}
       </label>
       {children}
@@ -291,7 +257,7 @@ function Input({ value, onChange, placeholder, type = 'text', required }: { valu
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       required={required}
-      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-black transition-colors"
+      className="w-full border border-ts-hairline rounded-ts-sm px-3 py-2.5 text-sm bg-ts-surface focus:outline-none focus:border-ts-accent transition-colors"
     />
   );
 }

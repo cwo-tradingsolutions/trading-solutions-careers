@@ -7,7 +7,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useLanguage } from "@/i18n/context";
 import { fetchOpenJobs, deriveDepartments, deriveModes, type Job } from "@/lib/vacancies-adapter";
-import { Search, MapPin, Briefcase, ArrowUpRight, ArrowLeft } from "lucide-react";
+import { Search, MapPin, ArrowLeft } from "lucide-react";
 
 function VacantesContent() {
   const searchParams = useSearchParams();
@@ -62,11 +62,10 @@ function VacantesContent() {
   return (
     <>
       <Navbar />
-      <div className="pt-28">
+      <div>
         <section className="py-12 md:py-16 bg-ts-canvas min-h-screen">
-          <div className="max-w-ts mx-auto px-6 lg:px-10">
-            {/* Header */}
-            <div className="mb-10">
+          <div className="max-w-ts mx-auto px-6 lg:px-8">
+            <div className="mb-8">
               <Link
                 href="/"
                 className="flex items-center gap-2 text-sm text-ts-muted hover:text-ts-accent mb-6 transition-colors"
@@ -74,8 +73,10 @@ function VacantesContent() {
                 <ArrowLeft size={16} />
                 {t.jobs.backHome}
               </Link>
-              <h1 className="section-title mb-2">{t.jobs.pageTitle}</h1>
-              <p className="text-ts-secondary">{t.jobs.pageSubtitle}</p>
+              <div className="flex items-end justify-between gap-4 pb-4 border-b border-ts-hairline">
+                <h1 className="section-title font-light">{t.jobs.pageTitle}</h1>
+                <p className="text-[13px] text-ts-muted">{t.jobs.pageSubtitle}</p>
+              </div>
             </div>
 
             {/* Search */}
@@ -144,49 +145,40 @@ function VacantesContent() {
             ) : (
             <>
             {/* Count */}
-            <p className="text-sm text-gray-500 mb-6">
+            <p className="text-sm text-ts-muted mb-6">
               {filtered.length} {filtered.length === 1 ? t.jobs.resultsSingular : t.jobs.resultsPlural}
             </p>
 
-            {/* Grid */}
             {filtered.length > 0 ? (
-              <div className="grid md:grid-cols-2 gap-5">
-                {filtered.map((job) => (
-                  <Link
-                    key={job.id}
-                    href={`/vacantes/${job.id}`}
-                    className="bg-ts-surface rounded-ts-lg p-7 border border-[color:var(--ts-line)] hover:border-ts-accent hover:-translate-y-1 transition-all duration-300"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="font-medium text-lg mb-1">{job.title[locale]}</h3>
-                        <p className="text-sm text-ts-muted">{deptName(job.dept)}</p>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filtered.map((job) => {
+                  const title = job.title[locale].trim();
+                  const headed = /[.!?]$/.test(title) ? title : `${title}.`;
+                  const summary = job.description[locale].replace(/\s+/g, " ").trim();
+                  return (
+                    <Link
+                      key={job.id}
+                      href={`/vacantes/${job.id}`}
+                      className="flex flex-col min-h-[260px] bg-ts-surface rounded-ts-lg p-7 border border-ts-hairline shadow-[var(--ts-shadow)] hover:-translate-y-0.5 transition-transform"
+                    >
+                      <div className="flex flex-wrap gap-2 mb-5">
+                        <span className="ts-pill ts-pill-accent">{deptName(job.dept)}</span>
+                        <span className="ts-pill">{modeName(job.mode)}</span>
                       </div>
-                      <span className="tag">{job.level}</span>
-                    </div>
-                    <p className="text-sm text-ts-secondary mb-5 leading-relaxed">
-                      {job.description[locale].substring(0, 120)}...
-                    </p>
-                    <div className="flex flex-wrap gap-2 mb-5">
-                      {job.tags.map((tag) => (
-                        <span key={tag} className="tag">{tag}</span>
-                      ))}
-                    </div>
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                      <div className="flex items-center gap-4">
-                        <span className="flex items-center gap-1.5 text-xs text-gray-500">
+                      <h3 className="ts-heading text-[22px] mb-2">{headed}</h3>
+                      <p className="text-sm text-ts-muted flex-1 leading-relaxed">
+                        {summary.length > 140 ? `${summary.slice(0, 137).trimEnd()}…` : summary}
+                      </p>
+                      <div className="mt-6 flex items-center justify-between text-[13px]">
+                        <span className="inline-flex items-center gap-1.5 text-ts-secondary">
                           <MapPin size={13} />
                           {job.location}
                         </span>
-                        <span className="flex items-center gap-1.5 text-xs text-gray-500">
-                          <Briefcase size={13} />
-                          {modeName(job.mode)}
-                        </span>
+                        <span className="text-ts-accent">{t.jobs.applyShort}</span>
                       </div>
-                      <ArrowUpRight size={16} className="text-ts-accent" />
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-16">

@@ -2,13 +2,13 @@ export type Locale = "es" | "en";
 
 export const translations = {
   es: {
-    nav: { culture: "Cultura", areas: "Áreas", experience: "Experiencia", viewJobs: "Ver vacantes" },
+    nav: { roles: "Vacantes", life: "Vida en TS", process: "Proceso", viewJobs: "Ver vacantes" },
     hero: {
-      tag: "Trading Solutions Careers",
-      title: "Tu próximo capítulo\nempieza aquí.",
+      tag: "Carreras",
+      title: "Construye mercados\ncon claridad.",
       subtitle: "Somos un boutique freight forwarder con operación en más de 10 países. Buscamos personas curiosas, comprometidas y con ganas de crecer junto a nosotros.",
-      cta: "Explorar oportunidades",
-      ctaSecondary: "Conoce nuestra cultura"
+      cta: "Explorar roles",
+      ctaSecondary: "Cómo contratamos"
     },
     stats: {
       countries: { value: "+10", label: "Países en operación" },
@@ -64,9 +64,9 @@ export const translations = {
       ]
     },
     cta: {
-      title: "¿Listo para lo que viene?",
-      subtitle: "Las mejores historias profesionales empiezan con una decisión valiente. Esta podría ser la tuya.",
-      button: "Ver todas las vacantes"
+      title: "¿No ves tu rol?",
+      subtitle: "Envía una aplicación general. Mantenemos un banco de talento.",
+      button: "Enviar hoja de vida"
     },
     footer: {
       tagline: "Boutique freight forwarder. Movemos lo que importa, con precisión y propósito.",
@@ -81,8 +81,9 @@ export const translations = {
       rights: "Todos los derechos reservados."
     },
     jobs: {
-      pageTitle: "Vacantes abiertas",
+      pageTitle: "Vacantes abiertas.",
       pageSubtitle: "Encuentra el rol que conecta con tu ambición.",
+      applyShort: "Aplicar →",
       backHome: "Volver al inicio",
       searchPlaceholder: "Buscar por título, área o habilidad...",
       deptLabel: "Departamento:",
@@ -136,13 +137,13 @@ export const translations = {
     }
   },
   en: {
-    nav: { culture: "Culture", areas: "Areas", experience: "Experience", viewJobs: "View openings" },
+    nav: { roles: "Open roles", life: "Life at TS", process: "Process", viewJobs: "View openings" },
     hero: {
-      tag: "Trading Solutions Careers",
-      title: "Your next chapter\nstarts here.",
+      tag: "Careers",
+      title: "Build markets\nwith clarity.",
       subtitle: "We are a boutique freight forwarder with operations in over 10 countries. We look for curious, committed people eager to grow with us.",
-      cta: "Explore opportunities",
-      ctaSecondary: "Learn about our culture"
+      cta: "Explore roles",
+      ctaSecondary: "How we hire"
     },
     stats: {
       countries: { value: "+10", label: "Countries of operation" },
@@ -198,9 +199,9 @@ export const translations = {
       ]
     },
     cta: {
-      title: "Ready for what's next?",
-      subtitle: "The best professional stories begin with a bold decision. This could be yours.",
-      button: "View all openings"
+      title: "Don't see your role.",
+      subtitle: "Send a general application — we keep a warm talent pool.",
+      button: "Submit resume"
     },
     footer: {
       tagline: "Boutique freight forwarder. We move what matters, with precision and purpose.",
@@ -215,8 +216,9 @@ export const translations = {
       rights: "All rights reserved."
     },
     jobs: {
-      pageTitle: "Open positions",
+      pageTitle: "Open roles.",
       pageSubtitle: "Find the role that matches your ambition.",
+      applyShort: "Apply →",
       backHome: "Back to home",
       searchPlaceholder: "Search by title, area, or skill...",
       deptLabel: "Department:",

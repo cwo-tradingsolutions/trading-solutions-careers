@@ -27,16 +27,15 @@ export default function LinkedInSetupPage() {
 
   return (
     <div className="min-h-screen bg-ts-canvas">
-      <header className="bg-ts-ink text-white">
+      <header className="border-b border-ts-hairline">
         <div className="max-w-4xl mx-auto px-6 py-10">
-          <Link href="/hr-admin" className="text-sm text-white/70 hover:text-white">
+          <Link href="/hr-admin" className="text-sm text-ts-muted hover:text-ts-accent">
             ← Volver al HR Admin
           </Link>
-          <h1 className="text-3xl font-light mt-4 tracking-tight flex items-center gap-3">
-            <span className="ts-mark" aria-hidden />
+          <h1 className="ts-heading text-3xl mt-4">
             Conectar LinkedIn Trading Solutions
           </h1>
-          <p className="text-white/70 mt-3 max-w-2xl">
+          <p className="text-ts-muted mt-3 max-w-2xl">
             Integración oficial vía <b>OAuth 2.0 corporativo</b> y{" "}
             <b>LinkedIn Talent Solutions · Recruiter System Connect (RSC)</b>. Nunca
             usamos el usuario y contraseña personales — sólo la App corporativa de
