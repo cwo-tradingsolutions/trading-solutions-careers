@@ -89,7 +89,7 @@ export default function JobDetailPage() {
       <>
         <Navbar />
         <div className="py-24 text-center min-h-screen bg-ts-canvas">
-          <h1 className="section-title mb-4">{t.jobs.notFound}</h1>
+          <h1 className="section-title font-light mb-4">{t.jobs.notFound}</h1>
           <Link href="/vacantes" className="pill-btn pill-btn-primary">
             {t.jobs.viewAll}
           </Link>
@@ -156,7 +156,7 @@ export default function JobDetailPage() {
             <span className="ts-pill ts-pill-accent">{deptName(job.dept)}</span>
             <span className="ts-pill">{modeName(job.mode)}</span>
           </div>
-          <h1 className="ts-display text-3xl md:text-5xl mb-3">{job.title[locale]}</h1>
+          <h1 className="ts-display font-light text-3xl md:text-5xl mb-3">{job.title[locale]}</h1>
           <div className="flex flex-wrap items-center gap-3 text-sm text-ts-muted">
             <span className="flex items-center gap-1.5">
               <MapPin size={14} />

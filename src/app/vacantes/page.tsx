@@ -74,7 +74,7 @@ function VacantesContent() {
                 {t.jobs.backHome}
               </Link>
               <div className="flex items-end justify-between gap-4 pb-4 border-b border-ts-hairline">
-                <h1 className="section-title">{t.jobs.pageTitle}</h1>
+                <h1 className="section-title font-light">{t.jobs.pageTitle}</h1>
                 <p className="text-[13px] text-ts-muted">{t.jobs.pageSubtitle}</p>
               </div>
             </div>

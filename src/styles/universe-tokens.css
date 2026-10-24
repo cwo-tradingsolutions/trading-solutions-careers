@@ -5,8 +5,8 @@
  * use var(--ts-*) or the Tailwind theme keys (bg-ts-canvas, text-ts-ink,
  * bg-ts-accent, rounded-ts-md, max-w-ts). Do not scatter raw hex in new UI.
  *
- * Open Sauce Two is first in --ts-font and is not vendored here. Inter, then
- * system-ui, carry the UI until that face is available. Do not claim SF Pro.
+ * Open Sauce Two is loaded from @fontsource/open-sauce-two (300/500/600).
+ * Inter, then system-ui, are the fallback. Do not claim SF Pro.
  *
  * Lima (--ts-highlight) is a small fill on dark surfaces only: a dot, a
  * badge, a short mark. Never a large background behind body text.

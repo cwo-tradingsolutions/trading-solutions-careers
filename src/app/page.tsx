@@ -47,7 +47,7 @@ export default function HomePage() {
       <main>
         <section className="max-w-ts mx-auto px-6 lg:px-8 pt-16 pb-12 md:pt-20">
           <p className="text-[13px] text-ts-accent mb-4">{t.hero.tag}</p>
-          <h1 className="hero-text max-w-[16ch] mb-5 whitespace-pre-line">{t.hero.title}</h1>
+          <h1 className="hero-text font-light max-w-[16ch] mb-5 whitespace-pre-line">{t.hero.title}</h1>
           <p className="text-[17px] text-ts-secondary max-w-[42ch] mb-8 leading-relaxed">{t.hero.subtitle}</p>
           <div className="flex flex-wrap gap-3">
             <Link href="/vacantes" className="pill-btn pill-btn-primary">

@@ -175,6 +175,18 @@
   }
 }
 
+/* Public display headlines stay Open Sauce Two Light.
+   Unlayered so body weight 500 and any utility cannot thicken them.
+   Large type is never bold. */
+h1.hero-text,
+h1.section-title,
+h1.ts-display,
+h1.ts-heading {
+  font-family: "Open Sauce Two", var(--font-inter), Inter, system-ui, sans-serif;
+  font-weight: 300;
+  font-synthesis: none;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    HR shell · data-ui="universe"
    The public site does not set this attribute. Inside the shell the

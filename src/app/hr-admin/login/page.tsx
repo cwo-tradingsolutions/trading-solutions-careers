@@ -28,7 +28,7 @@ export default function HRLoginPage() {
         setErr(j.error ?? "Clave incorrecta");
       }
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "error");
+      setErr(e instanceof Error ? e.message : "No se pudo verificar la clave");
     } finally {
       setLoading(false);
     }
@@ -36,14 +36,11 @@ export default function HRLoginPage() {
 
   return (
     <div className="min-h-screen bg-ts-canvas text-ts-ink flex flex-col">
-      <div className="flex justify-end px-6 pt-6">
-        <span className="text-[12px] text-ts-muted">HR</span>
-      </div>
-      <div className="flex-1 flex items-center justify-center px-6 pb-16">
+      <div className="flex-1 flex items-center justify-center px-6 py-16">
         <form onSubmit={submit} className="w-full max-w-sm">
           <UniverseMark className="mb-8" />
-          <p className="text-[13px] text-ts-accent mb-3">HR Admin</p>
-          <h1 className="ts-display text-4xl mb-2">Log in to Careers.</h1>
+          <p className="text-[13px] text-ts-accent mb-3">Panel HR</p>
+          <h1 className="ts-display font-light text-4xl mb-2">Ingresa a Careers.</h1>
           <p className="text-sm text-ts-muted mb-8">
             Acceso del equipo de Talent Acquisition.
           </p>

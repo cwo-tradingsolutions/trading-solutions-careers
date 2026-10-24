@@ -85,7 +85,7 @@ export default function RecomendarHojaDeVidaPage() {
             <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-ts-accent-soft flex items-center justify-center">
               <CheckCircle2 className="w-7 h-7 text-ts-accent-deep" />
             </div>
-            <h1 className="ts-heading text-3xl mb-3">Gracias por confiar en alguien.</h1>
+            <h1 className="ts-heading font-light text-3xl mb-3">Gracias por confiar en alguien.</h1>
             <h2 className="text-lg mb-2">Recomendación recibida</h2>
             <p className="text-sm text-gray-600 leading-relaxed">
               Gracias <strong>{referrerName.split(' ')[0]}</strong>. Recibimos la hoja de vida de{' '}
@@ -107,7 +107,7 @@ export default function RecomendarHojaDeVidaPage() {
       <div className="flex-1">
         <form onSubmit={handleSubmit} className="max-w-2xl mx-auto px-6 py-12">
           <p className="text-[13px] text-ts-accent mb-3">Recomienda talento</p>
-          <h1 className="ts-display text-4xl mb-3">¿Conocés talento? Recomendalo.</h1>
+          <h1 className="ts-display font-light text-4xl mb-3">¿Conocés talento? Recomendalo.</h1>
           <p className="text-sm text-gray-600 mb-8">
             Para evitar el caos por WhatsApp y email, usamos esta página. La revisaremos pronto y te avisamos si avanzamos.
           </p>
