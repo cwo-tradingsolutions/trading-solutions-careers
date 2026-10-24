@@ -48,6 +48,7 @@ import PrefiltrosPanel from "@/components/PrefiltrosPanel";
 import PipelineFunnel from "@/components/PipelineFunnel";
 import RejectionReasonsCard from "@/components/RejectionReasonsCard";
 import ReminderRulesEditor from "@/components/ReminderRulesEditor";
+import { FilterMenu, FilterPills } from "@/components/universe/Filters";
 
 type Tab =
   | "dashboard"
@@ -212,7 +213,7 @@ export default function HRAdminPage() {
             <button
               onClick={() => setSettingsOpen(true)}
               className="text-ts-ink-soft hover:text-ts-ink p-1.5"
-              title="Settings · metas del dashboard"
+              title="Ajustes · metas del tablero"
             >
               <SettingsIcon className="w-[18px] h-[18px]" />
             </button>
@@ -692,7 +693,7 @@ function CandidatesImportModal({ onClose, onDone }: { onClose: () => void; onDon
                 )}
                 {quickResult.inserted > 0 && (
                   <button onClick={onDone} className="mt-3 bg-black hover:bg-gray-800 text-white text-xs font-semibold px-4 py-2 rounded-full">
-                    Ver Funnel →
+                    Ver candidatos →
                   </button>
                 )}
               </div>
@@ -922,7 +923,7 @@ function CandidatesImportModal({ onClose, onDone }: { onClose: () => void; onDon
               onClick={onDone}
               className="bg-black hover:bg-gray-800 text-white font-semibold px-6 py-3 rounded-full text-sm"
             >
-              Ver Funnel →
+              Ver candidatos →
             </button>
           </div>
         )}
@@ -1131,29 +1132,31 @@ function Dashboard({ setTab }: { setTab: (t: Tab) => void }) {
   return (
     <>
       <PageHead
-        title="Dashboard"
+        title="Tablero"
         desc="Dónde se te está quedando la gente, y qué necesita cada vacante abierta."
         actions={
-          <div className="flex items-center gap-2">
-            <select
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <FilterMenu
+              ariaLabel="Vacante"
               value={selectedVacancy}
-              onChange={(e) => setSelectedVacancy(e.target.value)}
-              className="text-[13px] border border-neutral-200 rounded-md px-2.5 py-1.5 bg-white"
-            >
-              <option value="all">Todas las vacantes{vacanciesList.length ? ` (${vacanciesList.length})` : ""}</option>
-              {vacanciesList.map((v) => (
-                <option key={v.id} value={v.id}>{v.title}</option>
-              ))}
-            </select>
-            <select
+              onChange={setSelectedVacancy}
+              groups={[{
+                options: [
+                  { value: "all", label: `Todas las vacantes${vacanciesList.length ? ` (${vacanciesList.length})` : ""}` },
+                  ...vacanciesList.map((v) => ({ value: v.id, label: v.title })),
+                ],
+              }]}
+            />
+            <FilterPills
+              ariaLabel="País"
               value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              className="text-[13px] border border-neutral-200 rounded-md px-2.5 py-1.5 bg-white"
-            >
-              <option value="all">Todos los países</option>
-              <option value="Colombia">Colombia</option>
-              <option value="China">China</option>
-            </select>
+              onChange={setCountry}
+              options={[
+                { value: "all", label: "Todos los países" },
+                { value: "Colombia", label: "Colombia" },
+                { value: "China", label: "China" },
+              ]}
+            />
           </div>
         }
       />
@@ -1178,7 +1181,7 @@ function Dashboard({ setTab }: { setTab: (t: Tab) => void }) {
 
       <p className="text-[12px] text-neutral-400 mt-4">
         El detalle del pipeline (kanban, mover candidatos) sigue en la pestaña{" "}
-        <button onClick={() => setTab("funnel")} className="font-semibold underline">Funnel</button>. Aquí solo el diagnóstico.
+        <button onClick={() => setTab("funnel")} className="font-semibold underline">Candidatos</button>. Aquí solo el diagnóstico.
       </p>
     </>
   );
@@ -1431,8 +1434,12 @@ function VacanciesOverview({ vacancyFilter = 'all', onlyOpen = false }: { vacanc
 function OpenVacancyCard({ v, onResearch, onRediscover, onClose }: { v: VacancyOverview; onResearch: () => void; onRediscover?: () => void; onClose?: () => void }) {
   const m = v.milestones;
   const hasLinkedIn = !!m.linkedin_active_date;
-  const healthColor = v.health.score === 'green' ? '#10B981' : v.health.score === 'yellow' ? '#F59E0B' : '#EF4444';
-  const healthBg = v.health.score === 'green' ? '#ECFDF5' : v.health.score === 'yellow' ? '#FFFBEB' : '#FEF2F2';
+  const healthColor = v.health.score === 'green'
+    ? 'var(--ts-green)'
+    : v.health.score === 'yellow'
+      ? 'var(--ts-amber)'
+      : 'var(--ts-alert)';
+  const healthLabel = v.health.score === 'green' ? 'Al día' : v.health.score === 'yellow' ? 'Atención' : 'Crítico';
   const targetPct = v.metrics.target_days > 0
     ? Math.min(100, Math.round(((v.metrics.days_active || 0) / v.metrics.target_days) * 100))
     : 0;
@@ -1453,18 +1460,15 @@ function OpenVacancyCard({ v, onResearch, onRediscover, onClose }: { v: VacancyO
           className="absolute inset-0"
           style={{ background: `linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.55) 100%)` }}
         />
-        {/* Top accent bar - color del health */}
-        <div className="absolute top-0 left-0 right-0 h-[4px]" style={{ background: healthColor }} />
-        {/* Area name superpuesta */}
         <div className="absolute bottom-1.5 left-3 right-3 flex items-end justify-between text-white">
           <span className="text-[10px] uppercase tracking-[1.5px] font-semibold opacity-85">{v.area || '—'}</span>
           <span
-            className="flex-shrink-0 inline-flex items-center gap-1 bg-black/40 backdrop-blur px-1.5 py-0.5 rounded-full"
+            className="flex-shrink-0 inline-flex items-center gap-1.5 rounded-ts-pill bg-ts-surface px-2 py-0.5"
             title={v.health.reason}
           >
             <span className="w-1.5 h-1.5 rounded-full" style={{ background: healthColor }} />
-            <span className="text-[9px] font-bold uppercase tracking-wider">
-              {v.health.score === 'green' ? 'On track' : v.health.score === 'yellow' ? 'Atención' : 'Crítico'}
+            <span className="text-[11px] font-medium" style={{ color: healthColor }}>
+              {healthLabel}
             </span>
           </span>
         </div>
@@ -1494,17 +1498,17 @@ function OpenVacancyCard({ v, onResearch, onRediscover, onClose }: { v: VacancyO
       </div>
 
       {/* Days vs target progress */}
-      <div className="mb-3 p-2 rounded-lg" style={{ background: healthBg }}>
+      <div className="mb-3 p-2 rounded-lg bg-ts-canvas">
         <div className="flex items-baseline justify-between mb-1">
-          <span className="text-[10px] uppercase font-bold" style={{ color: healthColor }}>Health</span>
-          <span className="text-[10px] font-bold" style={{ color: healthColor }}>
-            {v.metrics.days_active}d / {v.metrics.target_days}d target
+          <span className="text-[10px] uppercase font-medium" style={{ color: healthColor }}>Estado</span>
+          <span className="text-[10px] text-ts-ink-soft">
+            {v.metrics.days_active}d / {v.metrics.target_days}d meta
           </span>
         </div>
-        <div className="h-1.5 bg-white/60 rounded-full overflow-hidden">
+        <div className="h-1 bg-ts-surface-2 rounded-full overflow-hidden">
           <div className="h-full rounded-full transition-all" style={{ width: `${targetPct}%`, background: healthColor }} />
         </div>
-        <div className="text-[9px] mt-1 leading-tight" style={{ color: healthColor }}>
+        <div className="text-[11px] mt-1 leading-tight text-ts-muted">
           {v.health.reason}
         </div>
       </div>
@@ -4389,7 +4393,7 @@ function CVBank() {
   return (
     <>
       <PageHead
-        title="CV Bank · Talent Pool"
+        title="Banco de hojas de vida"
         desc={
           loading
             ? "Cargando perfiles…"
@@ -5650,7 +5654,7 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
   };
 
   return (
-    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-start justify-center pt-[8vh] px-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[200] ts-scrim flex items-start justify-center pt-[8vh] px-4" onClick={onClose}>
       <div
         className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden"
         onClick={e => e.stopPropagation()}
@@ -5672,47 +5676,49 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
           <kbd className="text-[9px] font-mono bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5 text-gray-500">ESC</kbd>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-gray-100 bg-gray-50">
-          <span className="text-[10px] uppercase font-bold text-gray-500">Filtros:</span>
-          <select
+        <div className="flex flex-col gap-2 px-4 py-3 border-b border-ts-hairline bg-ts-canvas">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[11px] text-ts-ink-mute">Etapa</span>
+            <span className="text-[11px] text-ts-ink-mute">
+              {loading ? 'Buscando…' : `${results.length} resultado${results.length !== 1 ? 's' : ''}`}
+            </span>
+          </div>
+          <FilterPills
+            ariaLabel="Etapa"
             value={filterStage}
-            onChange={e => setFilterStage(e.target.value)}
-            className="text-xs border border-gray-200 rounded px-2 py-1 bg-white focus:outline-none focus:border-black"
-          >
-            <option value="">Todos los stages</option>
-            <optgroup label="Activos">
-              {['aplico','prefiltro_enviado','prefiltro_pasado','prefiltro_revision','assessment_invitado','assessment_en_progreso','assessment_completado','entrevista_ia','bateria_psicometrica','recruiter_interview','cwo_interview','touring','terna','oferta'].map(s => (
-                <option key={s} value={s}>{stageLabelShort(s)}</option>
-              ))}
-            </optgroup>
-            <optgroup label="Cerrados">
-              <option value="contratado">Contratados</option>
-              <option value="rechazado">Rechazados</option>
-            </optgroup>
-          </select>
-          <select
-            value={filterMinScore}
-            onChange={e => setFilterMinScore(e.target.value)}
-            className="text-xs border border-gray-200 rounded px-2 py-1 bg-white focus:outline-none focus:border-black"
-          >
-            <option value="">Score mínimo</option>
-            <option value="50">≥ 50</option>
-            <option value="70">≥ 70</option>
-            <option value="80">≥ 80</option>
-            <option value="90">≥ 90</option>
-          </select>
-          {(filterStage || filterMinScore) && (
-            <button
-              onClick={() => { setFilterStage(''); setFilterMinScore(''); }}
-              className="text-[10px] text-red-600 font-bold hover:underline"
-            >
-              Limpiar filtros
-            </button>
-          )}
-          <span className="ml-auto text-[10px] text-gray-500">
-            {loading ? 'Buscando…' : `${results.length} resultado${results.length !== 1 ? 's' : ''}`}
-          </span>
+            onChange={setFilterStage}
+            options={[
+              { value: '', label: 'Todas' },
+              ...['aplico','prefiltro_enviado','prefiltro_pasado','prefiltro_revision','assessment_invitado','assessment_en_progreso','assessment_completado','entrevista_ia','bateria_psicometrica','recruiter_interview','cwo_interview','touring','terna','oferta','contratado','rechazado'].map((stage) => ({
+                value: stage,
+                label: stageLabelShort(stage),
+              })),
+            ]}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] text-ts-ink-mute">Puntaje mínimo</span>
+            <FilterPills
+              ariaLabel="Puntaje mínimo"
+              value={filterMinScore}
+              onChange={setFilterMinScore}
+              options={[
+                { value: '', label: 'Cualquiera' },
+                { value: '50', label: '50 o más' },
+                { value: '70', label: '70 o más' },
+                { value: '80', label: '80 o más' },
+                { value: '90', label: '90 o más' },
+              ]}
+            />
+            {(filterStage || filterMinScore) && (
+              <button
+                type="button"
+                onClick={() => { setFilterStage(''); setFilterMinScore(''); }}
+                className="text-[12px] text-ts-accent-deep"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Results */}
@@ -5724,7 +5730,7 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
               </div>
               <div className="text-sm font-bold text-gray-700">Sin resultados</div>
               <div className="text-xs text-gray-500 mt-1">
-                {debouncedQ ? `No encontramos candidatos para "${debouncedQ}"` : 'Empezá a escribir para buscar'}
+                {debouncedQ ? `No encontramos candidatos para "${debouncedQ}"` : 'Empieza a escribir para buscar'}
               </div>
             </div>
           )}
@@ -5753,7 +5759,7 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
                         c.overall_score >= 60 ? 'bg-amber-100 text-amber-800' :
                         'bg-gray-100 text-gray-700'
                       }`}>
-                        Score {c.overall_score}
+                        Puntaje {c.overall_score}
                       </span>
                     )}
                   </div>
@@ -5780,7 +5786,7 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
             <span><kbd className="bg-white border border-gray-200 rounded px-1 py-0.5 text-[9px] font-mono">↵</kbd> abrir</span>
             <span><kbd className="bg-white border border-gray-200 rounded px-1 py-0.5 text-[9px] font-mono">ESC</kbd> cerrar</span>
           </div>
-          <span>Click en candidato → Funnel</span>
+          <span>Clic abre Candidatos</span>
         </div>
       </div>
     </div>
@@ -7615,8 +7621,8 @@ function OnboardingTab() {
     <div>
       <TSSectionBanner
         image={TS_IMG.contact}
-        title="Onboarding"
-        subtitle="Plan 30/60/90 para nuevos hires · integrado con People file"
+        title="Inducción"
+        subtitle="Plan 30/60/90 para personas que ingresan"
         icon="🎉"
       />
 
@@ -7647,7 +7653,7 @@ function OnboardingTab() {
         <KpiTile label="Día 30" value={counts.day30} accent={MS_COLOR.day30} />
         <KpiTile label="Día 60" value={counts.day60} accent={MS_COLOR.day60} />
         <KpiTile label="Día 90" value={counts.day90} accent={MS_COLOR.day90} />
-        <KpiTile label="At risk" value={counts.at_risk} accent="#EF4444" />
+        <KpiTile label="En riesgo" value={counts.at_risk} accent="var(--ts-alert)" />
       </div>
 
       {/* Filter pills */}
@@ -7719,8 +7725,8 @@ function KpiTile({ label, value, accent }: { label: string; value: number; accen
 }
 
 function OnboardingCard({ item, onClick }: { item: OnboardingItem; onClick: () => void }) {
-  const healthColor = item.health === 'at_risk' ? '#EF4444' : item.health === 'behind' ? '#F59E0B' : '#10B981';
-  const healthLabel = item.health === 'at_risk' ? 'At risk' : item.health === 'behind' ? 'Atrasado' : 'On track';
+  const healthColor = item.health === 'at_risk' ? 'var(--ts-alert)' : item.health === 'behind' ? 'var(--ts-amber)' : 'var(--ts-green)';
+  const healthLabel = item.health === 'at_risk' ? 'En riesgo' : item.health === 'behind' ? 'Atrasado' : 'Al día';
   const mColor = MS_COLOR[item.current_milestone];
 
   return (
@@ -7728,8 +7734,6 @@ function OnboardingCard({ item, onClick }: { item: OnboardingItem; onClick: () =
       onClick={onClick}
       className="text-left bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow relative overflow-hidden"
     >
-      <div className="absolute top-0 left-0 right-0 h-[4px]" style={{ background: healthColor }} />
-
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex-1 min-w-0">
@@ -7737,8 +7741,8 @@ function OnboardingCard({ item, onClick }: { item: OnboardingItem; onClick: () =
           <div className="text-[10px] text-gray-500 truncate">{item.person.role} · {item.person.area || '—'}</div>
         </div>
         <span
-          className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase"
-          style={{ background: `${healthColor}1A`, color: healthColor }}
+          className="text-[11px] font-medium px-2 py-0.5 rounded-ts-pill bg-ts-canvas"
+          style={{ color: healthColor }}
         >
           {healthLabel}
         </span>

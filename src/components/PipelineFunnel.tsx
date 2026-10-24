@@ -16,6 +16,7 @@ import { rubricaDeVacante } from "@/lib/rubricas";
 import { escucharPedidos, tomarPedidoDeCandidato } from "@/lib/abrirCandidato";
 import HistorialContactos from "@/components/HistorialContactos";
 import SeguimientoVacante from "@/components/SeguimientoVacante";
+import { FilterMenu, FilterPills } from "@/components/universe/Filters";
 
 // Map de stage → icono Lucide. Centralizado para reutilizar en cualquier render.
 const STAGE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -560,9 +561,9 @@ export default function PipelineFunnel() {
       <div className="mb-8 pb-6 border-b border-[var(--ts-gray-10)]">
         <div className="flex items-end justify-between flex-wrap gap-6">
           <div>
-            <div className="ts-eyebrow mb-3">Talent Acquisition · Pipeline</div>
+            <div className="ts-eyebrow mb-3">Selección</div>
             <h1 className="ts-display text-[44px] md:text-[56px] text-[var(--ts-black)] m-0">
-              Funnel
+              Candidatos
             </h1>
             <p className="text-[15px] text-[var(--ts-gray-60)] mt-3 max-w-[640px] leading-[1.55]">
               Vista del proceso completo · {totals} candidatos
@@ -579,81 +580,73 @@ export default function PipelineFunnel() {
               </a>
             </p>
           </div>
-          <div className="flex flex-col items-end gap-1.5">
+          <div className="flex flex-col items-end gap-3">
             {/* Quién lleva el proceso. Aparece solo cuando hay equipo cargado:
                 con una sola persona reclutando, el filtro es ruido. */}
             {reclutadores.length > 1 && (
               <div className="flex items-center gap-2">
                 <span className="ts-eyebrow text-[10px]">Reclutador</span>
-                <select
+                <FilterMenu
+                  ariaLabel="Reclutador"
                   value={duenoFilter}
-                  onChange={(e) => {
-                    setDuenoFilter(e.target.value);
+                  onChange={(value) => {
+                    setDuenoFilter(value);
                     setVacFilter("all");
                   }}
-                  className="text-xs font-medium border border-[var(--ts-gray-20)] bg-white px-2 py-1 hover:border-[var(--ts-black)] focus:border-[var(--ts-black)] outline-none transition-colors"
-                  style={{ borderRadius: 0 }}
-                  title="Muestra solo las vacantes de esa persona, como dueña o como apoyo"
-                >
-                  <option value="all">Todo el equipo</option>
-                  {reclutadores
-                    .filter((r) => r.rol !== "hiring_manager")
-                    .map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.nombre}
-                      </option>
-                    ))}
-                </select>
+                  groups={[{
+                    options: [
+                      { value: "all", label: "Todo el equipo" },
+                      ...reclutadores
+                        .filter((r) => r.rol !== "hiring_manager")
+                        .map((r) => ({ value: r.id, label: r.nombre })),
+                    ],
+                  }]}
+                />
                 <a
                   href="/hr-admin/reclutadores"
                   className="text-[11px] underline text-[var(--ts-gray-60)] hover:text-[var(--ts-black)] whitespace-nowrap"
-                  title="Equipo de Talent y dueños de vacante"
+                  title="Equipo de selección y dueños de vacante"
                 >
                   equipo
                 </a>
               </div>
             )}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
               <span className="ts-eyebrow text-[10px]">Origen</span>
-              <select
+              <FilterPills
+                ariaLabel="Origen"
                 value={origenFilter}
-                onChange={(e) => setOrigenFilter(e.target.value as "all" | "cv_proceso_anterior" | "web")}
-                className="text-xs font-medium border border-[var(--ts-gray-20)] bg-white px-2 py-1 hover:border-[var(--ts-black)] focus:border-[var(--ts-black)] outline-none transition-colors"
-                style={{ borderRadius: 0 }}
-                title="Separa las hojas de vida cargadas de un proceso anterior de quienes aplicaron por la web"
-              >
-                <option value="all">Todos</option>
-                <option value="cv_proceso_anterior">CV proceso anterior</option>
-                <option value="web">Aplicaron por la web</option>
-              </select>
+                onChange={(value) => setOrigenFilter(value as "all" | "cv_proceso_anterior" | "web")}
+                options={[
+                  { value: "all", label: "Todos" },
+                  { value: "cv_proceso_anterior", label: "CV de un proceso anterior" },
+                  { value: "web", label: "Aplicaron por la web" },
+                ]}
+              />
             </div>
             <span className="ts-eyebrow text-[10px]">Vacante</span>
-            <div className="flex items-center gap-2">
-              <select
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <FilterMenu
+                ariaLabel="Vacante"
                 value={vacFilter}
-                onChange={(e) => setVacFilter(e.target.value)}
-                className="text-sm font-medium border border-[var(--ts-gray-20)] bg-white px-4 py-2.5 hover:border-[var(--ts-black)] focus:border-[var(--ts-black)] outline-none transition-colors min-w-[240px]"
-                style={{ borderRadius: 0 }}
-              >
-                <option value="all">Todas las vacantes</option>
-                {opcionesVacante.abiertas.map(o => (
-                  <option key={o.id} value={o.id}>{o.label}</option>
-                ))}
-                {/* Las cerradas solo aparecen si se piden. Se sigue mostrando
-                    la que esté seleccionada aunque esté cerrada: si no, el
-                    selector quedaría en blanco filtrando por algo invisible. */}
-                {opcionesVacante.cerradas
-                  .filter(o => verCerradas || o.id === vacFilter)
-                  .length > 0 && (
-                  <optgroup label="Cerradas (con candidatos)">
-                    {opcionesVacante.cerradas
-                      .filter(o => verCerradas || o.id === vacFilter)
-                      .map(o => (
-                        <option key={o.id} value={o.id}>{o.label}</option>
-                      ))}
-                  </optgroup>
-                )}
-              </select>
+                onChange={setVacFilter}
+                groups={[
+                  {
+                    options: [
+                      { value: "all", label: "Todas las vacantes" },
+                      ...opcionesVacante.abiertas.map((o) => ({ value: o.id, label: o.label })),
+                    ],
+                  },
+                  ...(opcionesVacante.cerradas.filter((o) => verCerradas || o.id === vacFilter).length > 0
+                    ? [{
+                        label: "Cerradas (con candidatos)",
+                        options: opcionesVacante.cerradas
+                          .filter((o) => verCerradas || o.id === vacFilter)
+                          .map((o) => ({ value: o.id, label: o.label })),
+                      }]
+                    : []),
+                ]}
+              />
               {opcionesVacante.cerradas.length > 0 && (
                 <label
                   className="flex items-center gap-1.5 text-[11px] text-[var(--ts-gray-60)] whitespace-nowrap cursor-pointer"
@@ -751,7 +744,23 @@ export default function PipelineFunnel() {
       )}
 
       {loading ? (
-        <div className="text-center py-16 ts-eyebrow text-[var(--ts-gray-40)]">Cargando pipeline…</div>
+        <div className="py-6" aria-busy="true" aria-live="polite">
+          <p className="text-sm text-ts-muted mb-4">Cargando candidatos…</p>
+          <div className="flex gap-2 overflow-hidden">
+            {["Aplicó", "Prefiltro", "Entrevista", "Oferta", "Decisión"].map((label) => (
+              <div key={label} className="w-[220px] shrink-0 rounded-ts-md border border-ts-hairline bg-ts-surface overflow-hidden">
+                <div className="px-3 py-3 border-b border-ts-hairline bg-ts-canvas">
+                  <div className="h-3 w-16 rounded-ts-pill bg-ts-surface-2" />
+                  <p className="mt-2 text-[12px] text-ts-ink-mute">{label}</p>
+                </div>
+                <div className="p-3 space-y-2">
+                  <div className="h-14 rounded-ts-sm bg-ts-canvas" />
+                  <div className="h-14 rounded-ts-sm bg-ts-canvas" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : (
         <>
           {/* ════════════════ LEYENDA DE OWNERS ════════════════ */}

@@ -92,7 +92,10 @@
   --ts-gray-05: var(--ts-canvas);
   --ts-white: var(--ts-surface);
 
-  /* Status signals. Not brand chrome — do not use amber for actions or fills. */
+  /* Status signals. Not brand chrome — do not use these for actions or fills.
+     Success is --ts-green. Warning is --ts-amber.
+     Alert (--ts-alert) is the quiet “Crítico” mark: readable, lower chroma
+     than --ts-red, and meant for a dot or a small chip, not a card wash. */
   --ts-red: #c41818;
   --ts-red-bg: #fef5f5;
   --ts-red-border: #fcc;
@@ -102,6 +105,9 @@
   --ts-amber: #b45309;
   --ts-amber-bg: #fef4e8;
   --ts-amber-border: #fbd9b2;
+  --ts-alert: #7a4f4f;
+  --ts-alert-bg: #f6f1f1;
+  --ts-alert-border: #e7dcdc;
   --ts-blue: var(--ts-accent);
   --ts-blue-bg: #e8f3fd;
   --ts-blue-border: #c5dff8;

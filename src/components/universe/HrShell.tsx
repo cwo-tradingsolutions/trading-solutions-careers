@@ -11,12 +11,12 @@ type PathItem = { kind: "path"; href: string; label: string };
 type NavItem = HashItem | PathItem;
 
 const PRIMARY: NavItem[] = [
-  { kind: "hash", id: "dashboard", label: "Dashboard" },
+  { kind: "hash", id: "dashboard", label: "Tablero" },
   { kind: "hash", id: "funnel", label: "Candidatos" },
-  { kind: "hash", id: "vacantes", label: "Roles" },
+  { kind: "hash", id: "vacantes", label: "Vacantes" },
   { kind: "hash", id: "requisiciones", label: "Requisiciones" },
-  { kind: "hash", id: "onboarding", label: "Onboarding" },
-  { kind: "hash", id: "cvbank", label: "CV Bank" },
+  { kind: "hash", id: "onboarding", label: "Inducción" },
+  { kind: "hash", id: "cvbank", label: "Banco de HV" },
   { kind: "hash", id: "rubricas", label: "Rúbricas" },
   { kind: "hash", id: "nuevebox", label: "Decisiones" },
   { kind: "hash", id: "plantillas", label: "Ajustes" },
@@ -99,19 +99,19 @@ export default function HrShell({ children }: { children: React.ReactNode }) {
         <div className="flex items-center justify-between gap-3 px-2">
           <Link href="/hr-admin" className="flex items-center gap-3 text-sm text-white" onClick={() => setOpen(false)}>
             <UniverseMark tone="on-dark" />
-            <span>Careers ATS</span>
+            <span>Careers</span>
           </Link>
           <button type="button" className="md:hidden text-white/70 p-1" onClick={() => setOpen(false)} aria-label="Cerrar">
             <X size={18} />
           </button>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto" aria-label="HR">
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto" aria-label="Navegación">
           {links(PRIMARY)}
           <div className="my-3 mx-2 h-px bg-white/10" />
           {links(MORE)}
         </nav>
         <div className="rounded-ts-md border border-white/10 bg-white/5 px-3 py-3 text-xs text-white/55">
-          <strong className="block font-medium text-white mb-1">Workspace · Trading</strong>
+          <strong className="block font-medium text-white mb-1">Espacio · Trading</strong>
           Careers
         </div>
       </aside>
@@ -121,7 +121,7 @@ export default function HrShell({ children }: { children: React.ReactNode }) {
             <Menu size={20} />
           </button>
           <UniverseMark />
-          <span className="text-sm">Careers ATS</span>
+          <span className="text-sm">Careers</span>
         </div>
         {children}
       </div>

@@ -42,7 +42,7 @@ export default function HRLoginPage() {
           <p className="text-[13px] text-ts-accent mb-3">Panel HR</p>
           <h1 className="ts-display font-light text-4xl mb-2">Ingresa a Careers.</h1>
           <p className="text-sm text-ts-muted mb-8">
-            Acceso del equipo de Talent Acquisition.
+            Acceso del equipo de selección.
           </p>
 
           <label className="block text-sm text-ts-secondary mb-2">
