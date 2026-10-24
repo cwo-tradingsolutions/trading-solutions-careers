@@ -2,66 +2,72 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, X, ArrowUpRight } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useLanguage } from "@/i18n/context";
-import LanguageBanner from "./LanguageBanner";
-import { LOGO_TS_SIMBOLO } from "@/lib/brand";
+import UniverseMark from "./universe/Mark";
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { t } = useLanguage();
+  const { t, locale, setLocale } = useLanguage();
+
+  const close = () => setMobileOpen(false);
 
   return (
-    <>
-      <LanguageBanner />
-      <nav className="fixed top-8 w-full z-50 bg-ts-surface/90 backdrop-blur-md border-b border-[color:var(--ts-line)] transition-all">
-        <div className="max-w-ts mx-auto px-6 lg:px-10 flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={LOGO_TS_SIMBOLO}
-              alt="Trading Solutions"
-              className="h-8 w-auto"
-            />
+    <header className="sticky top-0 z-50 border-b border-ts-hairline bg-ts-canvas">
+      <div className="max-w-ts mx-auto px-6 lg:px-8 flex items-center justify-between gap-6" style={{ minHeight: "var(--ts-header)" }}>
+        <Link href="/" className="flex items-center gap-3 text-[15px] text-ts-ink">
+          <UniverseMark />
+          Trading Solutions
+        </Link>
+        <nav className="hidden md:flex items-center gap-7 text-sm text-ts-secondary" aria-label="Primary">
+          <Link href="/vacantes" className="hover:text-ts-ink transition-colors">
+            {t.nav.roles}
           </Link>
-          <div className="hidden md:flex items-center gap-8">
-            <Link href="/#culture" className="text-sm font-medium text-ts-secondary hover:text-ts-accent transition-colors">
-              {t.nav.culture}
-            </Link>
-            <Link href="/#departments" className="text-sm font-medium text-ts-secondary hover:text-ts-accent transition-colors">
-              {t.nav.areas}
-            </Link>
-            <Link href="/#experience" className="text-sm font-medium text-ts-secondary hover:text-ts-accent transition-colors">
-              {t.nav.experience}
-            </Link>
-            <Link href="/vacantes" className="pill-btn pill-btn-primary text-sm !py-2.5 !px-5">
-              {t.nav.viewJobs}
-              <ArrowUpRight size={14} strokeWidth={2.5} />
-            </Link>
+          <Link href="/#life" className="hover:text-ts-ink transition-colors">
+            {t.nav.life}
+          </Link>
+          <Link href="/#process" className="hover:text-ts-ink transition-colors">
+            {t.nav.process}
+          </Link>
+        </nav>
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center rounded-ts-pill bg-ts-surface-2 p-0.5 text-[12px]" aria-label="Language">
+            <button
+              type="button"
+              onClick={() => setLocale("en")}
+              className={`px-2.5 py-1 rounded-ts-pill ${locale === "en" ? "bg-ts-surface text-ts-accent" : "text-ts-muted"}`}
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              onClick={() => setLocale("es")}
+              className={`px-2.5 py-1 rounded-ts-pill ${locale === "es" ? "bg-ts-surface text-ts-accent" : "text-ts-muted"}`}
+            >
+              ES
+            </button>
           </div>
-          <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2">
-            {mobileOpen ? <X size={24} /> : <Menu size={24} />}
+          <Link href="/vacantes" className="pill-btn pill-btn-primary !py-2.5 !px-4 text-sm">
+            {t.nav.viewJobs}
+          </Link>
+          <button type="button" onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2 text-ts-ink" aria-label="Menu">
+            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
-        {mobileOpen && (
-          <div className="md:hidden bg-ts-surface border-t border-[color:var(--ts-line)] px-6 pb-6 pt-4">
-            <div className="flex flex-col gap-4">
-              <Link href="/#culture" onClick={() => setMobileOpen(false)} className="text-base font-medium text-ts-secondary">
-                {t.nav.culture}
-              </Link>
-              <Link href="/#departments" onClick={() => setMobileOpen(false)} className="text-base font-medium text-ts-secondary">
-                {t.nav.areas}
-              </Link>
-              <Link href="/#experience" onClick={() => setMobileOpen(false)} className="text-base font-medium text-ts-secondary">
-                {t.nav.experience}
-              </Link>
-              <Link href="/vacantes" onClick={() => setMobileOpen(false)} className="pill-btn pill-btn-primary text-sm justify-center mt-2">
-                {t.nav.viewJobs}
-              </Link>
+      </div>
+      {mobileOpen && (
+        <div className="md:hidden border-t border-ts-hairline bg-ts-canvas px-6 pb-6 pt-4">
+          <div className="flex flex-col gap-4 text-base">
+            <Link href="/vacantes" onClick={close}>{t.nav.roles}</Link>
+            <Link href="/#life" onClick={close}>{t.nav.life}</Link>
+            <Link href="/#process" onClick={close}>{t.nav.process}</Link>
+            <div className="flex gap-2 text-sm">
+              <button type="button" onClick={() => setLocale("en")} className={locale === "en" ? "text-ts-accent" : "text-ts-muted"}>EN</button>
+              <button type="button" onClick={() => setLocale("es")} className={locale === "es" ? "text-ts-accent" : "text-ts-muted"}>ES</button>
             </div>
           </div>
-        )}
-      </nav>
-    </>
+        </div>
+      )}
+    </header>
   );
 }

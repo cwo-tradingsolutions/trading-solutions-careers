@@ -76,8 +76,8 @@ export default function JobDetailPage() {
     return (
       <>
         <Navbar />
-        <div className="pt-40 pb-20 text-center min-h-screen bg-white">
-          <p className="text-gray-400 text-lg">{locale === "es" ? "Cargando..." : "Loading..."}</p>
+        <div className="py-24 text-center min-h-screen bg-ts-canvas">
+          <p className="text-ts-muted text-lg">{locale === "es" ? "Cargando..." : "Loading..."}</p>
         </div>
         <Footer />
       </>
@@ -88,7 +88,7 @@ export default function JobDetailPage() {
     return (
       <>
         <Navbar />
-        <div className="pt-40 pb-20 text-center min-h-screen bg-white">
+        <div className="py-24 text-center min-h-screen bg-ts-canvas">
           <h1 className="section-title mb-4">{t.jobs.notFound}</h1>
           <Link href="/vacantes" className="pill-btn pill-btn-primary">
             {t.jobs.viewAll}
@@ -143,28 +143,25 @@ export default function JobDetailPage() {
     <>
       <Navbar />
 
-      {/* Hero header */}
-      <div className="bg-ts-ink text-white pt-32 pb-12">
-        <div className="max-w-4xl mx-auto px-6 lg:px-10">
+      <div className="bg-ts-canvas pt-10 pb-4">
+        <div className="max-w-4xl mx-auto px-6 lg:px-8">
           <Link
             href="/vacantes"
-            className="flex items-center gap-2 text-sm text-white/60 hover:text-white mb-8 transition-colors"
+            className="flex items-center gap-2 text-sm text-ts-muted hover:text-ts-accent mb-6 transition-colors"
           >
             <ArrowLeft size={16} />
             {t.jobs.backToJobs}
           </Link>
-          <span className="tag mb-4 bg-white/10 text-white border-transparent inline-flex items-center gap-2">
-            <span className="ts-mark" aria-hidden />
-            {deptName(job.dept)}
-          </span>
-          <h1 className="text-3xl md:text-5xl font-light mt-4 mb-3 tracking-tight">{job.title[locale]}</h1>
-          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400">
+          <div className="flex flex-wrap gap-2 mb-4">
+            <span className="ts-pill ts-pill-accent">{deptName(job.dept)}</span>
+            <span className="ts-pill">{modeName(job.mode)}</span>
+          </div>
+          <h1 className="ts-display text-3xl md:text-5xl mb-3">{job.title[locale]}</h1>
+          <div className="flex flex-wrap items-center gap-3 text-sm text-ts-muted">
             <span className="flex items-center gap-1.5">
               <MapPin size={14} />
               {job.location}
             </span>
-            <span>·</span>
-            <span>{modeName(job.mode)}</span>
             <span>·</span>
             <span>{job.level}</span>
           </div>
@@ -226,15 +223,15 @@ export default function JobDetailPage() {
       {/* Apply Modal */}
       {showApply && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 ts-scrim z-50 flex items-center justify-center p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setShowApply(false); }}
         >
-          <div className="bg-white rounded-2xl max-w-[720px] w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-ts-surface rounded-ts-lg max-w-[720px] w-full max-h-[90vh] overflow-y-auto border border-ts-hairline">
             <div className="p-8 md:p-10">
               <div className="flex items-center justify-between mb-8">
                 <div>
                   <p className="text-sm text-gray-500 mb-1">{t.jobs.applyTo}</p>
-                  <h2 className="text-xl font-bold">{job.title[locale]}</h2>
+                  <h2 className="ts-heading text-xl">{job.title[locale]}</h2>
                 </div>
                 <button
                   onClick={() => setShowApply(false)}
@@ -322,15 +319,15 @@ export default function JobDetailPage() {
       {/* Success Modal */}
       {submitted && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 ts-scrim z-50 flex items-center justify-center p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setSubmitted(false); }}
         >
-          <div className="bg-white rounded-2xl max-w-[480px] w-full">
+          <div className="bg-ts-surface rounded-ts-lg max-w-[480px] w-full border border-ts-hairline">
             <div className="p-10 text-center">
               <div className="w-16 h-16 bg-ts-accent rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle size={28} className="text-white" />
               </div>
-              <h3 className="text-2xl font-bold mb-3">{t.jobs.successTitle}</h3>
+              <h3 className="ts-heading text-2xl mb-3">{t.jobs.successTitle}</h3>
               <p className="text-gray-500 mb-8">{t.jobs.successMsg}</p>
               <Link href="/vacantes" className="pill-btn pill-btn-primary">
                 {t.jobs.backToJobsBtn}

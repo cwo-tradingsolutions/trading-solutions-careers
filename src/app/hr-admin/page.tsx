@@ -4,65 +4,39 @@ import FunnelTiming from "@/components/FunnelTiming";
 import RubricasPanel from "@/components/RubricasPanel";
 import NueveBoxPanel from "@/components/NueveBoxPanel";
 import BateriaDashboard from "@/components/BateriaDashboard";
-import { LOGO_TS_SIMBOLO, LOGO_TS_CLASE_EN_OSCURO } from "@/lib/brand";
-
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
-  LayoutDashboard,
-  Briefcase,
-  Kanban,
-  Database,
-  Video,
   Bot,
-  LineChart,
   Linkedin,
   Brain,
-  ClipboardCheck,
   Bell,
   Plus,
   Download,
   Search,
   Calendar,
-  Filter,
-  ArrowUpRight,
   CheckCircle2,
   Clock,
   FileText,
-  Share2,
-  Play,
   ExternalLink,
   LogOut,
   Sparkles,
   ChevronRight,
-  // Corporate icon set — replace emojis
   Target,
   Trophy,
   Hand,
-  AlertOctagon,
-  Moon,
   AlertTriangle,
-  TrendingUp,
-  Users,
-  Mic,
-  Headphones,
   BarChart3,
   Globe,
   Award,
-  Flag,
-  Inbox,
   Mail,
   Send,
   Hourglass,
   XCircle,
-  MessageSquare,
-  Building2,
   UserCheck,
-  PartyPopper,
   Eye,
   RefreshCw,
   ArrowRight,
   Settings as SettingsIcon,
-  Grid3x3,
 } from "lucide-react";
 import { jobs } from "@/data/jobs";
 // La bandeja donde caen las vacantes que piden los líderes desde WXM.
@@ -85,18 +59,6 @@ type Tab =
   | "rubricas"
   | "nuevebox"
   | "plantillas";
-
-const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "requisiciones", label: "Requisiciones", icon: Inbox },
-  { id: "vacantes", label: "Vacantes", icon: Briefcase },
-  { id: "funnel", label: "Funnel", icon: Kanban },
-  { id: "onboarding", label: "Onboarding", icon: ClipboardCheck },
-  { id: "cvbank", label: "CV Bank", icon: Database },
-  { id: "rubricas", label: "Rúbricas", icon: ClipboardCheck },
-  { id: "nuevebox", label: "Decisiones", icon: Grid3x3 },
-  { id: "plantillas", label: "Plantillas", icon: SettingsIcon },
-];
 
 const VALID_TABS: Tab[] = ["dashboard", "requisiciones", "vacantes", "funnel", "onboarding", "cvbank", "rubricas", "nuevebox", "plantillas"];
 
@@ -168,6 +130,7 @@ export default function HRAdminPage() {
     setTabState(next);
     if (typeof window !== 'undefined') {
       window.history.replaceState(null, '', `#${next}`);
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
     }
   }, []);
 
@@ -196,66 +159,59 @@ export default function HRAdminPage() {
   }, [searchOpen]);
 
   return (
-    // data-ui="universe" vive en el layout de /hr-admin (globals.css).
+    // data-ui="universe" y el sidebar viven en el layout de /hr-admin.
     <div className="min-h-screen">
-      <header className="sticky top-0 z-50 text-white" style={{ background: "var(--ts-ink)" }}>
-        <div className="max-w-ts mx-auto px-5 h-14 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <img
-              src={LOGO_TS_SIMBOLO}
-              alt="Trading Solutions"
-              className={`h-[22px] w-auto ${LOGO_TS_CLASE_EN_OSCURO}`}
-            />
-            <span className="text-[14px] font-medium flex items-center gap-2">
-              <span className="ts-mark" aria-hidden />
-              HR Panel
-            </span>
+      <header className="sticky top-14 md:top-0 z-20 border-b border-ts-hairline bg-ts-canvas">
+        <div className="px-5 lg:px-8 py-5 flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0">
+            <p className="ts-heading text-[26px] md:text-[32px] text-ts-ink m-0">Good to see you, Kelly.</p>
+            <p className="mt-1 text-[13px] text-ts-muted">Careers ATS · el sitio público sigue en vivo.</p>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setSearchOpen(true)}
-              className="flex items-center gap-2 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
+              className="flex items-center gap-2 bg-ts-surface border border-ts-hairline text-ts-muted text-[13px] px-3.5 py-2.5 rounded-ts-md shadow-[var(--ts-shadow)] min-w-[200px]"
               title="Buscar candidatos (Cmd+K)"
             >
               <Search className="w-3.5 h-3.5" />
-              <span>Buscar</span>
-              <kbd className="text-[9px] font-mono bg-white/10 border border-white/15 rounded px-1 py-0.5 ml-1">⌘K</kbd>
-            </button>
-            <button
-              onClick={() => setImportOpen(true)}
-              className="flex items-center gap-1.5 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
-              title="Importar candidatos desde Excel"
-            >
-              <Download className="w-3.5 h-3.5" style={{ transform: 'rotate(180deg)' }} />
-              <span>Importar</span>
-            </button>
-            <button
-              onClick={() => setGmailAuditOpen(true)}
-              className="flex items-center gap-1.5 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
-              title="Auditar Gmail vs ATS"
-            >
-              <Mail className="w-3.5 h-3.5" />
-              <span>Auditar Gmail</span>
-            </button>
-            <button
-              onClick={() => setDecisionsOpen(true)}
-              className="flex items-center gap-1.5 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
-              title="Pedir decisión a CWO/Hiring Manager"
-            >
-              <Hand className="w-3.5 h-3.5" />
-              <span>Decisiones</span>
+              <span>Buscar candidatos</span>
+              <kbd className="ml-auto text-[10px] text-ts-ink-mute border border-ts-hairline rounded px-1 py-0.5">⌘K</kbd>
             </button>
             <button
               onClick={() => setScheduleOpen(true)}
-              className="flex items-center gap-1.5 bg-ts-accent hover:bg-[var(--ts-accent-hover)] text-white text-[12px] font-medium px-3.5 py-1.5 rounded-ts-sm transition-colors"
+              className="pill-btn pill-btn-primary !py-2.5"
               title="Agendar entrevista"
             >
               <Calendar className="w-3.5 h-3.5" />
-              <span>Agendar</span>
+              Agendar
+            </button>
+            <button
+              onClick={() => setImportOpen(true)}
+              className="flex items-center gap-1.5 text-ts-ink-soft hover:text-ts-ink text-[12px] px-2.5 py-2 rounded-ts-sm"
+              title="Importar candidatos desde Excel"
+            >
+              <Download className="w-3.5 h-3.5" style={{ transform: 'rotate(180deg)' }} />
+              <span className="hidden lg:inline">Importar</span>
+            </button>
+            <button
+              onClick={() => setGmailAuditOpen(true)}
+              className="flex items-center gap-1.5 text-ts-ink-soft hover:text-ts-ink text-[12px] px-2.5 py-2 rounded-ts-sm"
+              title="Auditar Gmail vs ATS"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">Auditar Gmail</span>
+            </button>
+            <button
+              onClick={() => setDecisionsOpen(true)}
+              className="flex items-center gap-1.5 text-ts-ink-soft hover:text-ts-ink text-[12px] px-2.5 py-2 rounded-ts-sm"
+              title="Pedir decisión a CWO/Hiring Manager"
+            >
+              <Hand className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">Decisiones</span>
             </button>
             <button
               onClick={() => setSettingsOpen(true)}
-              className="text-white/70 hover:text-white p-1.5"
+              className="text-ts-ink-soft hover:text-ts-ink p-1.5"
               title="Settings · metas del dashboard"
             >
               <SettingsIcon className="w-[18px] h-[18px]" />
@@ -264,31 +220,31 @@ export default function HRAdminPage() {
               href="https://mail.google.com/mail/u/0/#drafts"
               target="_blank"
               rel="noreferrer"
-              className="text-white/70 hover:text-white relative p-1.5"
+              className="text-ts-ink-soft hover:text-ts-ink relative p-1.5"
               title={draftsPending > 0 ? `${draftsPending} drafts esperando tu revisión en Gmail (últimas 48h)` : 'Sin drafts pendientes'}
             >
               <Mail className="w-[18px] h-[18px]" />
               {draftsPending > 0 ? (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-ts-highlight text-ts-ink text-[9px] font-medium flex items-center justify-center px-1 ring-2 ring-[var(--ts-ink)] tabular-nums">
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-ts-accent text-white text-[9px] font-medium flex items-center justify-center px-1 tabular-nums">
                   {draftsPending > 99 ? '99+' : draftsPending}
                 </span>
               ) : null}
             </a>
             <button
               onClick={() => setReferralsOpen(true)}
-              className="text-white/70 hover:text-white relative p-1.5"
+              className="text-ts-ink-soft hover:text-ts-ink relative p-1.5"
               title={referralsPending > 0 ? `${referralsPending} hojas de vida pendientes de revisar` : 'Sin notificaciones nuevas'}
             >
               <Bell className="w-[18px] h-[18px]" />
               {referralsPending > 0 ? (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-ts-accent text-white text-[9px] font-medium flex items-center justify-center px-1 ring-2 ring-[var(--ts-ink)] tabular-nums">
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-ts-accent text-white text-[9px] font-medium flex items-center justify-center px-1 tabular-nums">
                   {referralsPending > 99 ? '99+' : referralsPending}
                 </span>
               ) : null}
             </button>
-            <div className="flex items-center gap-2 pl-2 ml-1 border-l border-white/15">
-              <Avatar name="Kelly Castañeda" size={28} className="ring-2 ring-white/40" />
-              <span className="text-[12px] font-medium hidden sm:inline">Kelly Castañeda</span>
+            <div className="flex items-center gap-2 pl-2 ml-1 border-l border-ts-hairline">
+              <Avatar name="Kelly Castañeda" size={28} />
+              <span className="text-[12px] hidden sm:inline text-ts-ink">Kelly</span>
             </div>
             <button
               onClick={async () => {
@@ -299,7 +255,7 @@ export default function HRAdminPage() {
                 }
               }}
               title="Cerrar sesión"
-              className="flex items-center gap-1.5 text-white/70 hover:text-white text-[12px] font-medium px-2.5 py-1.5 rounded-ts-sm hover:bg-white/10 transition-colors"
+              className="flex items-center gap-1.5 text-ts-ink-soft hover:text-ts-ink text-[12px] px-2 py-1.5 rounded-ts-sm"
             >
               <LogOut className="w-[14px] h-[14px]" />
             </button>
@@ -307,30 +263,7 @@ export default function HRAdminPage() {
         </div>
       </header>
 
-      {/* Secciones · control segmentado en vez de pestañas subrayadas:
-          ocupa menos alto y deja claro que son excluyentes. */}
-      <nav className="sticky top-14 z-40 bg-ts-surface border-b border-[color:var(--ts-line)]">
-        <div className="max-w-ts mx-auto px-3 py-1.5">
-          <div className="ts-seg flex overflow-x-auto">
-            {TABS.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                aria-current={tab === id}
-                onClick={() => {
-                  setTab(id);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                className="ts-seg-item flex items-center justify-center gap-2 flex-1 whitespace-nowrap"
-              >
-                <Icon className="w-[15px] h-[15px]" />
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-ts mx-auto px-5 py-5 pb-12">
+      <main className="px-5 lg:px-8 py-6 pb-12">
         {tab === "dashboard" && <Dashboard setTab={setTab} />}
         {tab === "requisiciones" && <RequisitionsInbox />}
         {tab === "vacantes" && <Vacantes />}
@@ -355,7 +288,7 @@ export default function HRAdminPage() {
       {decisionsOpen && <DecisionNudgesModal onClose={() => setDecisionsOpen(false)} />}
       {settingsOpen && <DashboardSettingsModal onClose={() => setSettingsOpen(false)} />}
       {sessionExpired && (
-        <div className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[300] ts-scrim flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
             <div className="flex items-start gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
@@ -454,26 +387,11 @@ function TSHeroBanner({ image = TS_IMG.hero, title = "Talent that moves the worl
 /**
  * Section banner compacto — imagen TS de 100px con título superpuesto, para encabezar tabs/secciones.
  */
-function TSSectionBanner({ image, title, subtitle, icon }: { image: string; title: string; subtitle?: string; icon?: string }) {
+function TSSectionBanner({ title, subtitle }: { image?: string; title: string; subtitle?: string; icon?: string }) {
   return (
-    <div className="relative -mx-5 mb-4 overflow-hidden rounded-ts-md" style={{ height: 112 }}>
-      <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url(${image})` }}
-      />
-      <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(var(--ts-ink-rgb),0.88) 0%, rgba(var(--ts-ink-rgb),0.4) 100%)' }} />
-      <div className="absolute inset-0 flex items-center px-8">
-        <div className="max-w-ts w-full mx-auto">
-          <div className="flex items-center gap-3">
-            <span className="ts-mark" aria-hidden />
-            {icon && <span className="text-3xl">{icon}</span>}
-            <div>
-              <h2 className="text-white font-display font-light text-2xl tracking-[-0.02em] leading-tight">{title}</h2>
-              {subtitle && <p className="text-white/70 text-xs font-medium mt-0.5">{subtitle}</p>}
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="mb-5 pb-4 border-b border-ts-hairline">
+      <h2 className="ts-heading text-[28px] text-ts-ink">{title}</h2>
+      {subtitle && <p className="text-[13px] text-ts-muted mt-1">{subtitle}</p>}
     </div>
   );
 }
@@ -1059,7 +977,7 @@ function PageHead({ title, desc, actions }: { title: string; desc?: string; acti
   return (
     <div className="flex items-end justify-between flex-wrap gap-4 mb-5">
       <div>
-        <h1 className="text-[28px] font-extrabold tracking-tight m-0">{title}</h1>
+        <h1 className="ts-heading text-[28px] m-0">{title}</h1>
         {desc && <p className="text-gray-500 mt-1.5 text-sm">{desc}</p>}
       </div>
       {actions && <div className="flex gap-2 items-center flex-wrap">{actions}</div>}
