@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   COMP_JOB_OFFER_PREVIEW_ENABLED_ENV,
+  COMP_JOB_OFFER_PREVIEW_KEY_ENV,
   COMP_JOB_OFFER_WEBHOOK_URL_ENV,
   buildCompJobOfferPreview,
   deliverCompJobOfferPreview,
@@ -22,6 +23,7 @@ function previewEnv(overrides: CompPreviewEnv = {}): CompPreviewEnv {
     VERCEL_ENV: "preview",
     [COMP_JOB_OFFER_PREVIEW_ENABLED_ENV]: "true",
     [COMP_JOB_OFFER_WEBHOOK_URL_ENV]: "https://comp.example/preview",
+    [COMP_JOB_OFFER_PREVIEW_KEY_ENV]: "test-preview-key",
     ...overrides,
   };
 }
@@ -167,6 +169,17 @@ describe("resolveCompHookPlan", () => {
     });
     assert.equal(noUrl.kind, "skip");
     if (noUrl.kind === "skip") assert.equal(noUrl.result.reason, "url_missing");
+
+    const noKey = resolveCompHookPlan({
+      fromStage: "terna",
+      toStage: "oferta",
+      manualPreview: false,
+      candidateId: CANDIDATE,
+      vacancyId: VACANCY,
+      env: previewEnv({ [COMP_JOB_OFFER_PREVIEW_KEY_ENV]: "  " }),
+    });
+    assert.equal(noKey.kind, "skip");
+    if (noKey.kind === "skip") assert.equal(noKey.result.reason, "key_missing");
   });
 });
 
@@ -356,21 +369,25 @@ describe("deliverCompJobOfferPreview", () => {
     assert.equal(built.ok, true);
     if (!built.ok) return;
 
-    const calls: Array<{ url: string; body: string; redirect?: RequestRedirect }> = [];
+    const calls: Array<{ url: string; body: string; redirect?: RequestRedirect; key?: string }> = [];
     const sent = await deliverCompJobOfferPreview(built.payload, {
       url: "https://comp.example/preview",
       idempotencyKey: `${CANDIDATE}:${VACANCY}`,
+      previewKey: "test-preview-key",
       fetchImpl: async (url, init) => {
+        const headers = new Headers(init?.headers);
         calls.push({
           url: String(url),
           body: String(init?.body ?? ""),
           redirect: init?.redirect,
+          key: headers.get("x-comp-preview-key") ?? undefined,
         });
         return new Response("ok", { status: 202 });
       },
     });
     assert.equal(sent.status, "sent");
     assert.equal(calls.length, 1);
+    assert.equal(calls[0].key, "test-preview-key");
     assert.equal(calls[0].redirect, "manual");
     const body = JSON.parse(calls[0].body) as Record<string, unknown>;
     assert.equal(body.preview, true);
@@ -381,6 +398,7 @@ describe("deliverCompJobOfferPreview", () => {
     const redirected = await deliverCompJobOfferPreview(built.payload, {
       url: "https://comp.example/preview",
       idempotencyKey: `${CANDIDATE}:${VACANCY}`,
+      previewKey: "test-preview-key",
       fetchImpl: async () => new Response(null, { status: 302, headers: { location: "https://comp.example/send" } }),
     });
     assert.equal(redirected.status, "error");
@@ -388,10 +406,23 @@ describe("deliverCompJobOfferPreview", () => {
     const down = await deliverCompJobOfferPreview(built.payload, {
       url: "https://comp.example/preview",
       idempotencyKey: `${CANDIDATE}:${VACANCY}`,
+      previewKey: "test-preview-key",
       fetchImpl: async () => {
         throw new Error("network down");
       },
     });
+    const noKeyCalls: unknown[] = [];
+    const missingKey = await deliverCompJobOfferPreview(built.payload, {
+      url: "https://comp.example/preview",
+      idempotencyKey: `${CANDIDATE}:${VACANCY}`,
+      previewKey: " ",
+      fetchImpl: async () => {
+        noKeyCalls.push(true);
+        return new Response("no", { status: 500 });
+      },
+    });
+    assert.equal(missingKey.status, "skipped");
+    assert.equal(noKeyCalls.length, 0);
     assert.equal(down.status, "error");
     if (down.status === "error") assert.match(down.detail, /network down/);
   });

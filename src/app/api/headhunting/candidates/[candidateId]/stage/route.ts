@@ -220,6 +220,7 @@ export async function POST(
     let pendingCompPayload: CompJobOfferPreviewPayload | null = null;
     let pendingCompUrl: string | null = null;
     let pendingCompKey: string | null = null;
+    let pendingPreviewKey: string | null = null;
     if (targetStage === "oferta") {
       const plan = resolveCompHookPlan({
         fromStage: (candidate.stage as string | null) ?? null,
@@ -253,6 +254,7 @@ export async function POST(
         pendingCompPayload = built.payload;
         pendingCompUrl = plan.url;
         pendingCompKey = plan.idempotency_key;
+        pendingPreviewKey = plan.previewKey;
       }
     }
 
@@ -290,10 +292,11 @@ export async function POST(
       }, { status: 409 });
     }
 
-    if (pendingCompPayload && pendingCompUrl && pendingCompKey) {
+    if (pendingCompPayload && pendingCompUrl && pendingCompKey && pendingPreviewKey) {
       compPreview = await deliverCompJobOfferPreview(pendingCompPayload, {
         url: pendingCompUrl,
         idempotencyKey: pendingCompKey,
+        previewKey: pendingPreviewKey,
       });
     }
 

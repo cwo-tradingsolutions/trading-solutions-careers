@@ -4,10 +4,12 @@
  * No crea etapas, no mueve la etapa y no envía la carta. Si el flag está
  * apagado, falta el URL o el deploy es producción, se registra y se omite.
  *
- * Env:
- *   COMP_JOB_OFFER_WEBHOOK_URL       URL del stub de Comp (preview).
+ * Env (Vercel Preview únicamente; nunca Production):
+ *   COMP_JOB_OFFER_WEBHOOK_URL       URL del stub de Comp.
  *   COMP_JOB_OFFER_PREVIEW_ENABLED   tiene que ser "true" para llamar.
- * Producción (`VERCEL_ENV=production`) no llama aunque el flag esté prendido.
+ *   COMP_JOB_OFFER_PREVIEW_KEY       valor del header x-comp-preview-key.
+ * Producción (`VERCEL_ENV=production`) no llama aunque el flag y la llave estén puestos.
+ * Sin la llave no se hace POST: el stage igual se guarda.
  *
  * Fuera del payload a propósito: salario propuesto, aspiración, tope,
  * empleador, ESC2 y EC. Comp llena salario y empleador.
@@ -17,11 +19,13 @@ import { normalizeStage } from "@/lib/stage-labels";
 
 export const COMP_JOB_OFFER_WEBHOOK_URL_ENV = "COMP_JOB_OFFER_WEBHOOK_URL";
 export const COMP_JOB_OFFER_PREVIEW_ENABLED_ENV = "COMP_JOB_OFFER_PREVIEW_ENABLED";
+export const COMP_JOB_OFFER_PREVIEW_KEY_ENV = "COMP_JOB_OFFER_PREVIEW_KEY";
 
 export interface CompPreviewEnv {
   VERCEL_ENV?: string;
   COMP_JOB_OFFER_PREVIEW_ENABLED?: string;
   COMP_JOB_OFFER_WEBHOOK_URL?: string;
+  COMP_JOB_OFFER_PREVIEW_KEY?: string;
 }
 
 /** Etapas de selección / contratación desde las que el avance a oferta es esperable. */
@@ -46,7 +50,8 @@ export type CompSkipReason =
   | "odd_from_stage"
   | "prod_hold"
   | "flag_off"
-  | "url_missing";
+  | "url_missing"
+  | "key_missing";
 
 export interface CompJobOfferPreviewPayload {
   stage: "oferta";
@@ -88,7 +93,7 @@ export interface OfertaCompSource {
 
 export type CompHookPlan =
   | { kind: "skip"; result: Extract<CompPreviewResult, { status: "skipped" }> }
-  | { kind: "prepare"; url: string; idempotency_key: string };
+  | { kind: "prepare"; url: string; previewKey: string; idempotency_key: string };
 
 export function compIdempotencyKey(candidateId: string, vacancyId: string | null): string {
   return `${candidateId}:${vacancyId ?? ""}`;
@@ -131,12 +136,13 @@ function readCompPreviewEnv(env?: CompPreviewEnv): CompPreviewEnv {
     VERCEL_ENV: process.env.VERCEL_ENV,
     COMP_JOB_OFFER_PREVIEW_ENABLED: process.env[COMP_JOB_OFFER_PREVIEW_ENABLED_ENV],
     COMP_JOB_OFFER_WEBHOOK_URL: process.env[COMP_JOB_OFFER_WEBHOOK_URL_ENV],
+    COMP_JOB_OFFER_PREVIEW_KEY: process.env[COMP_JOB_OFFER_PREVIEW_KEY_ENV],
   };
 }
 
 export function compPreviewGate(env?: CompPreviewEnv):
-  | { open: true; url: string }
-  | { open: false; reason: "prod_hold" | "flag_off" | "url_missing" } {
+  | { open: true; url: string; previewKey: string }
+  | { open: false; reason: "prod_hold" | "flag_off" | "url_missing" | "key_missing" } {
   const resolved = readCompPreviewEnv(env);
   if (resolved.VERCEL_ENV === "production") return { open: false, reason: "prod_hold" };
 
@@ -146,7 +152,10 @@ export function compPreviewGate(env?: CompPreviewEnv):
   const url = (resolved.COMP_JOB_OFFER_WEBHOOK_URL || "").trim();
   if (!url) return { open: false, reason: "url_missing" };
 
-  return { open: true, url };
+  const previewKey = (resolved.COMP_JOB_OFFER_PREVIEW_KEY || "").trim();
+  if (!previewKey) return { open: false, reason: "key_missing" };
+
+  return { open: true, url, previewKey };
 }
 
 export function resolveCompHookPlan(input: {
@@ -166,7 +175,7 @@ export function resolveCompHookPlan(input: {
   if (!gate.open) {
     return { kind: "skip", result: { status: "skipped", reason: gate.reason, idempotency_key: key } };
   }
-  return { kind: "prepare", url: gate.url, idempotency_key: key };
+  return { kind: "prepare", url: gate.url, previewKey: gate.previewKey, idempotency_key: key };
 }
 
 export function forbiddenPayloadKeys(payload: object): string[] {
@@ -332,8 +341,21 @@ export function logCompPreviewSkip(reason: string, idempotencyKey: string): void
 
 export async function deliverCompJobOfferPreview(
   payload: CompJobOfferPreviewPayload,
-  opts: { url: string; idempotencyKey: string; fetchImpl?: typeof fetch },
+  opts: { url: string; idempotencyKey: string; previewKey: string; fetchImpl?: typeof fetch },
 ): Promise<CompPreviewResult> {
+  const previewKey = opts.previewKey.trim();
+  if (!previewKey) {
+    console.info("[comp-job-offer-preview] skip", {
+      reason: "key_missing",
+      idempotency_key: opts.idempotencyKey,
+    });
+    return {
+      status: "skipped",
+      reason: "key_missing",
+      idempotency_key: opts.idempotencyKey,
+    };
+  }
+
   const leaked = forbiddenPayloadKeys(payload);
   if (leaked.length > 0 || payload.preview !== true || payload.stage !== "oferta") {
     console.error("[comp-job-offer-preview] refused", {
@@ -354,6 +376,7 @@ export async function deliverCompJobOfferPreview(
       headers: {
         "content-type": "application/json",
         "x-comp-preview": "true",
+        "x-comp-preview-key": previewKey,
       },
       body: JSON.stringify(payload),
       redirect: "manual",
