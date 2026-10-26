@@ -44,6 +44,7 @@ import RequisitionsInbox from "@/components/RequisitionsInbox";
 import NuevaVacanteModal from "@/components/NuevaVacanteModal";
 import { factorXTS } from "@/data/assessments";
 import { STAGE_SLA_DAYS, STAGE_ACTION } from "@/lib/stage-labels";
+import { stageLabelUi } from "@/lib/hr-pipeline-look";
 import PrefiltrosPanel from "@/components/PrefiltrosPanel";
 import PipelineFunnel from "@/components/PipelineFunnel";
 import RejectionReasonsCard from "@/components/RejectionReasonsCard";
@@ -145,6 +146,12 @@ export default function HRAdminPage() {
     return () => window.removeEventListener('hashchange', onHash);
   }, [tab]);
 
+  useEffect(() => {
+    const open = () => setSearchOpen(true);
+    window.addEventListener("hr-admin-search", open);
+    return () => window.removeEventListener("hr-admin-search", open);
+  }, []);
+
   // Global Cmd+K / Ctrl+K shortcut to open search
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -162,22 +169,9 @@ export default function HRAdminPage() {
   return (
     // data-ui="universe" y el sidebar viven en el layout de /hr-admin.
     <div className="min-h-screen">
-      <header className="sticky top-14 md:top-0 z-20 border-b border-ts-hairline bg-ts-canvas">
-        <div className="px-5 lg:px-8 py-5 flex items-start justify-between gap-4 flex-wrap">
-          <div className="min-w-0">
-            <p className="ts-heading text-[26px] md:text-[32px] text-ts-ink m-0">Good to see you, Kelly.</p>
-            <p className="mt-1 text-[13px] text-ts-muted">Careers ATS · el sitio público sigue en vivo.</p>
-          </div>
+      <header className="border-b border-black/5 bg-[var(--ts-journal)]">
+        <div className="px-5 lg:px-8 py-3 flex items-center justify-end gap-2 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => setSearchOpen(true)}
-              className="flex items-center gap-2 bg-ts-surface border border-ts-hairline text-ts-muted text-[13px] px-3.5 py-2.5 rounded-ts-md shadow-[var(--ts-shadow)] min-w-[200px]"
-              title="Buscar candidatos (Cmd+K)"
-            >
-              <Search className="w-3.5 h-3.5" />
-              <span>Buscar candidatos</span>
-              <kbd className="ml-auto text-[10px] text-ts-ink-mute border border-ts-hairline rounded px-1 py-0.5">⌘K</kbd>
-            </button>
             <button
               onClick={() => setScheduleOpen(true)}
               className="pill-btn pill-btn-primary !py-2.5"
@@ -1590,7 +1584,7 @@ function OpenVacancyCard({ v, onResearch, onRediscover, onClose }: { v: VacancyO
       {/* Footer counts */}
       <div className="flex justify-between text-[10px] pt-2 border-t border-gray-100">
         <span className="text-gray-500">Total: <strong className="text-gray-800">{v.metrics.candidates_total}</strong></span>
-        <span className="text-red-600">Rechazados: <strong>{v.metrics.rechazados}</strong></span>
+        <span className="text-ts-muted">Rechazados: <strong className="text-ts-ink">{v.metrics.rechazados}</strong></span>
       </div>
 
       {/* CTAs estilo TS minimal */}
@@ -2433,14 +2427,7 @@ function fmtDate(iso?: string | null): string {
 }
 
 function stageLabelShort(s: string): string {
-  const map: Record<string, string> = {
-    aplico: 'Aplicó', prefiltro_enviado: 'Pref. enviado', prefiltro_pasado: 'Pref. ✓',
-    prefiltro_revision: 'Pref. (rev)', assessment_invitado: 'Integ. inv', assessment_en_progreso: 'Integ. prog',
-    assessment_completado: 'Integ. ✓', entrevista_ia: 'IA', bateria_psicometrica: 'Batería',
-    recruiter_interview: 'Recr.', cwo_interview: 'CWO', touring: 'Touring', terna: 'Terna', oferta: 'Oferta',
-    contratado: 'Contratado', rechazado: 'Rechazado',
-  };
-  return map[s] || s;
+  return stageLabelUi(s);
 }
 
 function Funnel({
@@ -5750,7 +5737,10 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-bold text-gray-900">{c.name}</span>
-                    <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${STAGE_CHIP_COLOR[c.stage] || 'bg-gray-100 text-gray-700'}`}>
+                    <span
+                      className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${STAGE_CHIP_COLOR[c.stage] || 'bg-gray-100 text-gray-700'}`}
+                      title={`stage: ${c.stage}`}
+                    >
                       {stageLabelShort(c.stage)}
                     </span>
                     {c.overall_score != null && (
@@ -7055,7 +7045,10 @@ function ScheduleInterviewModal({ onClose }: { onClose: () => void }) {
                       <div className="text-sm font-bold">{c.name}</div>
                       <div className="text-[10px] text-gray-500 truncate">{c.email} · {c.vacancy_title}</div>
                     </div>
-                    <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${STAGE_CHIP_COLOR[c.stage] || 'bg-gray-100 text-gray-700'}`}>
+                    <span
+                      className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${STAGE_CHIP_COLOR[c.stage] || 'bg-gray-100 text-gray-700'}`}
+                      title={`stage: ${c.stage}`}
+                    >
                       {stageLabelShort(c.stage)}
                     </span>
                   </div>

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Lock } from "lucide-react";
-import UniverseMark from "@/components/universe/Mark";
+import Lockup from "@/components/universe/Lockup";
 
 export default function HRLoginPage() {
   const [password, setPassword] = useState("");
@@ -35,53 +35,44 @@ export default function HRLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-ts-canvas text-ts-ink flex flex-col">
-      <div className="flex-1 flex items-center justify-center px-6 py-16">
-        <form onSubmit={submit} className="w-full max-w-sm">
-          <UniverseMark className="mb-8" />
-          <p className="text-[13px] text-ts-accent mb-3">Panel HR</p>
-          <h1 className="ts-display font-light text-4xl mb-2">Ingresa a Careers.</h1>
-          <p className="text-sm text-ts-muted mb-8">
-            Acceso del equipo de selección.
-          </p>
+    <div className="hr-login">
+      <form onSubmit={submit} className="hr-login-card">
+        <div className="mb-7">
+          <Lockup />
+        </div>
+        <p className="hr-login-eyebrow">HR Admin · Talent Acquisition</p>
+        <h1 className="hr-login-title">Ingresa a tu portal</h1>
+        <p className="hr-login-intro">
+          Acceso del equipo de Talent Acquisition. Solo cuentas autorizadas.
+        </p>
 
-          <label className="block text-sm text-ts-secondary mb-2">
-            Clave de acceso
-          </label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ts-ink-mute" />
-            <input
-              type="password"
-              autoFocus
-              className="w-full border border-ts-hairline rounded-ts-md px-10 py-3 text-sm bg-ts-surface focus:border-ts-accent focus:outline-none"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
+        <label htmlFor="hr-admin-key" className="hr-login-label">
+          Clave de acceso
+        </label>
+        <div className="hr-login-field">
+          <Lock className="w-4 h-4 shrink-0" aria-hidden />
+          <input
+            id="hr-admin-key"
+            type="password"
+            autoFocus
+            autoComplete="current-password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
 
-          {err && (
-            <div className="bg-[var(--ts-red-bg)] border border-[var(--ts-red-border)] rounded-ts-sm p-3 text-xs text-[var(--ts-red)] mt-3">
-              {err}
-            </div>
-          )}
+        {err && <div className="hr-login-error">{err}</div>}
 
-          <button
-            type="submit"
-            disabled={!password || loading}
-            className="pill-btn pill-btn-primary w-full justify-center mt-5 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {loading ? "Verificando…" : "Entrar"}
-          </button>
+        <button type="submit" disabled={!password || loading} className="hr-login-cta">
+          {loading ? "Verificando…" : "Entrar →"}
+        </button>
 
-          <p className="text-[12px] text-ts-muted text-center mt-8">
-            ¿Sin acceso?{" "}
-            <a className="text-ts-accent" href="mailto:jointheteam@tradingsolutions.com">
-              jointheteam@tradingsolutions.com
-            </a>
-          </p>
-        </form>
-      </div>
+        <p className="hr-login-foot">
+          ¿Sin acceso?{" "}
+          <a href="mailto:jointheteam@tradingsolutions.com">jointheteam@tradingsolutions.com</a>
+        </p>
+      </form>
     </div>
   );
 }

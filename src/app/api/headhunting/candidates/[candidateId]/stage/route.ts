@@ -18,6 +18,7 @@ import crypto from "crypto";
 // Las etapas válidas (v4 + legacy) viven en la fuente única de verdad.
 // No declarar listas de etapas acá.
 import { VALID_STAGES } from "@/lib/stage-labels";
+import { compEventNote } from "@/lib/hr-pipeline-look";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import {
   buildCompJobOfferPreview,
@@ -305,6 +306,7 @@ export async function POST(
     // updated_at, que se pisa con cualquier edición del candidato.
     // Es best-effort: si falla, el movimiento igual quedó guardado.
     if (candidate.stage !== targetStage) {
+      const compNote = compEventNote(compPreview?.status);
       const { error: eventErr } = await supabaseAdmin
         .from("ht_candidate_stage_events")
         .insert({
@@ -314,9 +316,24 @@ export async function POST(
           to_stage: targetStage,
           changed_at: new Date().toISOString(),
           source: "ui",
+          note: compNote,
         });
       if (eventErr) {
         console.error("[stage] no se pudo registrar el evento de etapa:", eventErr.message);
+      }
+      // Columna opcional. Si no existe en esta base, el evento de arriba
+      // igual deja el chip. No se tocan variables de Comp en producción.
+      if (compNote) {
+        const stored = await supabaseAdmin
+          .from("ht_candidates")
+          .update({
+            comp_preview_status: compNote === "comp:sent" ? "sent" : "fail",
+            comp_preview_at: new Date().toISOString(),
+          })
+          .eq("id", candidateId);
+        if (stored.error) {
+          console.info("[comp-job-offer-preview] status not stored on row", stored.error.message);
+        }
       }
     }
 
