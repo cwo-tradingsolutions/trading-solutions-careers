@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
+import { mergeCompStatus } from '@/lib/hr-pipeline-look';
 import { supabaseAdmin } from '@/lib/supabase';
 
 // GET /api/headhunting/candidates?vacancy_id=xxx&client_id=xxx
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
 
     let query = supabaseAdmin
       .from('ht_candidates')
-      .select('*, ht_results(match_percentage, recommendation), ht_vacancies(title)')
+      .select('*, ht_results(match_percentage, recommendation), ht_vacancies(title, country)')
       .order('created_at', { ascending: false });
 
     if (vacancyId) query = query.eq('vacancy_id', vacancyId);
@@ -25,7 +26,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ candidates: data || [] });
+    let compEvents: { candidate_id?: string; note?: string | null }[] | null = null;
+    const events = await supabaseAdmin
+      .from('ht_candidate_stage_events')
+      .select('candidate_id, note, changed_at')
+      .in('note', ['comp:sent', 'comp:fail'])
+      .order('changed_at', { ascending: false });
+    if (!events.error) compEvents = events.data;
+
+    return NextResponse.json({
+      candidates: mergeCompStatus(data || [], compEvents),
+    });
   } catch (err) {
     console.error('List candidates error:', err);
     return NextResponse.json(

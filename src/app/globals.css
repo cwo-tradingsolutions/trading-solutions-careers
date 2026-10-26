@@ -218,7 +218,7 @@ h1.ts-heading {
 
   --sombra-1: 0 1px 2px rgba(8, 20, 32, 0.05), 0 8px 24px -12px rgba(8, 20, 32, 0.16);
 
-  background: var(--ts-canvas);
+  background: var(--ts-journal);
   color: var(--ts-ink);
   font-family: var(--ts-font-sans);
   font-weight: 500;
@@ -431,3 +431,268 @@ h1.ts-heading {
 [data-ui="universe"] table tbody tr {
   border-color: var(--ts-line);
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   HR Admin · Journal light (preview Universe)
+   Login, header y cards. Sin ticker. Rojo solo en «acción hoy».
+   ═══════════════════════════════════════════════════════════════════ */
+
+.hr-login {
+  min-height: 100vh;
+  background: var(--ts-journal);
+  color: #0e0e0e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+}
+.hr-login-card {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border-radius: 17px;
+  padding: 36px 32px 32px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+.hr-login-eyebrow {
+  font-size: 12px;
+  color: #8a8a8a;
+  margin: 0 0 8px;
+  letter-spacing: 0.02em;
+}
+.hr-login-title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+  margin: 0 0 10px;
+  color: #0e0e0e;
+}
+[data-ui="universe"] h1.hr-login-title {
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+[data-ui="universe"] .ts-aging h2 {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.hr-login-intro {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #3a3a3a;
+  margin: 0 0 28px;
+}
+.hr-login-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0e0e0e;
+  margin: 0 0 8px;
+}
+.hr-login-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #e5e5ea;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fff;
+  color: #8a8a8a;
+}
+.hr-login-field input {
+  border: 0;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 14px;
+  color: #0e0e0e;
+  background: transparent;
+  letter-spacing: 0.12em;
+}
+.hr-login-error {
+  margin-top: 12px;
+  background: #fdeceb;
+  border: 1px solid #f3d0ce;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #8b1e1e;
+}
+.hr-login-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 48px;
+  margin-top: 16px;
+  border: none;
+  border-radius: 12px;
+  background: #0e0e0e;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hr-login-cta:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.hr-login-foot {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: #8a8a8a;
+  line-height: 1.5;
+}
+.hr-login-foot a {
+  color: #3a6ea5;
+  text-decoration: none;
+}
+
+.hr-journal-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  padding: 18px 16px;
+  background: var(--ts-journal);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+@media (min-width: 1024px) {
+  .hr-journal-header { padding-left: 56px; padding-right: 56px; }
+}
+@media (max-width: 720px) {
+  .hr-search { min-width: 0; flex: 1 1 160px; }
+}
+.hr-scope {
+  display: inline-flex;
+  border: 1px solid #e5e5ea;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #fff;
+  flex-shrink: 0;
+}
+.hr-scope button {
+  padding: 6px 14px;
+  font-size: 12px;
+  color: #6a6a6a;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.hr-scope button.on {
+  background: #0e0e0e;
+  color: #fff;
+}
+.hr-search {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e5e5ea;
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px 12px;
+  min-width: 180px;
+  font-size: 13px;
+  color: #8a8a8a;
+  cursor: pointer;
+}
+.hr-search kbd {
+  margin-left: auto;
+  font-size: 11px;
+  border: 1px solid #e5e5ea;
+  border-radius: 6px;
+  padding: 2px 6px;
+  color: #8a8a8a;
+  font-family: inherit;
+}
+
+.hr-pill {
+  border: 1px solid #e5e5ea;
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #3a3a3a;
+  cursor: pointer;
+}
+.hr-pill.on {
+  background: #0e0e0e;
+  color: #fff;
+  border-color: #0e0e0e;
+}
+.hr-pill.warn {
+  border-color: #f0d9a8;
+  background: #fff8eb;
+  color: #6a4a10;
+}
+.hr-pill.warn.on {
+  background: #6a4a10;
+  color: #fff8eb;
+  border-color: #6a4a10;
+}
+
+.ts-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.ts-chip-sla { background: #f4f1ea; color: #5a4a2a; }
+.ts-chip-hoy { background: #fdeceb; color: #8b1e1e; }
+.ts-chip-ok { background: #e8f5ee; color: #1f6b45; }
+.ts-chip-fail { background: #fdeceb; color: #8b1e1e; }
+.ts-chip-meta {
+  font-size: 11px;
+  color: #3a3a3a;
+  border: 1px solid #e5e5ea;
+  border-radius: 6px;
+  padding: 2px 6px;
+  line-height: 1.4;
+}
+.ts-pipe-card {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 14px;
+  padding: 14px;
+}
+.ts-av {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #dbe4f0;
+  color: #2a3d5c;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.ts-aging {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.ts-aging-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #3a3a3a;
+  padding: 6px 0;
+  border-top: 1px solid #f0f0f2;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+.ts-aging-row:first-of-type { border-top: 0; }

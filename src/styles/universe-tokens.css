@@ -23,6 +23,7 @@
 :root {
   /* Brand — Digital System names. Reference these, not raw hex. */
   --ts-canvas: #f7f7f7; /* Stalactite */
+  --ts-journal: #f5f5f7; /* Journal light · HR Admin chrome y login */
   --ts-surface: #ffffff;
   --ts-surface-2: #e8e8e8; /* Wispy Clouds */
   --ts-ink: #081420; /* dark chrome depth used by the merged shell */
