@@ -62,21 +62,13 @@ spec:
               valueFrom: { secretKeyRef: { name: prd-careers-CRON_SECRET, key: latest } }
             - name: WXM_SERVICE_SECRET
               valueFrom: { secretKeyRef: { name: prd-careers-WXM_SERVICE_SECRET, key: latest } }
-            # Valores que hoy viven en Vercel (correo, integraciones, avisos).
-            - name: RESEND_API_KEY
-              valueFrom: { secretKeyRef: { name: prd-careers-RESEND_API_KEY, key: latest } }
+            # Valores que hoy viven en Vercel. Sin RESEND_API_KEY (no está en
+            # Vercel producción): el ATS envía por Gmail conectado. Los correos de
+            # aviso internos usan los valores por defecto del código.
             # Remitente decidido por Kelly; requiere tradingsolutions.com verificado en Resend.
             - { name: EMAIL_FROM, value: "Trading Solutions <jointheteam@tradingsolutions.com>" }
             - name: EMAIL_BCC
               valueFrom: { secretKeyRef: { name: prd-careers-EMAIL_BCC, key: latest } }
-            - name: DIGEST_RECIPIENT
-              valueFrom: { secretKeyRef: { name: prd-careers-DIGEST_RECIPIENT, key: latest } }
-            - name: HANDOFF_EMAIL
-              valueFrom: { secretKeyRef: { name: prd-careers-HANDOFF_EMAIL, key: latest } }
-            - name: INTERNAL_NEWSLETTER_EMAIL
-              valueFrom: { secretKeyRef: { name: prd-careers-INTERNAL_NEWSLETTER_EMAIL, key: latest } }
-            - name: MARY_PSICO_EMAIL
-              valueFrom: { secretKeyRef: { name: prd-careers-MARY_PSICO_EMAIL, key: latest } }
             - name: ELEVENLABS_API_KEY
               valueFrom: { secretKeyRef: { name: prd-careers-ELEVENLABS_API_KEY, key: latest } }
             - name: ELEVENLABS_AGENT_ID
@@ -91,8 +83,6 @@ spec:
               valueFrom: { secretKeyRef: { name: prd-careers-GOOGLE_CLIENT_ID, key: latest } }
             - name: GOOGLE_CLIENT_SECRET
               valueFrom: { secretKeyRef: { name: prd-careers-GOOGLE_CLIENT_SECRET, key: latest } }
-            - name: VACANCY_ID_FULLSTACK_JUNIOR
-              valueFrom: { secretKeyRef: { name: prd-careers-VACANCY_ID_FULLSTACK_JUNIOR, key: latest } }
 
         - name: postgrest
           image: docker.io/postgrest/postgrest:v16.5
