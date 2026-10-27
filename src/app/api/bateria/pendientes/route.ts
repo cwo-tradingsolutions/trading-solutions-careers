@@ -25,7 +25,7 @@ import { aWhatsapp } from '@/lib/whatsapp';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const BASE = 'https://trading-solutions-careers.vercel.app';
+const BASE = process.env.NEXT_PUBLIC_APP_URL || 'https://trading-solutions-careers.vercel.app';
 
 /** Días completos desde una fecha. */
 function diasDesde(iso: string | null): number | null {

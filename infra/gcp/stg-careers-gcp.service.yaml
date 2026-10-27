@@ -41,7 +41,7 @@ spec:
               valueFrom: { secretKeyRef: { name: prod-careers-postgrest-jwt-secret, key: latest } }
             # Tablas que venían de Neon: esquema `neon`, rol careers_app
             # (su search_path ya apunta ahí). postgres.js lee PG*.
-            - { name: PGHOST, value: /cloudsql/wellness-experience-management:us-west1:wxm-pg }
+            - { name: PGHOST, value: "/cloudsql/wellness-experience-management:us-west1:wxm-pg" }
             - { name: PGUSER, value: careers_app }
             - { name: PGDATABASE, value: careers }
             - name: PGPASSWORD
