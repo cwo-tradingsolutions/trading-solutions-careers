@@ -47,8 +47,12 @@ spec:
             - name: PGPASSWORD
               valueFrom: { secretKeyRef: { name: prod-cloudsql-careers_app-password, key: latest } }
             - { name: ARCHIVOS_GCS_BUCKET, value: wellness-experience-management-careers-archivos }
-            - { name: ANTHROPIC_VERTEX_PROJECT_ID, value: wellness-experience-management }
-            - { name: CLOUD_ML_REGION, value: global }
+            # Claude por la API de Anthropic mientras Google no dé cupo en
+            # Vertex. Para volver a Vertex: quitar ANTHROPIC_API_KEY y poner
+            # ANTHROPIC_VERTEX_PROJECT_ID=wellness-experience-management y
+            # CLOUD_ML_REGION=global.
+            - name: ANTHROPIC_API_KEY
+              valueFrom: { secretKeyRef: { name: stg-careers-ANTHROPIC_API_KEY, key: latest } }
             - name: ADMIN_SECRET
               valueFrom: { secretKeyRef: { name: stg-careers-gcp-ADMIN_SECRET, key: latest } }
             - name: CRON_SECRET
