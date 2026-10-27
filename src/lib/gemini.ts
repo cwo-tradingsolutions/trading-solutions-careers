@@ -54,6 +54,32 @@ function partes(contenido: any): any[] {
   return out;
 }
 
+// Con Claude, un último mensaje del asistente («{») es el comienzo forzado de
+// la respuesta, y la ruta lo vuelve a pegar delante del texto que recibe.
+// Gemini no continúa un turno propio: se le pide empezar así y, al volver, se
+// quita ese comienzo para que la ruta no lo duplique («{{»).
+function separarComienzo(mensajes: any[]): { mensajes: any[]; comienzo: string } {
+  const ultimo = mensajes[mensajes.length - 1];
+  if (ultimo?.role !== 'assistant') return { mensajes, comienzo: '' };
+  const comienzo = textoDe(ultimo.content);
+  const resto = mensajes.slice(0, -1);
+  const pedido = `\n\nTu respuesta debe empezar exactamente con: ${comienzo}`;
+  const previo = resto[resto.length - 1];
+  if (previo?.role === 'user') {
+    const contenido = typeof previo.content === 'string'
+      ? previo.content + pedido
+      : [...previo.content, { type: 'text', text: pedido }];
+    resto[resto.length - 1] = { ...previo, content: contenido };
+  }
+  return { mensajes: resto, comienzo };
+}
+
+function quitarComienzo(texto: string, comienzo: string): string {
+  if (!comienzo) return texto;
+  const t = texto.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+  return t.startsWith(comienzo) ? t.slice(comienzo.length) : t;
+}
+
 function cuerpoGemini(p: any) {
   const contents = (p.messages ?? []).map((m: any) => ({
     role: m.role === 'assistant' ? 'model' : 'user',
@@ -74,12 +100,15 @@ function cuerpoGemini(p: any) {
 }
 
 // La respuesta vuelve con la forma de Anthropic que esperan las rutas.
-function aMensaje(d: any, modelo: string, maxTokens: number) {
+function aMensaje(d: any, modelo: string, maxTokens: number, comienzo: string) {
   const cand = d.candidates?.[0];
-  const texto = (cand?.content?.parts ?? [])
-    .filter((x: any) => !x.thought && typeof x.text === 'string')
-    .map((x: any) => x.text)
-    .join('');
+  const texto = quitarComienzo(
+    (cand?.content?.parts ?? [])
+      .filter((x: any) => !x.thought && typeof x.text === 'string')
+      .map((x: any) => x.text)
+      .join(''),
+    comienzo,
+  );
   const salida = (d.usageMetadata?.candidatesTokenCount ?? 0) as number;
   const cortado = cand?.finishReason === 'MAX_TOKENS' || salida > maxTokens;
   if (!cand || (cand.finishReason && !['STOP', 'MAX_TOKENS'].includes(cand.finishReason) && !texto)) {
@@ -107,7 +136,8 @@ async function generar(p: any, opciones?: { timeout?: number; maxRetries?: numbe
   const modelo = modeloGemini(p.model);
   const url = `https://${host}/v1/projects/${proyecto}/locations/${region}/publishers/google/models/${modelo}:generateContent`;
   const token = await auth.getAccessToken();
-  const cuerpo = JSON.stringify(cuerpoGemini(p));
+  const { mensajes, comienzo } = separarComienzo(p.messages ?? []);
+  const cuerpo = JSON.stringify(cuerpoGemini({ ...p, messages: mensajes }));
   const intentos = 1 + (opciones?.maxRetries ?? 2);
 
   for (let i = 0; ; i++) {
@@ -125,7 +155,7 @@ async function generar(p: any, opciones?: { timeout?: number; maxRetries?: numbe
       throw new ErrorGemini(`No se pudo contactar a Gemini: ${e?.message ?? e}`);
     }
     const d: any = await r.json().catch(() => ({}));
-    if (r.ok) return aMensaje(d, modelo, p.max_tokens ?? 4096);
+    if (r.ok) return aMensaje(d, modelo, p.max_tokens ?? 4096, comienzo);
     // 429 y 5xx se reintentan con espera creciente, como el SDK de Anthropic.
     if ((r.status === 429 || r.status >= 500) && i + 1 < intentos) {
       await new Promise((res) => setTimeout(res, 1000 * 2 ** i));
