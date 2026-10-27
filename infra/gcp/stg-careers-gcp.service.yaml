@@ -53,6 +53,9 @@ spec:
             - { name: GEMINI_REGION, value: global }
             - { name: GEMINI_MODELO_PRO, value: gemini-3.1-pro-preview }
             - { name: GEMINI_MODELO_RAPIDO, value: gemini-3-flash-preview }
+            # Razonamiento alto: en la evaluación de candidatos coincidió con
+            # Claude en 11 de 12 criterios (bajo: 10); tarda ~45 s en vez de 10.
+            - { name: GEMINI_RAZONAMIENTO, value: high }
             - name: ADMIN_SECRET
               valueFrom: { secretKeyRef: { name: stg-careers-gcp-ADMIN_SECRET, key: latest } }
             - name: CRON_SECRET
