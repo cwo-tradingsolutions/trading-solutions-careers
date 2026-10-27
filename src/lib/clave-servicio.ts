@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHmac } from 'crypto';
 
 // Llave service_role para PostgREST en Google Cloud.
 // En Vercel viene lista en SUPABASE_SERVICE_ROLE_KEY. En Google se firma aquí
