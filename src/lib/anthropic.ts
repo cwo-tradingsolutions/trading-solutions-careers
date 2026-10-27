@@ -3,13 +3,17 @@ import { AnthropicVertex } from '@anthropic-ai/vertex-sdk';
 
 // En Vertex AI los modelos llevan la fecha con "@" y los alias sin fecha no
 // existen. Se traducen aquí para no tocar los nombres en cada ruta.
+// Sonnet 4 no tiene cupo en el endpoint global: en Google pasa a Sonnet 4.5.
 const MODELOS_VERTEX: Record<string, string> = {
   'claude-sonnet-4-5': 'claude-sonnet-4-5@20250929',
   'claude-haiku-4-5': 'claude-haiku-4-5@20251001',
-  'claude-sonnet-4': 'claude-sonnet-4@20250514',
+  'claude-sonnet-4': 'claude-sonnet-4-5@20250929',
+  'claude-sonnet-4-20250514': 'claude-sonnet-4-5@20250929',
+  'claude-sonnet-4@20250514': 'claude-sonnet-4-5@20250929',
 };
 
 export function modeloVertex(modelo: string): string {
+  if (MODELOS_VERTEX[modelo]) return MODELOS_VERTEX[modelo];
   if (modelo.includes('@')) return modelo;
   const conFecha = modelo.match(/^(.*)-(\d{8})$/);
   if (conFecha) return `${conFecha[1]}@${conFecha[2]}`;
