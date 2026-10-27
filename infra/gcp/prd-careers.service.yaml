@@ -65,8 +65,8 @@ spec:
             # Valores que hoy viven en Vercel (correo, integraciones, avisos).
             - name: RESEND_API_KEY
               valueFrom: { secretKeyRef: { name: prd-careers-RESEND_API_KEY, key: latest } }
-            - name: EMAIL_FROM
-              valueFrom: { secretKeyRef: { name: prd-careers-EMAIL_FROM, key: latest } }
+            # Remitente decidido por Kelly; requiere tradingsolutions.com verificado en Resend.
+            - { name: EMAIL_FROM, value: "Trading Solutions <jointheteam@tradingsolutions.com>" }
             - name: EMAIL_BCC
               valueFrom: { secretKeyRef: { name: prd-careers-EMAIL_BCC, key: latest } }
             - name: DIGEST_RECIPIENT
