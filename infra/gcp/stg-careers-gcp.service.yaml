@@ -43,7 +43,7 @@ spec:
             # (su search_path ya apunta ahí). postgres.js lee PG*.
             - { name: PGHOST, value: "/cloudsql/wellness-experience-management:us-west1:wxm-pg" }
             - { name: PGUSER, value: careers_app }
-            - { name: PGDATABASE, value: careers }
+            - { name: PGDATABASE, value: careers_stg }
             - name: PGPASSWORD
               valueFrom: { secretKeyRef: { name: prod-cloudsql-careers_app-password, key: latest } }
             - { name: ARCHIVOS_GCS_BUCKET, value: wellness-experience-management-careers-archivos }
@@ -68,7 +68,7 @@ spec:
           resources:
             limits: { cpu: "1", memory: 256Mi }
           env:
-            - { name: PGRST_DB_URI, value: "postgres:///careers?host=/cloudsql/wellness-experience-management:us-west1:wxm-pg&user=authenticator" }
+            - { name: PGRST_DB_URI, value: "postgres:///careers_stg?host=/cloudsql/wellness-experience-management:us-west1:wxm-pg&user=authenticator" }
             - name: PGPASSWORD
               valueFrom: { secretKeyRef: { name: prod-cloudsql-authenticator-password, key: latest } }
             - { name: PGRST_DB_SCHEMAS, value: public }
