@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { claveServicioFirmada } from './clave-servicio';
 
 // ─── Lazy init para que el build de Next.js no requiera las env vars ─
 // Se crean los clients al primer uso (request time), no al importar el módulo.
@@ -20,12 +21,32 @@ let _anon: SupabaseClient | null = null;
  * sola lectura en esta app que pueda servirse de una copia de hace horas.
  */
 const fetchSinCache: typeof fetch = (input, init) =>
-  fetch(input, { ...init, cache: 'no-store' });
+  fetch(postgrestDirecto(input), { ...init, cache: 'no-store' });
+
+/**
+ * En Google Cloud, PostgREST corre como sidecar en el mismo contenedor y no se
+ * publica: NEXT_PUBLIC_SUPABASE_URL apunta a él (http://127.0.0.1:3001) y,
+ * con POSTGREST_DIRECTO=1, se quita el /rest/v1 que agrega supabase-js porque
+ * PostgREST sirve desde la raíz. En Vercel no hace nada.
+ */
+function postgrestDirecto(input: Parameters<typeof fetch>[0]): Parameters<typeof fetch>[0] {
+  if (process.env.POSTGREST_DIRECTO !== '1') return input;
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  return url.replace('/rest/v1/', '/');
+}
 
 function getAdminClient(): SupabaseClient {
   if (_admin) return _admin;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Google Cloud: sin llave fija, el token se firma por hora (clave-servicio.ts).
+  if (url && !key && claveServicioFirmada()) {
+    _admin = createClient(url, claveServicioFirmada() as string, {
+      accessToken: async () => claveServicioFirmada() as string,
+      global: { fetch: fetchSinCache },
+    });
+    return _admin;
+  }
   if (!url || !key) {
     throw new Error(
       'Supabase admin client not configured: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set'

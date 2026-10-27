@@ -14,7 +14,7 @@
  *        -H "Authorization: Bearer $ADMIN_SECRET"
  */
 import { NextRequest, NextResponse } from "next/server";
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 import { supabaseAdmin } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { almacen } from "@/lib/almacen";
 import { supabaseAdmin } from '@/lib/supabase';
 
 /**
@@ -39,9 +40,7 @@ export async function POST(req: NextRequest) {
     const filename = `${candidate.id}/${scenario_index ?? 0}_${ts}.${ext}`;
 
     // Upload to Supabase Storage
-    const { error: uploadError } = await supabaseAdmin
-      .storage
-      .from('proctoring-snapshots')
+    const { error: uploadError } = await almacen('proctoring-snapshots')
       .upload(filename, binary, {
         contentType: mime,
         cacheControl: '3600',

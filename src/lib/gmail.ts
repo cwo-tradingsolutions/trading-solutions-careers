@@ -11,7 +11,7 @@
  *
  * Sin paquete `googleapis` — usamos fetch directo. Más liviano, sin deps extra.
  */
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";

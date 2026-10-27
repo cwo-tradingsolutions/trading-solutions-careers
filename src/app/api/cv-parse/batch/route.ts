@@ -13,7 +13,7 @@
  *
  * Response: resumen con contadores + errores por candidato.
  */
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { parseCV, buildCandidateText } from "@/lib/cv-parser";

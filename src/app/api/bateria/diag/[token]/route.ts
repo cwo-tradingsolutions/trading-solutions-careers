@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     items: ITEMS.length,
     // Lo primero que hay que descartar cuando el agente "no hace nada".
     entorno: {
-      anthropicConfigurada: !!process.env.ANTHROPIC_API_KEY,
+      anthropicConfigurada: !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_VERTEX_PROJECT_ID),
       largoLlave: process.env.ANTHROPIC_API_KEY?.length ?? 0,
     },
   };

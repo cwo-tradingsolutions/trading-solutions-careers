@@ -9,7 +9,7 @@
  *        modificarlos sin tocar Vercel). EMAIL_FROM se queda como env var
  *        porque cambiarlo requiere DNS verificado en Resend.
  */
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 

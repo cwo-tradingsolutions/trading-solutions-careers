@@ -11,7 +11,7 @@
  * Si force=false (default) y cv_parsed_at existe, devuelve el cache.
  * Si force=true, re-parsea.
  */
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { parseCV, buildCandidateText } from "@/lib/cv-parser";

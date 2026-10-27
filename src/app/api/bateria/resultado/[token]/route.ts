@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { almacen } from "@/lib/almacen";
 import { supabaseAdmin } from '@/lib/supabase';
 import { isAdminRequest } from '@/lib/bateria/auth';
 import { findItem, ITEMS } from '@/lib/bateria/items';
@@ -32,8 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
   // URLs firmadas: el bucket es privado.
   let capturas: { path: string; url: string | null; captured_at: string; block: string | null }[] = [];
   if (snaps?.length) {
-    const { data: urls } = await supabaseAdmin.storage
-      .from('proctoring-snapshots')
+    const { data: urls } = await almacen('proctoring-snapshots')
       .createSignedUrls(snaps.map((s: any) => s.storage_path), 60 * 60);
     capturas = snaps.map((s: any, idx: number) => ({
       path: s.storage_path, url: urls?.[idx]?.signedUrl ?? null,
