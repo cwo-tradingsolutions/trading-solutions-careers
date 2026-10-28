@@ -7,14 +7,18 @@ import { useLanguage } from "@/i18n/context";
 import { fill } from "@/i18n/translations";
 import { fetchOpenJobs, type Job } from "@/lib/vacancies-adapter";
 import { AREAS, areaOf, type AreaKey } from "@/lib/areas";
-import { ArrowUpRight, ArrowRight, Route, Ship, MessageCircle, BookOpen, Globe, Heart, Star } from "lucide-react";
 
 /**
- * Home pública · Careers talla mundial (Clara + Bernabé, 27-oct).
+ * Home pública · Careers en el shell Universe About (pack rev F).
  *
- * Light-first: canvas #f7f7f7 y blanco alternados, hero con la foto en un
- * contenedor redondeado (no a sangre), y una sola banda ink: el CTA final.
+ * Misma estructura del panel About del clon de Clara — intro con cifra
+ * gigante, hero cinematográfico redondeado, tarjetas de pilares, tarjeta de
+ * cobertura con globo — con el copy de Bernabé en los espacios de Careers.
  * Fotos propias de Trading Solutions en /public/careers (nada de Unsplash).
+ *
+ * Del clon quedan fuera las piezas internas de Universe (Policies con
+ * códigos SIG, merch "Free for our team", eventos internos, FAQ de la
+ * plataforma): no son contenido para candidatos.
  */
 
 const AREA_IMAGES: Record<AreaKey, string> = {
@@ -23,8 +27,9 @@ const AREA_IMAGES: Record<AreaKey, string> = {
   commercial: "/careers/area-commercial.jpg",
 };
 
-const PILLAR_ICONS = [Route, Ship, MessageCircle];
-const BENEFIT_ICONS = [BookOpen, Globe, Heart, Star];
+const GLOBE_DOTS = [
+  [32, 38], [40, 55], [48, 62], [55, 48], [70, 40], [62, 58],
+];
 
 export default function HomePage() {
   const { t } = useLanguage();
@@ -51,225 +56,197 @@ export default function HomePage() {
 
   return (
     <PublicPage>
-      {/* HERO · texto sobre canvas, foto en contenedor redondeado */}
-      <section className="pt-12 md:pt-20 pb-6">
-        <div className="max-w-ts mx-auto px-5 md:px-6 lg:px-10">
-          <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-end mb-10 md:mb-14">
-            <div className="lg:col-span-8">
-              <p className="ts-kicker mb-6">{t.hero.eyebrow}</p>
-              <h1 className="hero-text text-ts-ink max-w-[14ch] md:max-w-[16ch]">{t.hero.title}</h1>
-            </div>
-            <div className="lg:col-span-4">
-              <p className="text-base md:text-lg text-ts-muted leading-relaxed mb-8">{t.hero.body}</p>
-              <div className="flex flex-wrap gap-3">
-                <Link href="/vacantes" className="pill-btn pill-btn-primary text-base">
-                  {t.hero.ctaPrimary}
-                  <ArrowUpRight size={16} strokeWidth={2.5} />
-                </Link>
-                <a href="#how-we-hire" className="pill-btn pill-btn-white text-base border border-solid border-[color:var(--ts-line)] hover:border-ts-ink">
-                  {t.hero.ctaSecondary}
-                </a>
-              </div>
-            </div>
-          </div>
+      <a className="back" href={t.cta.secondaryUrl} target="_blank" rel="noopener">
+        ‹ {t.shell.backToCompany}
+      </a>
 
-          <div className="relative rounded-ts-lg md:rounded-ts-xl overflow-hidden bg-ts-ink aspect-[4/3] md:aspect-[21/9]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/careers/hero-miami-port.jpg"
-              alt={t.hero.imageAlt}
-              className="absolute inset-0 w-full h-full object-cover"
-              fetchPriority="high"
-            />
+      {/* INTRO · como "About Trading Solutions" del clon */}
+      <div className="about-intro">
+        <div>
+          <p className="eyebrow">{t.hero.eyebrow}</p>
+          <h1>{t.hero.title}</h1>
+          <p className="lead">{t.hero.body}</p>
+          <div className="cta-row">
+            <Link href="/vacantes" className="btn-reg lg">
+              {t.hero.ctaPrimary} →
+            </Link>
+            <a href="#how-we-hire" className="btn-ghost">
+              {t.hero.ctaSecondary}
+            </a>
           </div>
-
-          {/* STATS · mismos 4 números LOCK que el bloque Why */}
-          <dl className="grid grid-cols-2 md:grid-cols-4 gap-y-8 mt-10 md:mt-14 border-t border-[color:var(--ts-line)] pt-8 md:pt-10">
-            {t.stats.map((s, i) => (
-              <div key={s.label} className={`md:px-6 ${i > 0 ? "md:border-l md:border-[color:var(--ts-line)]" : "md:pl-0"}`}>
-                <dt className="sr-only">{s.label}</dt>
-                <dd className="stat-number text-ts-ink ts-tabular">{s.value}</dd>
-                <dd className="text-sm text-ts-muted mt-2">{s.label}</dd>
-              </div>
-            ))}
-          </dl>
         </div>
-      </section>
+        <div className="stat">
+          <div className="n">{t.stats[0].value}</div>
+          <div className="l">{t.stats[0].label}</div>
+        </div>
+      </div>
+
+      {/* HERO STORY · cinematográfico redondeado, foto TS */}
+      <div className="hero-story">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/careers/hero-miami-port.jpg" alt={t.hero.imageAlt} fetchPriority="high" />
+        <div className="overlay" />
+        <div className="copy">
+          <div className="kicker">{t.hero.eyebrow}</div>
+          <div className="ht">{t.cta.title}</div>
+          <p className="hb">{t.cta.body}</p>
+          <Link href="/vacantes" className="pill">
+            ▸ {t.cta.primary}
+          </Link>
+        </div>
+      </div>
+
+      {/* STATS · los 4 números LOCK */}
+      <div className="sec">
+        <div className="pillars cols-4 stats">
+          {t.stats.map((s) => (
+            <div key={s.label} className="pillar stat-card">
+              <div className="v">{s.value}</div>
+              <div className="t">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* WHY */}
-      <section id="why" className="scroll-mt-20 py-20 md:py-28 bg-ts-surface mt-14 md:mt-20">
-        <div className="max-w-ts mx-auto px-5 md:px-6 lg:px-10">
-          <div className="grid lg:grid-cols-12 gap-6 lg:gap-12 mb-14">
-            <div className="lg:col-span-6">
-              <p className="ts-kicker mb-4">{t.why.eyebrow}</p>
-              <h2 className="section-title">{t.why.title}</h2>
+      <section id="why" className="sec">
+        <p className="eyebrow">{t.why.eyebrow}</p>
+        <h2>{t.why.title}</h2>
+        <p className="sub">{t.why.lead}</p>
+        <div className="pillars cols-3" style={{ marginBottom: 18 }}>
+          {t.why.pillars.map((p, i) => (
+            <div key={p.title} className="pillar">
+              <div className="num">{String(i + 1).padStart(2, "0")}</div>
+              <div className="t">{p.title}</div>
+              <p className="b">{p.body}</p>
             </div>
-            <p className="lg:col-span-6 text-lg text-ts-muted leading-relaxed lg:pt-10">{t.why.lead}</p>
-          </div>
+          ))}
+        </div>
 
-          <div className="grid md:grid-cols-3 gap-5">
-            {t.why.pillars.map((p, i) => {
-              const Icon = PILLAR_ICONS[i];
-              return (
-                <div key={p.title} className="bg-ts-canvas rounded-ts-lg p-8 h-full">
-                  <div className="w-11 h-11 rounded-ts-sm bg-ts-surface border border-[color:var(--ts-line)] flex items-center justify-center mb-8">
-                    <Icon size={20} className="text-ts-ink" strokeWidth={1.75} />
-                  </div>
-                  <h3 className="text-xl font-normal tracking-ts-tight mb-3">{p.title}</h3>
-                  <p className="text-ts-muted text-[15px] leading-relaxed">{p.body}</p>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Cierre · pull-quote */}
-          <div className="grid lg:grid-cols-2 gap-5 mt-5">
-            <div className="relative rounded-ts-lg overflow-hidden min-h-[280px] lg:min-h-full bg-ts-canvas">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/careers/why-ground.jpg" alt={t.why.imageAlt} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-            </div>
-            <figure className="bg-ts-canvas rounded-ts-lg p-8 md:p-12 flex flex-col">
-              <blockquote className="border-l-2 border-ts-accent pl-6">
-                <p className="text-2xl md:text-[2rem] font-light leading-[1.2] tracking-ts-tight text-ts-ink">
-                  {t.why.closeTitle}
-                </p>
-              </blockquote>
-              <p className="text-ts-muted leading-relaxed mt-6">{t.why.closeBody}</p>
-              <ul className="flex flex-wrap gap-2 mt-8" aria-label="Services">
+        {/* Cierre · pull-quote */}
+        <figure className="cov-card">
+          <div className="cov-top">
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <blockquote className="quote">{t.why.closeTitle}</blockquote>
+              <p className="quote-body">{t.why.closeBody}</p>
+              <ul className="chip-row" aria-label="Services" style={{ listStyle: "none", padding: 0, marginTop: 22 }}>
                 {t.why.tags.map((tag) => (
-                  <li key={tag} className="tag !bg-ts-surface">{tag}</li>
+                  <li key={tag} className="chip blue">{tag}</li>
                 ))}
               </ul>
-              <dl className="grid grid-cols-3 gap-4 mt-auto pt-10">
+              <div className="mini-stats">
                 {t.why.miniStats.map((s) => (
                   <div key={s.label}>
-                    <dt className="sr-only">{s.label}</dt>
-                    <dd className="text-2xl md:text-3xl font-light tracking-ts-tight ts-tabular">{s.value}</dd>
-                    <dd className="text-xs md:text-sm text-ts-muted mt-1 leading-snug">{s.label}</dd>
+                    <div className="v">{s.value}</div>
+                    <div className="l">{s.label}</div>
                   </div>
                 ))}
-              </dl>
-            </figure>
+              </div>
+            </div>
+            <div className="cov-photo">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/careers/why-ground.jpg" alt={t.why.imageAlt} loading="lazy" />
+            </div>
+          </div>
+        </figure>
+      </section>
+
+      {/* COVERAGE · del clon */}
+      <section className="sec">
+        <h2>{t.coverage.title}</h2>
+        <p className="sub">{t.coverage.sub}</p>
+        <div className="cov-card">
+          <div className="cov-top">
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div className="cov-label">{t.coverage.label}</div>
+              <div className="cov-title">
+                {t.coverage.country}
+                <span>{t.coverage.role}</span>
+              </div>
+              <div className="cov-meta">
+                <div className="row"><span className="k">{t.coverage.foundedK}</span> {t.coverage.founded}</div>
+                <div className="row"><span className="k">{t.coverage.officeK}</span> {t.coverage.office}</div>
+                <a href={t.coverage.mapsUrl} target="_blank" rel="noopener">{t.coverage.maps} ↗</a>
+              </div>
+            </div>
+            <div className="cov-right">
+              <div className="globe" aria-hidden>
+                {GLOBE_DOTS.map(([x, y]) => (
+                  <span key={`${x}-${y}`} className="dot" style={{ left: `${x}%`, top: `${y}%` }} />
+                ))}
+                <div className="pin">
+                  <div className="flag">🇺🇸</div>
+                  <div className="chip">{t.coverage.pin}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="chip-col">
+          <div className="lab"><i /> {t.coverage.countriesLabel}</div>
+          <div className="chip-row">
+            {t.coverage.countries.map((c, i) => (
+              <span key={c} className={`chip blue${i === 0 ? " on" : ""}`}>{c}</span>
+            ))}
           </div>
         </div>
       </section>
 
       {/* AREAS · conteos desde las vacantes abiertas */}
-      <section id="areas" className="scroll-mt-20 py-20 md:py-28">
-        <div className="max-w-ts mx-auto px-5 md:px-6 lg:px-10">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
-            <div className="max-w-2xl">
-              <p className="ts-kicker mb-4">{t.areas.eyebrow}</p>
-              <h2 className="section-title mb-5">{t.areas.title}</h2>
-              <p className="text-lg text-ts-muted leading-relaxed">{t.areas.lead}</p>
-            </div>
-            <Link href="/vacantes" className="pill-btn pill-btn-outline text-sm self-start md:self-auto shrink-0">
-              {t.nav.cta}
-              <ArrowRight size={14} strokeWidth={2.5} />
+      <section id="areas" className="sec">
+        <p className="eyebrow">{t.areas.eyebrow}</p>
+        <h2>{t.areas.title}</h2>
+        <p className="sub">{t.areas.lead}</p>
+        <div className="areas">
+          {AREAS.map((key) => (
+            <Link key={key} href={`/vacantes?area=${key}`} className="area">
+              <div className="pol-card">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={AREA_IMAGES[key]} alt={t.areas[key].imageAlt} loading="lazy" />
+                {jobs !== null && <span className="badge">{countLabel(counts[key])}</span>}
+              </div>
+              <div className="pol-info">
+                <h3>{t.areas[key].title}</h3>
+                <p>{t.areas[key].desc}</p>
+                <div className="code">{t.areas.cardCta} →</div>
+              </div>
             </Link>
-          </div>
-          <div className="grid md:grid-cols-3 gap-5">
-            {AREAS.map((key) => (
-              <Link
-                key={key}
-                href={`/vacantes?area=${key}`}
-                className="group bg-ts-surface rounded-ts-lg overflow-hidden border border-[color:var(--ts-line)] hover:border-ts-accent transition-colors flex flex-col"
-              >
-                <div className="aspect-[4/3] overflow-hidden m-2 rounded-ts-md">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={AREA_IMAGES[key]}
-                    alt={t.areas[key].imageAlt}
-                    className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
-                    loading="lazy"
-                  />
-                </div>
-                <div className="p-6 pt-4 flex flex-col flex-1">
-                  <h3 className="text-xl font-normal tracking-ts-tight mb-2">{t.areas[key].title}</h3>
-                  <p className="text-sm text-ts-muted leading-relaxed mb-6">{t.areas[key].desc}</p>
-                  <div className="mt-auto flex items-center justify-between pt-4 border-t border-[color:var(--ts-line)]">
-                    <span className="text-sm text-ts-ink min-h-[1.25rem]">
-                      {jobs === null ? "" : countLabel(counts[key])}
-                    </span>
-                    <span className="text-sm font-medium text-ts-accent flex items-center gap-1">
-                      {t.areas.cardCta}
-                      <ArrowUpRight size={14} strokeWidth={2.5} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+          ))}
         </div>
       </section>
 
       {/* PROCESS · 4 tarjetas de igual altura */}
-      <section id="how-we-hire" className="scroll-mt-20 py-20 md:py-28 bg-ts-surface">
-        <div className="max-w-ts mx-auto px-5 md:px-6 lg:px-10">
-          <div className="max-w-2xl mb-12">
-            <p className="ts-kicker mb-4">{t.process.eyebrow}</p>
-            <h2 className="section-title mb-5">{t.process.title}</h2>
-            <p className="text-lg text-ts-muted leading-relaxed">{t.process.lead}</p>
-          </div>
-          <ol className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 auto-rows-fr">
-            {t.process.steps.map((s) => (
-              <li key={s.label} className="bg-ts-canvas rounded-ts-lg p-7 h-full flex flex-col">
-                <p className="text-sm text-ts-accent font-medium mb-10">{s.label}</p>
-                <h3 className="text-xl font-normal tracking-ts-tight mb-3">{s.title}</h3>
-                <p className="text-[15px] text-ts-muted leading-relaxed">{s.body}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
+      <section id="how-we-hire" className="sec">
+        <p className="eyebrow">{t.process.eyebrow}</p>
+        <h2>{t.process.title}</h2>
+        <p className="sub">{t.process.lead}</p>
+        <ol className="pillars cols-4" style={{ listStyle: "none", padding: 0 }}>
+          {t.process.steps.map((s) => (
+            <li key={s.label} className="pillar">
+              <div className="num">{s.label}</div>
+              <div className="t">{s.title}</div>
+              <p className="b">{s.body}</p>
+            </li>
+          ))}
+        </ol>
       </section>
 
       {/* BENEFITS */}
-      <section id="life-here" className="scroll-mt-20 py-20 md:py-28">
-        <div className="max-w-ts mx-auto px-5 md:px-6 lg:px-10">
-          <div className="max-w-2xl mb-12">
-            <p className="ts-kicker mb-4">{t.benefits.eyebrow}</p>
-            <h2 className="section-title">{t.benefits.title}</h2>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {t.benefits.items.map((b, i) => {
-              const Icon = BENEFIT_ICONS[i];
-              return (
-                <div key={b.title} className="bg-ts-surface rounded-ts-lg p-7 h-full border border-[color:var(--ts-line)]">
-                  <Icon size={22} className="text-ts-accent mb-8" strokeWidth={1.75} />
-                  <h3 className="text-lg font-normal tracking-ts-tight mb-2">{b.title}</h3>
-                  <p className="text-sm text-ts-muted leading-relaxed">{b.body}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA · la única banda ink, redondeada sobre canvas */}
-      <section className="pb-20 md:pb-28">
-        <div className="max-w-ts mx-auto px-5 md:px-6 lg:px-10">
-          <div className="bg-ts-ink text-white rounded-ts-lg md:rounded-ts-xl px-7 py-14 md:px-16 md:py-20">
-            <p className="ts-kicker ts-kicker-on-dark mb-6">
-              <span className="ts-mark" aria-hidden />
-              {t.hero.eyebrow}
-            </p>
-            <h2 className="section-title max-w-2xl mb-5">{t.cta.title}</h2>
-            <p className="text-lg text-white/70 max-w-xl mb-10 leading-relaxed">{t.cta.body}</p>
-            <div className="flex flex-wrap gap-3">
-              <Link href="/vacantes" className="pill-btn pill-btn-primary text-base">
-                {t.cta.primary}
-                <ArrowUpRight size={16} strokeWidth={2.5} />
-              </Link>
-              <a
-                href={t.cta.secondaryUrl}
-                target="_blank"
-                rel="noopener"
-                className="pill-btn text-base text-white border border-solid border-white/30 hover:border-white"
-              >
-                {t.cta.secondary}
-              </a>
+      <section id="life-here" className="sec" style={{ marginBottom: 24 }}>
+        <p className="eyebrow">{t.benefits.eyebrow}</p>
+        <h2>{t.benefits.title}</h2>
+        <div className="pillars cols-4" style={{ marginTop: 22 }}>
+          {t.benefits.items.map((b, i) => (
+            <div key={b.title} className="pillar">
+              <div className="num">{String(i + 1).padStart(2, "0")}</div>
+              <div className="t">{b.title}</div>
+              <p className="b">{b.body}</p>
             </div>
-          </div>
+          ))}
+        </div>
+        <div className="cta-row" style={{ marginTop: 28 }}>
+          <Link href="/vacantes" className="btn-reg lg">{t.cta.primary} →</Link>
+          <a href={t.cta.secondaryUrl} target="_blank" rel="noopener" className="btn-ghost">{t.cta.secondary} ↗</a>
         </div>
       </section>
     </PublicPage>

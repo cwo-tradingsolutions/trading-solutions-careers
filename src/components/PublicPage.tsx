@@ -5,7 +5,8 @@ import Navbar from "./Navbar";
 import Footer from "./Footer";
 
 /**
- * Envoltorio de las páginas públicas (home, vacantes, detalle).
+ * Envoltorio de las páginas públicas (home, vacantes, detalle): shell
+ * Universe About (`.uv`, ver styles/universe-shell.css).
  *
  * El layout raíz declara `lang="es"` porque lo comparte con HR Admin, que va
  * en español. El portal público va en inglés: se marca el bloque con
@@ -23,9 +24,9 @@ export default function PublicPage({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <div lang="en" className="min-h-screen bg-ts-canvas flex flex-col">
+    <div lang="en" className="uv">
       <Navbar />
-      <main className="flex-1">{children}</main>
+      <main className="page">{children}</main>
       <Footer />
     </div>
   );
