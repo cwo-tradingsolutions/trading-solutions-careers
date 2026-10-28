@@ -333,7 +333,7 @@ export default function HRAdminPage() {
       <main className="max-w-ts mx-auto px-5 py-5 pb-12">
         {tab === "dashboard" && <Dashboard setTab={setTab} />}
         {tab === "requisiciones" && <RequisitionsInbox />}
-        {tab === "vacantes" && <Vacantes />}
+        {tab === "vacantes" && <Vacantes setTab={setTab} />}
         {tab === "funnel" && <PipelineFunnel />}
         {tab === "onboarding" && <OnboardingTab />}
         {tab === "cvbank" && <CVBank />}
@@ -1055,7 +1055,7 @@ function KPI({ label, value, delta, tone = "up" }: { label: string; value: strin
   );
 }
 
-function PageHead({ title, desc, actions }: { title: string; desc?: string; actions?: React.ReactNode }) {
+function PageHead({ title, desc, actions }: { title: string; desc?: React.ReactNode; actions?: React.ReactNode }) {
   return (
     <div className="flex items-end justify-between flex-wrap gap-4 mb-5">
       <div>
@@ -1327,10 +1327,12 @@ function VacanciesOverview({ vacancyFilter = 'all', onlyOpen = false }: { vacanc
 
   async function publicarEnLaWeb() {
     if (!confirm(
+      'Seed desde jobs.ts (legacy).\n\n' +
       'Publicar en la web las vacantes definidas en el código (src/data/jobs.ts).\n\n' +
       'Actualiza título, descripción, responsabilidades y requisitos de las que ya están ' +
       'publicadas, y crea las que falten.\n\n' +
-      'No cierra ninguna vacante ni reabre las que hayas cerrado.'
+      'No cierra ninguna vacante ni reabre las que hayas cerrado.\n\n' +
+      'La vía normal es publicar desde Requisiciones. ¿Seguir igual?'
     )) return;
     setPublicando(true);
     try {
@@ -1402,14 +1404,25 @@ function VacanciesOverview({ vacancyFilter = 'all', onlyOpen = false }: { vacanc
           <p className="text-xs text-gray-500">{abiertas.length} abierta{abiertas.length !== 1 ? 's' : ''}{!onlyOpen && ` · ${todasCerradas.length} cerrada${todasCerradas.length !== 1 ? 's' : ''}`}</p>
         </div>
         <div className="flex gap-2 text-[11px] items-center">
-          <button
-            onClick={publicarEnLaWeb}
-            disabled={publicando}
-            className="bg-black hover:bg-gray-800 disabled:opacity-50 text-white text-[11px] font-semibold px-3 py-2 rounded-lg transition-colors"
-            title="Publica en la página pública las vacantes definidas en src/data/jobs.ts · no cierra ninguna"
-          >
-            {publicando ? 'Publicando…' : 'Publicar en la web'}
-          </button>
+          {/* La publicación normal es desde Requisiciones. El seed desde
+              jobs.ts queda plegado como herramienta de admin. */}
+          <details className="relative">
+            <summary className="cursor-pointer list-none border border-gray-300 hover:bg-gray-50 text-[11px] font-semibold px-3 py-2 rounded-lg">
+              Admin ▾
+            </summary>
+            <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-lg p-2 z-20">
+              <button
+                type="button"
+                onClick={publicarEnLaWeb}
+                disabled={publicando}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                title="Publica en la página pública las vacantes definidas en src/data/jobs.ts · no cierra ninguna"
+              >
+                <div className="font-semibold">{publicando ? 'Publicando…' : 'Seed desde jobs.ts (legacy)'}</div>
+                <div className="text-gray-500">La vía normal es Requisiciones → Publicar en la web.</div>
+              </button>
+            </div>
+          </details>
           <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
             <div className="text-[9px] uppercase font-bold text-emerald-700">Avg time-to-fill</div>
             <div className="text-base font-extrabold text-emerald-900">{avgTtfRecruitment}<span className="text-[10px] font-medium ml-1">días</span></div>
@@ -2644,11 +2657,11 @@ type ScreeningModalData = {
   assessmentToken: string | null;
 };
 
-type AgentDetailModalData = {
-  agent: 'recepcion' | 'pareo' | 'screening' | 'assessment';
-};
-
-function Vacantes() {
+// Catálogo público de careers (tabla `vacancies` en Neon). Esta pantalla ya no
+// es un centro de reclutamiento: el pipeline vive en Funnel y la publicación
+// canónica es «Publicar en la web» desde Requisiciones. Acá solo se ve qué está
+// publicado, se cierra/reabre y se salta al funnel de la vacante en el ATS.
+function Vacantes({ setTab: irA }: { setTab: (t: Tab) => void }) {
   const [publicandoWeb, setPublicandoWeb] = useState(false);
   const [recuperando, setRecuperando] = useState(false);
   const [vacancies, setVacancies] = useState<LiveVacancy[]>([]);
@@ -2656,60 +2669,15 @@ function Vacantes() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'active' | 'closed'>('active');
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [statsByVacancy, setStatsByVacancy] = useState<Record<number, VacancyAppStats>>({});
-  const [showJobWriter, setShowJobWriter] = useState(false);
-  const [showMarketResearch, setShowMarketResearch] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showNuevaVacante, setShowNuevaVacante] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-  const [screeningModal, setScreeningModal] = useState<ScreeningModalData | null>(null);
-  const [agentModal, setAgentModal] = useState<AgentDetailModalData | null>(null);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
-  // Filtros por vacante (key = vacancy_id)
-  const [filterByVacancy, setFilterByVacancy] = useState<Record<number, { search: string; status: string; sort: 'score' | 'date' | 'name' }>>({});
-  const [selectedCandidates, setSelectedCandidates] = useState<Record<number, Set<number>>>({});
-
-  function getFilters(vid: number) {
-    return filterByVacancy[vid] ?? { search: '', status: 'all', sort: 'score' as const };
-  }
-  function setFilter(vid: number, patch: Partial<{ search: string; status: string; sort: 'score' | 'date' | 'name' }>) {
-    setFilterByVacancy((prev) => ({ ...prev, [vid]: { ...getFilters(vid), ...patch } }));
-  }
-  function toggleSelect(vid: number, candId: number) {
-    setSelectedCandidates((prev) => {
-      const cur = new Set(prev[vid] ?? []);
-      if (cur.has(candId)) cur.delete(candId);
-      else cur.add(candId);
-      return { ...prev, [vid]: cur };
-    });
-  }
-  async function bulkSendTest(vid: number, candidates: Array<{ id: number; name: string; email: string }>, vacancyTitle: string) {
-    if (candidates.length === 0) return;
-    if (!confirm(`Enviar prueba de integridad a ${candidates.length} candidatos?`)) return;
-    setActionBusy(`bulk-${vid}`);
-    let ok = 0;
-    for (const c of candidates) {
-      try {
-        await fetch('/api/assessments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            candidate_name: c.name,
-            candidate_email: c.email,
-            vacancy_id: vid,
-            vacancy_title: vacancyTitle,
-            send_email: true,
-            source: 'bulk_send_from_vacantes',
-          }),
-        });
-        ok += 1;
-      } catch { /* sigue */ }
-    }
-    setActionBusy(null);
-    alert(`✓ Invitaciones enviadas: ${ok}/${candidates.length}`);
-    setSelectedCandidates((prev) => ({ ...prev, [vid]: new Set() }));
-    window.location.reload();
-  }
+  // web_vacancy_id (Neon) -> vacancy_id del ATS, sacado de las requisiciones
+  // publicadas. Solo lectura: no se escribe nada en ninguna de las dos bases.
+  const [atsPorVacante, setAtsPorVacante] = useState<Record<number, string>>({});
+  // Aviso tras cerrar una vacante vinculada: el cierre acá solo toca Neon.
+  const [avisoCierre, setAvisoCierre] = useState<{ title: string; atsId: string } | null>(null);
 
   // Trae al funnel las aplicaciones que se guardaron en Neon pero nunca
   // llegaron al ATS. Pasa cuando alguien aplica a una vacante que todavía no
@@ -2751,15 +2719,17 @@ function Vacantes() {
     }
   }
 
-  // Publica en la página pública las vacantes definidas en src/data/jobs.ts.
-  // El botón vive también en el Dashboard, pero acá es donde se busca: esta es
-  // la pantalla de vacantes.
+  // Seed legacy: publica las vacantes definidas en src/data/jobs.ts. Ya no es
+  // la vía normal (eso es Requisiciones → Publicar en la web); queda en el menú
+  // Admin para casos puntuales.
   async function publicarEnLaWeb() {
     if (!confirm(
-      'Publicar en la web las vacantes definidas en el código.\n\n' +
-      'Actualiza las que ya están publicadas y crea las que falten. También crea ' +
+      'Seed desde jobs.ts (legacy).\n\n' +
+      'Publica en la web las vacantes definidas en el código (src/data/jobs.ts): ' +
+      'actualiza las que ya están publicadas y crea las que falten. También crea ' +
       'el funnel en el ATS si no existe.\n\n' +
-      'No cierra ninguna vacante ni reabre las que hayas cerrado.'
+      'No cierra ninguna vacante ni reabre las que hayas cerrado.\n\n' +
+      'La vía normal es publicar desde Requisiciones. ¿Seguir igual?'
     )) return;
     setPublicandoWeb(true);
     try {
@@ -2777,6 +2747,40 @@ function Vacantes() {
       alert(`No se pudo publicar: ${e?.message || 'error de red'}`);
     } finally {
       setPublicandoWeb(false);
+    }
+  }
+
+  // Cerrar / reabrir en la página pública. Solo toca Neon: el cierre en el ATS
+  // (Dashboard/Funnel) sigue siendo aparte hasta la fase 2.
+  async function cambiarEstado(v: LiveVacancy, title: string, status: 'closed' | 'open') {
+    const key = `estado-${v.id}`;
+    if (actionBusy === key) return;
+    const ok = status === 'closed'
+      ? confirm(
+          `¿Quitar "${title}" de la página pública?\n\n` +
+          `Deja de aparecer en /vacantes y nadie puede aplicar.\n\n` +
+          `No se borra nada: las aplicaciones que ya entraron conservan su ` +
+          `historial y la vacante se puede volver a abrir.`
+        )
+      : confirm(`¿Reabrir "${title}" en la página pública?\n\nVuelve a aparecer en /vacantes y se puede aplicar.`);
+    if (!ok) return;
+    setActionBusy(key);
+    try {
+      const r = await fetch(`/api/vacancies/${v.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      const j = await r.json();
+      if (!r.ok) { alert(`No se pudo ${status === 'closed' ? 'cerrar' : 'reabrir'}: ${j.error || r.status}`); return; }
+      const atsId = atsPorVacante[v.id];
+      setAvisoCierre(status === 'closed' && atsId ? { title, atsId } : null);
+      setExpandedId(null);
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      alert(`No se pudo ${status === 'closed' ? 'cerrar' : 'reabrir'}: ${(err as Error).message}`);
+    } finally {
+      setActionBusy(null);
     }
   }
 
@@ -2802,97 +2806,35 @@ function Vacantes() {
     return () => { cancelled = true; };
   }, [reloadKey]);
 
-  // Cargar stats per vacancy en paralelo (apps + scores + ranking + assessment status)
+  // Vínculo con el ATS: las requisiciones publicadas guardan web_vacancy_id.
   useEffect(() => {
-    if (vacancies.length === 0) return;
+    let cancelled = false;
     (async () => {
-      const out: Record<number, VacancyAppStats> = {};
-
-      // Primero traer todos los assessment_tokens (un solo fetch, indexar por email)
-      let allTokens: Array<{ candidate_email: string; status: string; token: string; score: number | null }> = [];
       try {
-        const tR = await fetch('/api/assessments?limit=500', { cache: 'no-store' });
-        const tJ = await tR.json();
-        allTokens = (tJ.data ?? []) as typeof allTokens;
-      } catch { /* ignore */ }
-      const tokensByEmail: Record<string, typeof allTokens[number]> = {};
-      for (const t of allTokens) {
-        const em = (t.candidate_email || '').toLowerCase();
-        // Mantener el más reciente (la API ya viene ordenada DESC por sent_at)
-        if (em && !tokensByEmail[em]) tokensByEmail[em] = t;
-      }
-
-      await Promise.all(vacancies.map(async (v) => {
-        try {
-          const r = await fetch(`/api/applications?job_id=${v.id}&limit=300`, { cache: 'no-store' });
-          const j = await r.json();
-          const apps = (j.applications ?? j.data ?? []) as Array<{ id: number; full_name?: string; email?: string; status?: string; score?: number | null; why_ts?: string | null; prefilter_data?: Record<string, unknown> | null }>;
-          const stats: VacancyAppStats = {
-            total: apps.length,
-            new: 0, reviewing: 0, interview: 0, offer: 0, hired: 0, rejected: 0,
-            byScore: { green: 0, amber: 0, red: 0 },
-            topRanking: [],
-          };
-          const enriched = apps.map((a) => {
-            const score = (a.score ?? null) || extractScoreFromText(a.why_ts);
-            const matchPct = scoreToMatchPct(score);
-            const light = matchLight(matchPct);
-            const st = (a.status ?? 'new') as 'new' | 'reviewing' | 'interview' | 'offer' | 'hired' | 'rejected';
-            if (st in stats && typeof stats[st] === 'number') {
-              (stats[st] as number) = (stats[st] as number) + 1;
-            }
-            if (light === 'green') stats.byScore.green += 1;
-            else if (light === 'amber') stats.byScore.amber += 1;
-            else if (light === 'red') stats.byScore.red += 1;
-            const token = tokensByEmail[(a.email || '').toLowerCase()];
-            return {
-              id: a.id,
-              name: a.full_name ?? '',
-              email: a.email ?? '',
-              score,
-              matchPct,
-              light,
-              status: a.status ?? 'new',
-              why_ts: a.why_ts ?? null,
-              prefilter_data: a.prefilter_data ?? null,
-              assessmentStatus: (token?.status as VacancyAppStats['topRanking'][number]['assessmentStatus']) ?? 'none',
-              assessmentToken: token?.token ?? null,
-              assessmentScore: token?.score ?? null,
-            };
-          });
-          // TODOS los candidatos (no solo top 8). El filtro/orden se aplica
-          // en la UI con controles. Excluimos hired/rejected del ranking
-          // operativo pero los mostramos en la vista filtrada.
-          stats.topRanking = enriched
-            .sort((a, b) => {
-              // hired al final, rejected aún más al final
-              const sw = (s: string) => s === 'hired' ? -1 : s === 'rejected' ? -2 : 0;
-              const diff = sw(b.status) - sw(a.status);
-              if (diff !== 0) return diff;
-              return (b.score ?? 0) - (a.score ?? 0);
-            });
-          out[v.id] = stats;
-        } catch { /* ignore single-vacancy errors */ }
-      }));
-      setStatsByVacancy(out);
+        const r = await fetch('/api/requisitions', { cache: 'no-store' });
+        if (!r.ok) return;
+        const j = await r.json();
+        const mapa: Record<number, string> = {};
+        for (const req of (j.requisiciones ?? []) as Array<{ web_vacancy_id?: number | null; vacancy_id?: string | null }>) {
+          if (req.web_vacancy_id && req.vacancy_id) mapa[req.web_vacancy_id] = req.vacancy_id;
+        }
+        if (!cancelled) setAtsPorVacante(mapa);
+      } catch { /* sin vínculo: las filas quedan como legacy */ }
     })();
-  }, [vacancies]);
+    return () => { cancelled = true; };
+  }, [reloadKey]);
 
   const active = vacancies.filter((v) => !v.status || v.status === 'open' || v.status === 'active');
   const closed = vacancies.filter((v) => v.status === 'closed' || v.status === 'filled' || v.status === 'paused');
   const list = tab === 'active' ? active : closed;
-  const totalApplications = Object.values(statsByVacancy).reduce((s, x) => s + x.total, 0);
+  const vinculadas = vacancies.filter((v) => atsPorVacante[v.id]).length;
 
   function exportToExcel() {
-    // Simple CSV export (Excel-compatible). Una hoja con vacantes + stats.
+    // Simple CSV export (Excel-compatible). Una hoja con el catálogo.
     const rows: string[][] = [
-      ['ID', 'Vacante', 'Departamento', 'Status', 'Ubicación', 'Modalidad', 'Nivel', 'Publicada', 'LinkedIn', 'Total Apps', 'New', 'Reviewing', 'Interview', 'Offer', 'Hired', 'Rejected', 'Verde', 'Amber', 'Rojo'],
+      ['ID', 'Vacante', 'Departamento', 'Status', 'Ubicación', 'Modalidad', 'Nivel', 'Publicada', 'LinkedIn', 'Vacante ATS'],
     ];
     for (const v of vacancies) {
-      const st = statsByVacancy[v.id] ?? {
-        total: 0, new: 0, reviewing: 0, interview: 0, offer: 0, hired: 0, rejected: 0,
-        byScore: { green: 0, amber: 0, red: 0 }, topRanking: [],
-      };
       rows.push([
         String(v.id),
         v.title_es ?? v.title ?? v.slug,
@@ -2903,12 +2845,11 @@ function Vacantes() {
         v.level ?? '',
         v.posted_at ? new Date(v.posted_at).toISOString().slice(0, 10) : '',
         v.linkedin_url ?? '',
-        String(st.total), String(st.new), String(st.reviewing), String(st.interview), String(st.offer), String(st.hired), String(st.rejected),
-        String(st.byScore.green), String(st.byScore.amber), String(st.byScore.red),
+        atsPorVacante[v.id] ?? '',
       ]);
     }
     const csv = rows.map((r) => r.map((c) => `"${(c ?? '').toString().replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+    const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -2920,12 +2861,30 @@ function Vacantes() {
   return (
     <>
       <PageHead
-        title="Vacantes · Centro de reclutamiento"
-        desc={loading ? 'Cargando desde Neon…' : `${active.length} activa(s) · ${closed.length} cerrada(s) · ${totalApplications} aplicaciones totales`}
+        title="Vacantes · catálogo careers"
+        desc={
+          <>
+            Lo que está publicado en la página pública (Neon).{' '}
+            {loading ? 'Cargando…' : `${active.length} activa(s) · ${closed.length} cerrada(s).`}{' '}
+            Candidatos en{' '}
+            <button type="button" className="underline font-semibold text-gray-700 hover:text-black" onClick={() => irA('funnel')}>Funnel</button>
+            {' '}· nuevas vacantes en{' '}
+            <button type="button" className="underline font-semibold text-gray-700 hover:text-black" onClick={() => irA('requisiciones')}>Requisiciones</button>.
+          </>
+        }
         actions={
           <>
-            <button className="pill-btn text-xs bg-black text-white hover:bg-gray-800" style={{ padding: '9px 14px' }} onClick={() => setShowNuevaVacante(true)}>
-              + Nueva vacante
+            <button className="pill-btn text-xs bg-black text-white hover:bg-gray-800" style={{ padding: '9px 14px' }} onClick={() => irA('requisiciones')}>
+              Publicar desde Requisiciones →
+            </button>
+            <button
+              className="pill-btn pill-btn-outline text-xs disabled:opacity-50"
+              style={{ padding: '9px 14px' }}
+              onClick={recuperarAplicaciones}
+              disabled={recuperando}
+              title="Puente Neon → Funnel"
+            >
+              {recuperando ? 'Recuperando…' : 'Recuperar aplicaciones'}
             </button>
             <button className="pill-btn pill-btn-outline text-xs" style={{ padding: '9px 14px' }} onClick={() => setShowSettings(true)}>
               ⚙ Email & Calendly
@@ -2933,34 +2892,36 @@ function Vacantes() {
             <button className="pill-btn pill-btn-outline text-xs" style={{ padding: '9px 14px' }} onClick={exportToExcel}>
               <Download className="w-3.5 h-3.5" /> Export Excel
             </button>
-            <button className="pill-btn text-xs bg-[#0F172A] text-white hover:bg-black" style={{ padding: '9px 14px' }} onClick={() => setShowJobWriter(true)}>
-              <Sparkles className="w-3.5 h-3.5" /> Agente Job Writer
-            </button>
-            <button className="pill-btn text-xs bg-[#1F4FBF] text-white hover:bg-[#163E96]" style={{ padding: '9px 14px' }} onClick={() => setShowMarketResearch(true)}>
-              <Sparkles className="w-3.5 h-3.5" /> Agente Market Research
-            </button>
-            <button
-              className="pill-btn text-xs bg-[#0F172A] text-white hover:bg-black disabled:opacity-50"
-              style={{ padding: '9px 14px' }}
-              onClick={publicarEnLaWeb}
-              disabled={publicandoWeb}
-              title="Publica en la página pública las vacantes definidas en el código y crea su funnel en el ATS"
-            >
-              <Sparkles className="w-3.5 h-3.5" /> {publicandoWeb ? 'Publicando…' : 'Publicar en la web'}
-            </button>
-            <button
-              className="pill-btn pill-btn-outline text-xs disabled:opacity-50"
-              style={{ padding: '9px 14px' }}
-              onClick={recuperarAplicaciones}
-              disabled={recuperando}
-              title="Busca aplicaciones que se guardaron pero no entraron al funnel y las mete"
-            >
-              {recuperando ? 'Recuperando…' : 'Recuperar aplicaciones'}
-            </button>
-            {/* No hay botón de «Nueva requisición» acá a propósito: las pide el
-                líder desde WXM, y eso es lo que garantiza que la vacante nazca
-                con un responsable de contratación de verdad. El botón estaba
-                puesto sin onClick: no hacía nada al apretarlo. */}
+            {/* Acciones de excepción: no son el camino normal y por eso viven
+                plegadas. No hay botón de «Nueva requisición» acá a propósito:
+                las pide el líder desde WXM. */}
+            <details className="relative">
+              <summary className="pill-btn pill-btn-outline text-xs cursor-pointer list-none" style={{ padding: '9px 14px' }}>
+                Admin ▾
+              </summary>
+              <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-lg p-2 z-20 space-y-1">
+                <button
+                  type="button"
+                  className="w-full text-left text-xs px-3 py-2 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                  onClick={publicarEnLaWeb}
+                  disabled={publicandoWeb}
+                >
+                  <div className="font-semibold">{publicandoWeb ? 'Publicando…' : 'Seed desde jobs.ts (legacy)'}</div>
+                  <div className="text-gray-500">Publica las vacantes definidas en el código.</div>
+                </button>
+                <button
+                  type="button"
+                  className="w-full text-left text-xs px-3 py-2 rounded-lg hover:bg-amber-50"
+                  onClick={() => {
+                    if (!confirm('Vacante sin requisición (excepción).\n\nNo pasa por CWO ni aparece en Funnel. ¿Seguir?')) return;
+                    setShowNuevaVacante(true);
+                  }}
+                >
+                  <div className="font-semibold">Vacante sin requisición (excepción)</div>
+                  <div className="text-amber-700">No pasa por CWO ni aparece en Funnel.</div>
+                </button>
+              </div>
+            </details>
           </>
         }
       />
@@ -2972,10 +2933,23 @@ function Vacantes() {
         />
       )}
 
+      {avisoCierre && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-sm text-amber-900 flex items-center justify-between gap-3">
+          <span>
+            «{avisoCierre.title}» quedó cerrada en la web. También cerrá en{' '}
+            <button type="button" className="underline font-semibold" onClick={() => irA('dashboard')}>Dashboard</button>
+            {' / '}
+            <a className="underline font-semibold" href={`/hr-admin?vacancy=${encodeURIComponent(avisoCierre.atsId)}#funnel`}>Funnel</a>
+            {' '}— el cierre acá no toca el ATS.
+          </span>
+          <button type="button" className="text-xs text-amber-700 hover:text-amber-900" onClick={() => setAvisoCierre(null)}>✕</button>
+        </div>
+      )}
+
       <div className="grid grid-cols-4 gap-3 mb-4">
-        <KPI label="Activas" value={loading ? '…' : String(active.length)} delta="En Neon" tone="neutral" />
+        <KPI label="Activas" value={loading ? '…' : String(active.length)} delta="En la web" tone="neutral" />
         <KPI label="Cerradas" value={loading ? '…' : String(closed.length)} delta="Histórico" tone="neutral" />
-        <KPI label="Aplicaciones totales" value={String(totalApplications)} delta="Across all vacancies" />
+        <KPI label="Con vínculo ATS" value={loading ? '…' : String(vinculadas)} delta="Publicadas desde Requisiciones" tone="neutral" />
         <KPI label="Departamentos" value={String(new Set(vacancies.map((v) => v.department)).size)} delta="Áreas activas" tone="neutral" />
       </div>
 
@@ -3010,8 +2984,9 @@ function Vacantes() {
       <div className="space-y-3">
         {list.map((v) => {
           const title = v.title_es ?? v.title ?? v.title_en ?? v.slug;
-          const stats = statsByVacancy[v.id];
           const expanded = expandedId === v.id;
+          const atsId = atsPorVacante[v.id];
+          const funnelHref = atsId ? `/hr-admin?vacancy=${encodeURIComponent(atsId)}#funnel` : null;
           return (
             <div key={v.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
               {/* Header — siempre visible */}
@@ -3030,12 +3005,15 @@ function Vacantes() {
                   </div>
                 </div>
                 <div className="flex gap-2 items-center">
-                  {stats && (
-                    <>
-                      <Pill color="gray">{stats.total} apps</Pill>
-                      {stats.byScore.green > 0 && <Pill color="green">{stats.byScore.green} verde</Pill>}
-                      {stats.hired > 0 && <Pill color="black">{stats.hired} hired</Pill>}
-                    </>
+                  <Pill color="blue">Careers · Neon</Pill>
+                  {funnelHref ? (
+                    <a href={funnelHref} onClick={(e) => e.stopPropagation()} title="Abrir el funnel de esta vacante en el ATS">
+                      <Pill color="green">ATS ✓</Pill>
+                    </a>
+                  ) : (
+                    <span title="Publicada sin requisición (seed jobs.ts o vacante de excepción): no tiene funnel enlazado">
+                      <Pill color="gray">Sin vínculo ATS (legacy)</Pill>
+                    </span>
                   )}
                   <Pill color="black">id={v.id}</Pill>
                   {tab === 'active' && (
@@ -3067,41 +3045,6 @@ function Vacantes() {
                       {actionBusy === `post-internal-${v.id}` ? '…' : '📢 Interno'}
                     </button>
                   )}
-                  {tab === 'active' && (
-                    <button
-                      type="button"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        if (actionBusy === `close-web-${v.id}`) return;
-                        if (!confirm(
-                          `¿Quitar "${title}" de la página pública?\n\n` +
-                          `Deja de aparecer en /vacantes y nadie puede aplicar.\n\n` +
-                          `No se borra nada: las aplicaciones que ya entraron conservan su ` +
-                          `historial y la vacante se puede volver a abrir.`
-                        )) return;
-                        setActionBusy(`close-web-${v.id}`);
-                        try {
-                          const r = await fetch(`/api/vacancies/${v.id}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ status: 'closed' }),
-                          });
-                          const j = await r.json();
-                          if (!r.ok) { alert(`No se pudo cerrar: ${j.error || r.status}`); return; }
-                          window.location.reload();
-                        } catch (err) {
-                          alert(`No se pudo cerrar: ${(err as Error).message}`);
-                        } finally {
-                          setActionBusy(null);
-                        }
-                      }}
-                      disabled={actionBusy === `close-web-${v.id}`}
-                      className="text-[10px] font-bold px-2 py-1 rounded border border-gray-300 text-gray-600 bg-white hover:bg-gray-50 hover:text-red-700 hover:border-red-300 disabled:opacity-50"
-                      title="Quita la vacante de la página pública. No borra datos y se puede reabrir."
-                    >
-                      {actionBusy === `close-web-${v.id}` ? '…' : 'Cerrar en la web'}
-                    </button>
-                  )}
                   {v.linkedin_url && (
                     <a
                       href={v.linkedin_url}
@@ -3118,294 +3061,46 @@ function Vacantes() {
                 </div>
               </div>
 
-              {/* Detail expandido */}
+              {/* Detail expandido: datos del aviso + cerrar/reabrir + funnel */}
               {expanded && (
                 <div className="border-t border-gray-200 bg-gray-50 px-4 py-4 space-y-4">
-                  {/* Pipeline horizontal */}
-                  <PipelineSummary stats={stats} />
-
-                  {/* Agentes activos — clickables para ver detalle y modificar */}
-                  <div className="grid grid-cols-4 gap-3">
-                    <AgenteBox icon="📥" title="Recepción" desc="Recibe aplicación · valida email" status="active" onClick={() => setAgentModal({ agent: 'recepcion' })} />
-                    <AgenteBox icon="🔍" title="Pareo HDV" desc="Anthropic CV parser · extrae skills" status="active" onClick={() => setAgentModal({ agent: 'pareo' })} />
-                    <AgenteBox icon="✅" title="Screening" desc="16 Mandamientos · score 0-100" status={stats && stats.total > 0 ? 'active' : 'idle'} onClick={() => setAgentModal({ agent: 'screening' })} />
-                    <AgenteBox icon="📧" title="Assessment" desc="Envío + tracking de prueba de integridad" status={stats && stats.reviewing > 0 ? 'active' : 'idle'} onClick={() => setAgentModal({ agent: 'assessment' })} />
-                  </div>
-
-                  {/* Ranking + filtros + bulk */}
-                  <div>
-                    {(() => {
-                      const f = getFilters(v.id);
-                      const sel = selectedCandidates[v.id] ?? new Set<number>();
-                      const all = stats?.topRanking ?? [];
-                      // aplicar filtros
-                      const filtered = all.filter((c) => {
-                        if (f.search) {
-                          const q = f.search.toLowerCase();
-                          if (!c.name.toLowerCase().includes(q) && !c.email.toLowerCase().includes(q)) return false;
-                        }
-                        if (f.status !== 'all' && c.status !== f.status) return false;
-                        return true;
-                      });
-                      filtered.sort((a, b) => {
-                        if (f.sort === 'score') return (b.score ?? 0) - (a.score ?? 0);
-                        if (f.sort === 'name') return a.name.localeCompare(b.name);
-                        return 0; // date sort = original order
-                      });
-                      const selectedList = Array.from(sel).map((id) => all.find((c) => c.id === id)).filter(Boolean) as typeof all;
-                      const sendableSelected = selectedList.filter((c) => c.assessmentStatus === 'none');
-
-                      return (
-                        <>
-                          <div className="flex items-center justify-between mb-2 gap-2">
-                            <div className="text-xs uppercase text-gray-500 font-semibold tracking-wider">
-                              Candidatos · {filtered.length} de {all.length}
-                            </div>
-                            <div className="flex gap-2 items-center">
-                              <input
-                                type="text"
-                                placeholder="Buscar por nombre o email…"
-                                value={f.search}
-                                onChange={(e) => setFilter(v.id, { search: e.target.value })}
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-xs border border-gray-300 rounded px-2 py-1 bg-white"
-                                style={{ width: 200 }}
-                              />
-                              <select
-                                value={f.status}
-                                onChange={(e) => setFilter(v.id, { status: e.target.value })}
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-xs border border-gray-300 rounded px-2 py-1 bg-white"
-                              >
-                                <option value="all">Todos los status</option>
-                                <option value="reviewing">Reviewing</option>
-                                <option value="new">New</option>
-                                <option value="interview">Interview</option>
-                                <option value="offer">Offer</option>
-                                <option value="hired">Hired</option>
-                                <option value="rejected">Rejected</option>
-                              </select>
-                              <select
-                                value={f.sort}
-                                onChange={(e) => setFilter(v.id, { sort: e.target.value as 'score' | 'date' | 'name' })}
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-xs border border-gray-300 rounded px-2 py-1 bg-white"
-                              >
-                                <option value="score">↓ Score</option>
-                                <option value="name">A-Z nombre</option>
-                                <option value="date">Por fecha</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          {/* Bulk action bar */}
-                          {sel.size > 0 && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-2 flex items-center gap-2">
-                              <div className="text-sm text-blue-900 flex-1">
-                                {sel.size} candidato{sel.size > 1 ? 's' : ''} seleccionado{sel.size > 1 ? 's' : ''}
-                                {sendableSelected.length < sel.size && (
-                                  <span className="text-blue-700 ml-2">({sendableSelected.length} sin prueba enviada)</span>
-                                )}
-                              </div>
-                              <button
-                                disabled={sendableSelected.length === 0 || actionBusy === `bulk-${v.id}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  bulkSendTest(v.id, sendableSelected, v.title_es ?? v.title ?? '');
-                                }}
-                                className="text-xs px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                              >
-                                {actionBusy === `bulk-${v.id}` ? 'Enviando…' : `✉ Enviar prueba a ${sendableSelected.length}`}
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedCandidates((prev) => ({ ...prev, [v.id]: new Set() }));
-                                }}
-                                className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-white"
-                              >
-                                Limpiar
-                              </button>
-                            </div>
-                          )}
-
-                    {!stats || filtered.length === 0 ? (
-                      <div className="text-sm text-gray-400 py-4 bg-white rounded-lg border border-gray-200 text-center">
-                        {all.length === 0 ? 'Sin candidatos en esta vacante.' : 'Ningún candidato cumple los filtros.'}
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {filtered.map((c, idx) => {
-                          const dot = c.light === 'green' ? '#10B981' : c.light === 'amber' ? '#F59E0B' : c.light === 'red' ? '#EF4444' : '#9CA3AF';
-                          const hasAssessment = c.assessmentStatus !== 'none';
-                          const isSelected = sel.has(c.id);
-                          const assessmentDone = c.assessmentStatus === 'completed';
-
-                          // Botón principal asessment (contextual)
-                          let assessmentButton: React.ReactNode = null;
-                          if (assessmentDone) {
-                            // Bajar PDF de resultados
-                            assessmentButton = (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (c.assessmentToken) {
-                                    window.open(`/api/assessments/${c.assessmentToken}/pdf`, '_blank');
-                                  }
-                                }}
-                                className="text-xs px-2.5 py-1 rounded border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                                title="Bajar PDF con resultados de la prueba"
-                              >
-                                ↓ PDF
-                              </button>
-                            );
-                          } else if (hasAssessment) {
-                            // Ya enviada, en progreso o expirada — mostrar status + reenviar
-                            const label = c.assessmentStatus === 'in_progress' ? 'En curso' : c.assessmentStatus === 'expired' ? 'Expirada' : 'Enviada';
-                            assessmentButton = (
-                              <button
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  if (!confirm(`Reenviar invitación a ${c.name}?`)) return;
-                                  setActionBusy(`resend-${c.id}`);
-                                  try {
-                                    await fetch('/api/assessments', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        candidate_name: c.name,
-                                        candidate_email: c.email,
-                                        vacancy_id: v.id,
-                                        vacancy_title: v.title_es ?? v.title,
-                                        send_email: true,
-                                        source: 'resend_from_vacantes_tab',
-                                      }),
-                                    });
-                                    alert('Invitación reenviada');
-                                  } finally { setActionBusy(null); }
-                                }}
-                                className="text-xs px-2.5 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50"
-                                title={`Estado: ${c.assessmentStatus} — click para reenviar`}
-                              >
-                                {label} · ↻
-                              </button>
-                            );
-                          } else {
-                            // Sin token aún — Enviar prueba
-                            assessmentButton = (
-                              <button
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  if (!confirm(`Enviar prueba de integridad a ${c.name} (${c.email})?`)) return;
-                                  setActionBusy(`send-${c.id}`);
-                                  try {
-                                    const r = await fetch('/api/assessments', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        candidate_name: c.name,
-                                        candidate_email: c.email,
-                                        vacancy_id: v.id,
-                                        vacancy_title: v.title_es ?? v.title,
-                                        send_email: true,
-                                        source: 'send_from_vacantes_tab',
-                                      }),
-                                    });
-                                    const j = await r.json();
-                                    if (j.email?.sent) {
-                                      alert(`✓ Prueba enviada a ${c.email}`);
-                                    } else if (j.link) {
-                                      navigator.clipboard.writeText(j.link);
-                                      alert(`Token creado. Link copiado:\n${j.link}`);
-                                    }
-                                    window.location.reload();
-                                  } finally { setActionBusy(null); }
-                                }}
-                                disabled={actionBusy === `send-${c.id}`}
-                                className="text-xs px-2.5 py-1 rounded border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50"
-                                title="Generar token y enviar invitación por email"
-                              >
-                                {actionBusy === `send-${c.id}` ? '…' : '✉ Enviar prueba'}
-                              </button>
-                            );
-                          }
-
-                          return (
-                            <div key={c.id} className={`flex items-center gap-2 bg-white rounded-lg border px-3 py-2 ${isSelected ? 'border-blue-400 bg-blue-50/30' : 'border-gray-200'}`}>
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={(e) => { e.stopPropagation(); toggleSelect(v.id, c.id); }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="cursor-pointer"
-                              />
-                              <span className="text-xs text-gray-400 font-mono w-6">{idx + 1}</span>
-                              <span style={{ width: 9, height: 9, borderRadius: '50%', background: dot, flexShrink: 0 }} />
-                              <div className="text-sm font-medium flex-1 min-w-0 truncate">{c.name}</div>
-                              <Pill color={c.status === 'hired' ? 'green' : c.status === 'interview' ? 'black' : 'gray'}>{c.status}</Pill>
-                              <div className="text-sm font-bold text-right" style={{ minWidth: 48 }}>
-                                {c.matchPct !== null ? `${c.matchPct}%` : '—'}
-                              </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setScreeningModal({
-                                    candidate: { id: c.id, name: c.name, email: c.email, status: c.status },
-                                    vacancyId: v.id,
-                                    score: c.score,
-                                    category: ((c.prefilter_data as Record<string, unknown> | null)?.category as string) ?? '—',
-                                    breakdown: ((c.prefilter_data as Record<string, unknown> | null)?.breakdown as Record<string, number>) ?? {},
-                                    reasons: ((c.prefilter_data as Record<string, unknown> | null)?.reasons as string[]) ?? [],
-                                    notes: c.why_ts ?? '',
-                                    assessmentStatus: c.assessmentStatus,
-                                    assessmentToken: c.assessmentToken,
-                                  });
-                                }}
-                                className="text-xs px-2.5 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50"
-                                title="Ver detalle del screening (16 Mandamientos)"
-                              >
-                                🔍 Screening
-                              </button>
-                              {assessmentButton}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                        </>
-                      );
-                    })()}
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+                    <KV k="Slug" v={v.slug} />
+                    <KV k="Estado" v={v.status ?? 'open'} />
+                    <KV k="Departamento" v={v.department} />
+                    <KV k="Ubicación" v={v.location} />
+                    <KV k="Modalidad" v={v.work_mode} />
+                    <KV k="Nivel" v={v.level} />
+                    <KV k="Publicada" v={v.posted_at ? new Date(v.posted_at).toISOString().slice(0, 10) : undefined} />
+                    <KV k="Email de aplicación" v={v.apply_email} />
+                    <KV k="LinkedIn" v={v.linkedin_url} />
+                    <KV k="Vacante ATS" v={atsId ?? 'Sin vínculo (legacy)'} />
                   </div>
 
                   <div className="flex gap-2 pt-2 border-t border-gray-200">
-                    <button
-                      className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-100"
-                      onClick={() => window.open(`/api/assessments?vacancy_id=${v.id}&format=pdf`, '_blank')}
-                    >
-                      📄 Bajar pruebas en PDF
-                    </button>
                     <button
                       className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-100"
                       onClick={() => window.open(`/vacantes/${v.slug}`, '_blank')}
                     >
                       Ver pública ↗
                     </button>
-                    {tab === 'active' && (
-                      <button
-                        className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-100 ml-auto"
-                        onClick={async () => {
-                          if (!confirm(`Cerrar vacante "${title}"?`)) return;
-                          await fetch(`/api/vacancies/${v.id}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ status: 'closed' }),
-                          });
-                          window.location.reload();
-                        }}
-                      >
-                        Cerrar vacante
-                      </button>
+                    {funnelHref ? (
+                      <a className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-100" href={funnelHref}>
+                        Ver en Funnel →
+                      </a>
+                    ) : (
+                      <span className="text-xs px-3 py-1.5 text-gray-400" title="Sin requisición vinculada no hay funnel para filtrar">
+                        Sin funnel vinculado
+                      </span>
                     )}
+                    <button
+                      className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-100 hover:text-red-700 hover:border-red-300 ml-auto disabled:opacity-50"
+                      disabled={actionBusy === `estado-${v.id}`}
+                      onClick={() => cambiarEstado(v, title, tab === 'active' ? 'closed' : 'open')}
+                      title={tab === 'active' ? 'Quita la vacante de la página pública. No borra datos y se puede reabrir.' : 'Vuelve a publicar la vacante en la página pública.'}
+                    >
+                      {actionBusy === `estado-${v.id}` ? '…' : tab === 'active' ? 'Cerrar en la web' : 'Reabrir en la web'}
+                    </button>
                   </div>
                 </div>
               )}
@@ -3414,11 +3109,7 @@ function Vacantes() {
         })}
       </div>
 
-      {showJobWriter && <JobWriterModal onClose={() => setShowJobWriter(false)} />}
-      {showMarketResearch && <MarketResearchModal vacancies={vacancies} onClose={() => setShowMarketResearch(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-      {screeningModal && <ScreeningDetailModal data={screeningModal} onClose={() => setScreeningModal(null)} />}
-      {agentModal && <AgentDetailModal agent={agentModal.agent} onClose={() => setAgentModal(null)} />}
     </>
   );
 }
