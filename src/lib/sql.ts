@@ -23,9 +23,21 @@ function valor(v: unknown): unknown {
   return v;
 }
 
+// Las rutas mandan `${JSON.stringify(x)}::jsonb`: el texto ya es JSON. El
+// serializador de postgres.js lo volvía a envolver y jsonb guardaba un string
+// ("{\"a\":1}") en vez del objeto. Un texto pasa tal cual, como con Neon.
+const tipos = {
+  json: {
+    to: 114,
+    from: [114, 3802],
+    serialize: (x: unknown) => (typeof x === "string" ? x : JSON.stringify(x)),
+    parse: (x: string) => JSON.parse(x),
+  },
+};
+
 export function neon(url?: string): Sql {
   if (url && /\.neon\.tech/.test(url)) return neonHttp(url) as unknown as Sql;
-  pool ??= url ? postgres(url, { max: 5 }) : postgres({ max: 5 });
+  pool ??= url ? postgres(url, { max: 5, types: tipos }) : postgres({ max: 5, types: tipos });
   const db = pool;
   return ((primero: TemplateStringsArray | string, ...resto: unknown[]) => {
     if (typeof primero === "string") {
