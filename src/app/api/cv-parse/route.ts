@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       UPDATE talent_pool
          SET cv_parsed_data = ${JSON.stringify(parsed)}::jsonb,
              cv_parsed_at = NOW(),
-             current_role = COALESCE(NULLIF(current_role, ''), ${parsed.current_title ?? null}),
+             "current_role" = COALESCE(NULLIF("current_role", ''), ${parsed.current_title ?? null}),
              years_experience = COALESCE(years_experience, ${parsed.years_experience ?? null}),
              education = COALESCE(NULLIF(education, ''), ${parsed.education_field ?? null}),
              updated_at = NOW()
