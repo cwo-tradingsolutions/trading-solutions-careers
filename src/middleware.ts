@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { hasMaskedCredentialConfig } from './lib/credential-config';
 
 /**
  * Middleware combinado:
@@ -43,6 +44,20 @@ async function isValidSession(token: string | undefined, secret: string | undefi
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Los marcadores de exportación nunca son credenciales. Fallar antes de
+  // aceptar cookies, tokens o login evita autorizar un literal adivinable.
+  if ((pathname.startsWith('/api') || pathname.startsWith('/hr-admin')) &&
+      hasMaskedCredentialConfig({
+        ADMIN_SECRET: process.env.ADMIN_SECRET,
+        CRON_SECRET: process.env.CRON_SECRET,
+        WXM_SERVICE_SECRET: process.env.WXM_SERVICE_SECRET,
+      })) {
+    return NextResponse.json(
+      { error: 'Servicio temporalmente no disponible.' },
+      { status: 503, headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
 
   // ---------- 1) Protección de /hr-admin ----------
   if (pathname.startsWith('/hr-admin')) {
