@@ -9,7 +9,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
-import { resolveCandidateLang, EN_SIGNATURE_NAME } from "@/lib/candidate-lang";
+import { resolveCandidateLang } from "@/lib/candidate-lang";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
 
 export const runtime = "nodejs";
 
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
     <p>Elige el horario que mejor te funcione · solo vas a ver opciones donde todos estén disponibles al mismo tiempo. Una vez confirmes, se genera la videollamada de Google Meet automáticamente.</p>
     <p style="text-align:center"><a href="${jointLink}" class="cta">Elegir horario</a></p>
     <p>Si ninguno de los horarios disponibles te funciona, regálame una respuesta a este correo y buscamos juntos.</p>
-    <p>Un abrazo,<br><strong>Kelly Castañeda</strong><br>Talent Acquisition and Development Lead<br>Trading Solutions</p>
+    <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>
     <div class="footer">El enlace queda activo 7 días. La videollamada de Google Meet se genera automáticamente al confirmar el horario.</div>
   </div>
 </body></html>`;
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
         ? `Trading Solutions · Choose your interview time for ${vacancyTitle}`
         : `Trading Solutions · Elige tu horario para la entrevista de ${vacancyTitle}`,
       html,
-      fromName: lang === "en" ? EN_SIGNATURE_NAME : "Kelly Castañeda",
+      fromName: ATS_FROM_NAME,
       replyTo: "jointheteam@tradingsolutions.com",
     });
 

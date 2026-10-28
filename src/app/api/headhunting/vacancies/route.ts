@@ -8,7 +8,9 @@ export async function GET(req: NextRequest) {
   if (authError) return authError;
 
   try {
-    const clientId = req.nextUrl.searchParams.get('client_id');
+    // `clientId` se acepta por compatibilidad: el funnel lo mandó así meses y
+    // el filtro se ignoraba en silencio.
+    const clientId = req.nextUrl.searchParams.get('client_id') ?? req.nextUrl.searchParams.get('clientId');
 
     let query = supabaseAdmin
       .from('ht_vacancies')
