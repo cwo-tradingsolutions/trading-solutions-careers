@@ -21,6 +21,7 @@ import { VALID_STAGES, KELLY_GATES, normalizeStage, STAGE_RANK } from "@/lib/sta
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { recordStageEvent } from "@/lib/stage-events";
 import { enviarBateriaAuto } from "@/lib/bateria/invitar";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
 
 const TS_LINKEDIN_URL = "https://www.linkedin.com/company/trading-sol/";
 
@@ -55,7 +56,7 @@ function buildRejectionHtml(name: string, vacancyTitle: string): string {
     <p>Gracias por tomarte el tiempo de aplicar a la posición de <strong>${vacancyTitle}</strong> en Trading Solutions. Después de revisar tu aplicación, hemos decidido avanzar con otros candidatos cuyo perfil se ajusta más a la posición en este momento. Sin embargo, Trading Solutions sigue creciendo y nos encantaría mantenernos en contacto.</p>
     <p>Tu información queda en nuestra base de datos para futuras oportunidades. También te invitamos a seguirnos en LinkedIn para enterarte de nuevas vacantes: <a href="${TS_LINKEDIN_URL}">${TS_LINKEDIN_URL}</a></p>
     <p>Apreciamos tu interés en Trading Solutions y te deseamos mucho éxito en tus próximos pasos.</p>
-    <p>Un abrazo,<br><strong>Kelly Castañeda</strong><br>Talent Acquisition and Development Lead<br>Trading Solutions</p>
+    <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>
   </div>
 </body></html>`;
 }
@@ -157,14 +158,14 @@ export async function POST(
       <li>Tus respuestas se guardan automáticamente</li>
     </ul>
     <p>Si te queda alguna duda, contestame este correo.</p>
-    <p>Un abrazo,<br><strong>Kelly Castañeda</strong><br>Talent Acquisition and Development Lead<br>Trading Solutions</p>
+    <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>
   </div>
 </body></html>`;
           const draftRes = await createDraftViaGmail({
             to: candidate.email as string,
             subject: `Trading Solutions · Assessment virtual para ${vacancyTitle}`,
             html,
-            fromName: "Kelly Castañeda",
+            fromName: ATS_FROM_NAME,
           });
           if (draftRes.ok) {
             draftId = draftRes.draft_id;
@@ -198,7 +199,7 @@ export async function POST(
             html: rejLang === "en"
               ? buildRejectionHtmlEn(candidate.name as string, vacancyTitle)
               : buildRejectionHtml(candidate.name as string, vacancyTitle),
-            fromName: rejLang === "en" ? "Trading Solutions Talent Team" : "Kelly Castañeda",
+            fromName: ATS_FROM_NAME,
           });
           if (draftRes.ok) {
             draftId = draftRes.draft_id;
@@ -282,14 +283,14 @@ export async function POST(
     </ul>
     <p>Si tenés alguna duda mientras tanto · sobre tu fecha de inicio, lo logístico, lo que sea · contestame este correo y resolvemos.</p>
     <p>Nos vemos muy pronto.</p>
-    <p>Un abrazo,<br><strong>Kelly Castañeda</strong><br>Talent Acquisition and Development Lead<br>Trading Solutions</p>
+    <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>
   </div>
 </body></html>`;
           const welcomeRes = await createDraftViaGmail({
             to: candidate.email as string,
             subject: `Bienvenida/o a Trading Solutions, ${firstName}`,
             html: welcomeHtml,
-            fromName: "Kelly Castañeda",
+            fromName: ATS_FROM_NAME,
             replyTo: "jointheteam@tradingsolutions.com",
           });
           if (welcomeRes.ok) {

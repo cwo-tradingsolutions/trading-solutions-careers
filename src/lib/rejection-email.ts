@@ -12,6 +12,8 @@
  * correo. Si mañana cambia la firma o el pie, cambia en un solo sitio.
  */
 
+import { ATS_FROM_NAME, ATS_FROM_NAME_EN } from "@/lib/ats-from";
+
 const TS_LINKEDIN_URL = "https://www.linkedin.com/company/trading-sol/";
 
 export type RejectionLang = "es" | "en";
@@ -42,7 +44,7 @@ export function buildRejectionHtml(
       : `Tu información queda en nuestra base por si se abre una posición que te calce mejor. Si querés mantenerte cerca, podés seguirnos en <a href="${TS_LINKEDIN_URL}">LinkedIn</a>.`}</p>
     <p>${lang === "en"
       ? "Best regards,<br><strong>Talent Team</strong><br>Trading Solutions"
-      : "Un abrazo,<br><strong>Kelly Castañeda</strong><br>Talent Acquisition and Development Lead<br>Trading Solutions"}</p>
+      : `Un abrazo,<br><strong>${ATS_FROM_NAME}</strong><br>Trading Solutions`}</p>
   </div>
 </body></html>`;
 }
@@ -62,6 +64,6 @@ export function rejectionSubject(vacancyTitle: string, lang: RejectionLang = "es
 export const EN_REJECTION_BODY =
   "Hi {firstName},\n\nThank you for taking the time to apply for the {vacancy} position at Trading Solutions. After reviewing your application, we have decided to move forward with other candidates whose profile is a closer match at this time.";
 
-export const REJECTION_FROM_NAME = "Kelly Castañeda";
-export const REJECTION_FROM_NAME_EN = "Trading Solutions Talent Team";
+export const REJECTION_FROM_NAME = ATS_FROM_NAME;
+export const REJECTION_FROM_NAME_EN = ATS_FROM_NAME_EN;
 export const REJECTION_REPLY_TO = "jointheteam@tradingsolutions.com";

@@ -8,8 +8,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
-import { resolveCandidateLang, EN_SIGNATURE_NAME } from "@/lib/candidate-lang";
+import { resolveCandidateLang } from "@/lib/candidate-lang";
 import crypto from "crypto";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
 
 export async function POST(
   req: NextRequest,
@@ -129,8 +130,7 @@ export async function POST(
                 <p style="margin: 18px 0 0; font-size: 12px; color: #737373;">Si el botón no funciona, copia este link:<br/><span style="color: #0a0a0a; word-break: break-all;">${surveyLink}</span></p>
                 <p style="margin: 24px 0 0; padding-top: 18px; border-top: 1px solid #e8e8e8; font-size: 12px; color: #737373; line-height: 1.6;">
                   Un abrazo,<br/>
-                  <strong style="color: #0a0a0a;">Kelly Castañeda</strong><br/>
-                  Talent Acquisition and Development Lead · Trading Solutions
+                  <strong>Talent Acquisition Team</strong>
                 </p>
               </div>
             </div>
@@ -161,7 +161,7 @@ export async function POST(
             to: cand.email,
             subject,
             html,
-            fromName: lang === 'en' ? EN_SIGNATURE_NAME : "Kelly Castañeda",
+            fromName: ATS_FROM_NAME,
             replyTo: "jointheteam@tradingsolutions.com",
           });
 

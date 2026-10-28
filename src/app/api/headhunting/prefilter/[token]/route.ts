@@ -16,7 +16,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected, sendViaGmail } from "@/lib/gmail";
 import { recordStageEvent } from "@/lib/stage-events";
 import { enviarBateriaAuto } from "@/lib/bateria/invitar";
-import { resolveCandidateLang, EN_SIGNATURE_NAME } from "@/lib/candidate-lang";
+import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { TEMPLATE_ENGLISH_MIN_RANK, TEMPLATE_SALARY_CAP, type TemplateKey } from "@/lib/prefilter-templates";
 
 // Techos por vacancy_id (en COP mensuales)
@@ -256,7 +256,7 @@ function buildRejectionHtmlEs(name: string, clientName: string, vacancyTitle: st
     <p>Gracias por tomarte el tiempo de aplicar a la posición de <strong>${vacancyTitle}</strong> en ${clientName}. Después de revisar tu aplicación, hemos decidido avanzar con otros candidatos cuyo perfil se ajusta más a la posición en este momento. Sin embargo, ${clientName} sigue creciendo y nos encantaría mantenernos en contacto.</p>
     <p>Tu información queda en nuestra base de datos para futuras oportunidades. También te invitamos a seguirnos en LinkedIn para enterarte de nuevas vacantes: <a href="${TS_LINKEDIN_URL}">${TS_LINKEDIN_URL}</a></p>
     <p>Apreciamos tu interés en ${clientName} y te deseamos mucho éxito en tus próximos pasos.</p>
-    <p>Un abrazo,<br><strong>Kelly Castañeda</strong><br>Talent Acquisition and Development Lead<br>${clientName}</p>
+    <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>${clientName}</p>
   </div>
 </body></html>`;
 }

@@ -16,6 +16,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
 import crypto from "crypto";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -37,7 +38,7 @@ function buildReplyHtml(firstName: string, vacancyTitle: string, freshUrl: strin
     <p style="text-align:center"><a href="${freshUrl}" class="cta">Continuar</a></p>
     <p style="font-size:12px;color:#737373;word-break:break-all">O cópialo: ${freshUrl}</p>
     <p>Cualquier cosa que necesites para avanzar, regálame una respuesta a este correo.</p>
-    <p>Un abrazo,<br><strong>Kelly Castañeda</strong><br>Talent Acquisition and Development Lead<br>Trading Solutions</p>
+    <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>
   </div>
 </body></html>`;
 }
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
         to: cand.email as string,
         subject,
         html,
-        fromName: "Kelly Castañeda",
+        fromName: ATS_FROM_NAME,
         replyTo: "jointheteam@tradingsolutions.com",
       });
 

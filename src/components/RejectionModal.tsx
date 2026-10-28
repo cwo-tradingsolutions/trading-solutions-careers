@@ -33,8 +33,7 @@ Tu información queda en nuestra base de datos para futuras oportunidades. Tambi
 Apreciamos tu interés en Trading Solutions y te deseamos mucho éxito en tus próximos pasos.
 
 Un abrazo,
-Kelly Castañeda
-Talent Acquisition and Development Lead
+Talent Acquisition Team
 Trading Solutions`;
 
 type SubDetail = { key: string; label: string };
