@@ -19,10 +19,22 @@ function VacantesContent() {
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState(params.get("q") || "");
-  const initialArea = params.get("area");
-  const [area, setArea] = useState<AreaKey | "all">(isAreaKey(initialArea) ? initialArea : "all");
-  const [mode, setMode] = useState(params.get("mode") || "all");
+  const search = params.get("q") || "";
+  const areaParam = params.get("area");
+  const area: AreaKey | "all" = isAreaKey(areaParam) ? areaParam : "all";
+  const mode = params.get("mode") || "all";
+
+  // The URL owns discovery state, including same-page navigation and Back.
+  const updateFilters = (changes: Record<string, string>) => {
+    const url = new URL(window.location.href);
+    for (const [key, value] of Object.entries(changes)) {
+      value && value !== "all" ? url.searchParams.set(key, value) : url.searchParams.delete(key);
+    }
+    window.history.replaceState(null, "", url.toString());
+  };
+  const setSearch = (value: string) => updateFilters({ q: value });
+  const setArea = (value: AreaKey | "all") => updateFilters({ area: value });
+  const setMode = (value: string) => updateFilters({ mode: value });
 
   useEffect(() => {
     let active = true;
@@ -36,15 +48,6 @@ function VacantesContent() {
       active = false;
     };
   }, [attempt]);
-
-  // Keep ?area / ?q shareable without a navigation.
-  useEffect(() => {
-    const u = new URL(window.location.href);
-    area === "all" ? u.searchParams.delete("area") : u.searchParams.set("area", area);
-    search.trim() ? u.searchParams.set("q", search.trim()) : u.searchParams.delete("q");
-    mode === "all" ? u.searchParams.delete("mode") : u.searchParams.set("mode", mode);
-    window.history.replaceState(null, "", u.toString());
-  }, [area, search, mode]);
 
   const counts = useMemo(() => countByArea(jobs), [jobs]);
   const modes = useMemo(() => (jobs.length ? deriveModes(jobs) : []), [jobs]);
@@ -66,11 +69,7 @@ function VacantesContent() {
   }, [jobs, search, area, mode]);
 
   const hasFilters = area !== "all" || mode !== "all" || search.trim() !== "";
-  const reset = () => {
-    setSearch("");
-    setArea("all");
-    setMode("all");
-  };
+  const reset = () => updateFilters({ q: "", area: "all", mode: "all" });
 
   const areaTitle = area !== "all" ? t.areas.items[area].title : "";
 

@@ -93,7 +93,7 @@ export const translations = {
         commercial: {
           title: "Commercial",
           desc: "Understand what clients need to move and design the right solution. Relationships built one conversation at a time.",
-          imageAlt: "Team member on a call at an operations site",
+          imageAlt: "Freight professional on a call at a logistics site",
         },
       },
       cardCta: "View roles",
@@ -129,7 +129,7 @@ export const translations = {
     benefits: {
       eyebrow: "Life at Trading Solutions",
       title: "What you can count on.",
-      imageAlt: "Trading Solutions trucks lined up at a ground freight yard",
+      imageAlt: "Trucks lined up at a ground freight yard",
       items: [
         {
           title: "Keep learning",
