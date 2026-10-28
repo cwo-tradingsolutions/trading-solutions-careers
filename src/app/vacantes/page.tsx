@@ -6,209 +6,247 @@ import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useLanguage } from "@/i18n/context";
-import { fetchOpenJobs, deriveDepartments, deriveModes, type Job } from "@/lib/vacancies-adapter";
-import { Search, MapPin, Briefcase, ArrowUpRight, ArrowLeft } from "lucide-react";
+import { countLabel } from "@/i18n/translations";
+import { fetchOpenJobs, deriveModes, type Job } from "@/lib/vacancies-adapter";
+import { AREA_KEYS, areaOf, countByArea, isAreaKey, type AreaKey } from "@/lib/careers-areas";
+import { Search, MapPin, Briefcase, ArrowRight, X } from "lucide-react";
 
 function VacantesContent() {
-  const searchParams = useSearchParams();
-  const initialDept = searchParams.get("dept") || "all";
-  const { t, locale } = useLanguage();
+  const params = useSearchParams();
+  const { t } = useLanguage();
 
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [loadError, setLoadError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [deptFilter, setDeptFilter] = useState(initialDept);
-  const [modeFilter, setModeFilter] = useState("all");
+  const search = params.get("q") || "";
+  const areaParam = params.get("area");
+  const area: AreaKey | "all" = isAreaKey(areaParam) ? areaParam : "all";
+  const mode = params.get("mode") || "all";
+
+  // The URL owns discovery state, including same-page navigation and Back.
+  const updateFilters = (changes: Record<string, string>) => {
+    const url = new URL(window.location.href);
+    for (const [key, value] of Object.entries(changes)) {
+      value && value !== "all" ? url.searchParams.set(key, value) : url.searchParams.delete(key);
+    }
+    window.history.replaceState(null, "", url.toString());
+  };
+  const setSearch = (value: string) => updateFilters({ q: value });
+  const setArea = (value: AreaKey | "all") => updateFilters({ area: value });
+  const setMode = (value: string) => updateFilters({ mode: value });
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setLoadError(false);
     fetchOpenJobs()
-      .then((list) => {
-        if (active) setJobs(list);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+      .then((list) => active && setJobs(list))
+      .catch(() => active && setLoadError(true))
+      .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, []);
+  }, [attempt]);
 
-  const departments = useMemo(() => deriveDepartments(jobs), [jobs]);
-  const modes = useMemo(() => deriveModes(jobs), [jobs]);
+  const counts = useMemo(() => countByArea(jobs), [jobs]);
+  const modes = useMemo(() => (jobs.length ? deriveModes(jobs) : []), [jobs]);
+  const deptName = (d: string) => t.deptNames[d] || t.areas.items[areaOf(d)].title;
+  const modeName = (m: string) => t.modeNames[m] || m;
 
   const filtered = useMemo(() => {
+    const s = search.trim().toLowerCase();
     return jobs.filter((j) => {
-      if (deptFilter !== "all" && j.dept !== deptFilter) return false;
-      if (modeFilter !== "all" && j.mode !== modeFilter) return false;
-      if (search) {
-        const s = search.toLowerCase();
-        const searchable = `${j.title[locale]} ${j.dept} ${j.location} ${j.tags.join(" ")} ${j.description[locale]}`.toLowerCase();
-        if (!searchable.includes(s)) return false;
+      if (area !== "all" && areaOf(j.dept) !== area) return false;
+      if (mode !== "all" && j.mode !== mode) return false;
+      if (s) {
+        const hay = `${j.title.en} ${j.dept} ${deptName(j.dept)} ${j.location} ${j.tags.join(" ")} ${j.description.en}`.toLowerCase();
+        if (!hay.includes(s)) return false;
       }
       return true;
     });
-  }, [jobs, search, deptFilter, modeFilter, locale]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobs, search, area, mode]);
 
-  const resetFilters = () => {
-    setSearch("");
-    setDeptFilter("all");
-    setModeFilter("all");
-  };
+  const hasFilters = area !== "all" || mode !== "all" || search.trim() !== "";
+  const reset = () => updateFilters({ q: "", area: "all", mode: "all" });
 
-  const deptName = (d: string) => (t.deptNames as Record<string, string>)[d] || d;
-  const modeName = (m: string) => (t.modeNames as Record<string, string>)[m] || m;
+  const areaTitle = area !== "all" ? t.areas.items[area].title : "";
 
   return (
     <>
       <Navbar />
-      <div className="pt-28">
-        <section className="py-12 md:py-16 bg-ts-canvas min-h-screen">
-          <div className="max-w-ts mx-auto px-6 lg:px-10">
-            {/* Header */}
-            <div className="mb-10">
-              <Link
-                href="/"
-                className="flex items-center gap-2 text-sm text-ts-muted hover:text-ts-accent mb-6 transition-colors"
-              >
-                <ArrowLeft size={16} />
-                {t.jobs.backHome}
-              </Link>
-              <h1 className="section-title mb-2">{t.jobs.pageTitle}</h1>
-              <p className="text-ts-secondary">{t.jobs.pageSubtitle}</p>
-            </div>
+      <main className="bg-ts-canvas min-h-[70vh]">
+        {/* Header + search */}
+        <section className="px-4 sm:px-6 lg:px-10 pt-10 md:pt-16 pb-8">
+          <div className="max-w-ts mx-auto">
+            <p className="ts-kicker mb-4">{t.jobs.eyebrow}</p>
+            <h1 className="section-title mb-4 max-w-3xl">{t.jobs.pageTitle}</h1>
+            <p className="text-lg text-ts-secondary max-w-2xl leading-relaxed">{t.jobs.pageSubtitle}</p>
 
-            {/* Search */}
-            <div className="mb-8">
+            <div className="mt-8 bg-ts-surface rounded-ts-lg border border-[color:var(--ts-line)] p-4 md:p-5">
+              <label htmlFor="jobs-search" className="sr-only">{t.jobs.searchLabel}</label>
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-ts-muted" size={18} aria-hidden />
                 <input
-                  type="text"
+                  id="jobs-search"
+                  type="search"
                   placeholder={t.jobs.searchPlaceholder}
-                  className="input-field pl-12"
+                  className="input-field pl-11 pr-10"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
+                {search && (
+                  <button
+                    onClick={() => setSearch("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-ts-muted hover:text-ts-ink"
+                    aria-label={t.jobs.clear}
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-4 flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-8">
+                <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t.jobs.teamLabel}>
+                  <span className="text-sm text-ts-muted mr-1">{t.jobs.teamLabel}</span>
+                  <button className={`filter-chip ${area === "all" ? "active" : ""}`} aria-pressed={area === "all"} onClick={() => setArea("all")}>
+                    {t.jobs.all}
+                    {!loading && <span className="chip-count">{jobs.length}</span>}
+                  </button>
+                  {AREA_KEYS.map((k) => (
+                    <button key={k} className={`filter-chip ${area === k ? "active" : ""}`} aria-pressed={area === k} onClick={() => setArea(k)}>
+                      {t.areas.items[k].title}
+                      {!loading && <span className="chip-count">{counts[k]}</span>}
+                    </button>
+                  ))}
+                </div>
+                {modes.length > 1 && (
+                  <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t.jobs.modeLabel}>
+                    <span className="text-sm text-ts-muted mr-1">{t.jobs.modeLabel}</span>
+                    <button className={`filter-chip ${mode === "all" ? "active" : ""}`} aria-pressed={mode === "all"} onClick={() => setMode("all")}>
+                      {t.jobs.all}
+                    </button>
+                    {modes.map((m) => (
+                      <button key={m} className={`filter-chip ${mode === m ? "active" : ""}`} aria-pressed={mode === m} onClick={() => setMode(m)}>
+                        {modeName(m)}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
+          </div>
+        </section>
 
-            {/* Filters */}
-            <div className="mb-10 space-y-4">
-              <div className="flex flex-wrap gap-3">
-                <span className="text-sm font-medium text-ts-muted self-center mr-2">
-                  {t.jobs.deptLabel}
-                </span>
-                <button
-                  className={`filter-chip ${deptFilter === "all" ? "active" : ""}`}
-                  onClick={() => setDeptFilter("all")}
-                >
-                  {t.jobs.all}
-                </button>
-                {departments.map((d) => (
-                  <button
-                    key={d}
-                    className={`filter-chip ${deptFilter === d ? "active" : ""}`}
-                    onClick={() => setDeptFilter(d)}
-                  >
-                    {deptName(d)}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <span className="text-sm font-medium text-ts-muted self-center mr-2">
-                  {t.jobs.modeLabel}
-                </span>
-                <button
-                  className={`filter-chip ${modeFilter === "all" ? "active" : ""}`}
-                  onClick={() => setModeFilter("all")}
-                >
-                  {t.jobs.allFem}
-                </button>
-                {modes.map((m) => (
-                  <button
-                    key={m}
-                    className={`filter-chip ${modeFilter === m ? "active" : ""}`}
-                    onClick={() => setModeFilter(m)}
-                  >
-                    {modeName(m)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Loading */}
+        {/* Results */}
+        <section className="px-4 sm:px-6 lg:px-10 pb-20 md:pb-28">
+          <div className="max-w-ts mx-auto">
             {loading ? (
-              <div className="text-center py-16">
-                <p className="text-gray-400 text-lg">{locale === "es" ? "Cargando vacantes..." : "Loading positions..."}</p>
-              </div>
-            ) : (
-            <>
-            {/* Count */}
-            <p className="text-sm text-gray-500 mb-6">
-              {filtered.length} {filtered.length === 1 ? t.jobs.resultsSingular : t.jobs.resultsPlural}
-            </p>
-
-            {/* Grid */}
-            {filtered.length > 0 ? (
-              <div className="grid md:grid-cols-2 gap-5">
-                {filtered.map((job) => (
-                  <Link
-                    key={job.id}
-                    href={`/vacantes/${job.id}`}
-                    className="bg-ts-surface rounded-ts-lg p-7 border border-[color:var(--ts-line)] hover:border-ts-accent hover:-translate-y-1 transition-all duration-300"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="font-medium text-lg mb-1">{job.title[locale]}</h3>
-                        <p className="text-sm text-ts-muted">{deptName(job.dept)}</p>
-                      </div>
-                      <span className="tag">{job.level}</span>
-                    </div>
-                    <p className="text-sm text-ts-secondary mb-5 leading-relaxed">
-                      {job.description[locale].substring(0, 120)}...
-                    </p>
-                    <div className="flex flex-wrap gap-2 mb-5">
-                      {job.tags.map((tag) => (
-                        <span key={tag} className="tag">{tag}</span>
-                      ))}
-                    </div>
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                      <div className="flex items-center gap-4">
-                        <span className="flex items-center gap-1.5 text-xs text-gray-500">
-                          <MapPin size={13} />
-                          {job.location}
-                        </span>
-                        <span className="flex items-center gap-1.5 text-xs text-gray-500">
-                          <Briefcase size={13} />
-                          {modeName(job.mode)}
-                        </span>
-                      </div>
-                      <ArrowUpRight size={16} className="text-ts-accent" />
-                    </div>
-                  </Link>
+              <div className="grid md:grid-cols-2 gap-5" aria-busy="true" aria-label={t.jobs.loading}>
+                {[0, 1].map((i) => (
+                  <div key={i} className="h-[220px] rounded-ts-lg bg-ts-surface border border-[color:var(--ts-line)] animate-pulse" />
                 ))}
               </div>
+            ) : loadError ? (
+              <EmptyState title={t.jobs.loadError} body="" action={<button onClick={() => setAttempt((n) => n + 1)} className="pill-btn pill-btn-primary">{t.jobs.retry}</button>} />
+            ) : jobs.length === 0 ? (
+              <EmptyState title={t.empty.allTitle} body={t.empty.allBody} />
+            ) : filtered.length === 0 ? (
+              area !== "all" && counts[area] === 0 && !search.trim() && mode === "all" ? (
+                <EmptyState
+                  title={t.empty.areaTitle.replace("{Area}", areaTitle)}
+                  body={t.empty.areaBody}
+                  action={
+                    <button onClick={reset} className="pill-btn pill-btn-primary">
+                      {t.empty.areaCta}
+                    </button>
+                  }
+                />
+              ) : (
+                <EmptyState
+                  title={t.jobs.noMatchTitle}
+                  body={t.jobs.noMatchBody}
+                  action={
+                    <button onClick={reset} className="pill-btn pill-btn-outline">
+                      {t.jobs.clear}
+                    </button>
+                  }
+                />
+              )
             ) : (
-              <div className="text-center py-16">
-                <p className="text-gray-400 text-lg">{t.jobs.noResults}</p>
-                <button onClick={resetFilters} className="pill-btn pill-btn-outline mt-4 text-sm">
-                  {t.jobs.clearFilters}
-                </button>
-              </div>
-            )}
-            </>
+              <>
+                <div className="flex items-center justify-between mb-5">
+                  <p className="text-sm text-ts-muted" aria-live="polite">
+                    {countLabel(filtered.length, { one: t.jobs.resultsOne, many: t.jobs.resultsMany, zero: t.counts.zero })}
+                  </p>
+                  {hasFilters && (
+                    <button onClick={reset} className="text-sm font-medium text-ts-accent hover:underline">
+                      {t.jobs.clear}
+                    </button>
+                  )}
+                </div>
+                <ul className="grid md:grid-cols-2 gap-5">
+                  {filtered.map((job) => (
+                    <li key={job.id}>
+                      <Link
+                        href={`/vacantes/${job.id}`}
+                        className="group h-full flex flex-col bg-ts-surface rounded-ts-lg p-7 border border-[color:var(--ts-line)] hover:border-ts-accent transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-4 mb-4">
+                          <div>
+                            <p className="text-sm text-ts-muted mb-1.5">
+                              {t.areas.items[areaOf(job.dept)].title} · {deptName(job.dept)}
+                            </p>
+                            <h2 className="text-xl font-light tracking-ts-tight text-ts-ink">{job.title.en}</h2>
+                          </div>
+                          {job.level && <span className="tag shrink-0">{job.level}</span>}
+                        </div>
+                        {job.description.en && (
+                          <p className="text-[15px] text-ts-secondary leading-relaxed mb-5 line-clamp-3">{job.description.en}</p>
+                        )}
+                        <div className="mt-auto pt-4 border-t border-[color:var(--ts-line)] flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ts-muted">
+                            {job.location && (
+                              <span className="inline-flex items-center gap-1.5"><MapPin size={14} aria-hidden />{job.location}</span>
+                            )}
+                            <span className="inline-flex items-center gap-1.5"><Briefcase size={14} aria-hidden />{modeName(job.mode)}</span>
+                          </div>
+                          <span className="inline-flex items-center gap-1.5 text-sm font-medium text-ts-accent">
+                            {t.jobs.cardCta}
+                            <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
+                          </span>
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </div>
         </section>
-      </div>
+      </main>
       <Footer />
     </>
   );
 }
 
+function EmptyState({ title, body, action }: { title: string; body: string; action?: React.ReactNode }) {
+  return (
+    <div className="bg-ts-surface rounded-ts-lg border border-[color:var(--ts-line)] px-6 py-16 md:py-20 text-center">
+      <div className="w-12 h-12 mx-auto mb-6 rounded-full bg-[var(--ts-blue-bg)] text-ts-accent flex items-center justify-center">
+        <Briefcase size={20} aria-hidden />
+      </div>
+      <h2 className="text-2xl font-light tracking-ts-tight mb-3">{title}</h2>
+      <p className="text-ts-secondary max-w-md mx-auto leading-relaxed">{body}</p>
+      {action && <div className="mt-8">{action}</div>}
+    </div>
+  );
+}
+
 export default function VacantesPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+    <Suspense fallback={<div className="min-h-screen bg-ts-canvas" />}>
       <VacantesContent />
     </Suspense>
   );

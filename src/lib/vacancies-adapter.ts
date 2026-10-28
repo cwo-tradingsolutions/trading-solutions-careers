@@ -1,4 +1,4 @@
-import { jobs, departments, modes, type Job } from "@/data/jobs";
+import { departments, modes, type Job } from "@/data/jobs";
 
 export type { Job };
 
@@ -6,7 +6,7 @@ export type { Job };
  * ETAPA 1 — Unificación de fuente de datos.
  * Este adapter mapea filas de la tabla `vacancies` (Neon, vía GET /api/vacancies)
  * al shape `Job` que consumen las páginas públicas de vacantes.
- * Mantiene `@/data/jobs` como fallback en caso de error de red/BD.
+ * Public views show a retry state if the live feed is unavailable.
  */
 
 // Convierte un array jsonb (si viene) o un texto ";"-separado en string[].
@@ -42,7 +42,7 @@ export function mapRowToJob(row: VacancyRow): Job {
     linkedinUrl: row.linkedin_url || "",
     title: {
       es: row.title_es || row.title || "",
-      en: row.title_en || row.title || "",
+      en: row.title_en || "Open role",
     },
     dept: row.department || "",
     location: row.location || "",
@@ -55,15 +55,15 @@ export function mapRowToJob(row: VacancyRow): Job {
       .filter(Boolean),
     description: {
       es: row.description_es || row.description || "",
-      en: row.description_en || row.description || "",
+      en: row.description_en || "",
     },
     responsibilities: {
       es: toArr(row.responsibilities_es, row.responsibilities),
-      en: toArr(row.responsibilities_en, row.responsibilities),
+      en: toArr(row.responsibilities_en, null),
     },
     requirements: {
       es: toArr(row.requirements_es, row.requirements),
-      en: toArr(row.requirements_en, row.requirements),
+      en: toArr(row.requirements_en, null),
     },
     applyEmail: row.apply_email || "jointheteam@tradingsolutions.com",
     postedAt: row.posted_at || "",
@@ -87,9 +87,7 @@ export async function fetchOpenJobs(): Promise<Job[]> {
     const mapped = rows.map(mapRowToJob);
     return mapped.sort(byPostedAtDesc);
   } catch (err) {
-    console.error("fetchOpenJobs fallback a data estática:", err);
-    // Fallback: data estática (ya representa vacantes abiertas).
-    return [...jobs].sort(byPostedAtDesc);
+    throw new Error("Open roles could not be loaded.", { cause: err });
   }
 }
 

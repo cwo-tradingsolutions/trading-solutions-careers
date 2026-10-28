@@ -2,59 +2,75 @@
 
 import Link from "next/link";
 import { useLanguage } from "@/i18n/context";
-import { LOGO_TS, LOGO_TS_CLASE_EN_OSCURO } from "@/lib/brand";
+import { LOGO_TS } from "@/lib/brand";
+
+/**
+ * Light footer, every link live. Corporate links point at the real pages on
+ * tradingsolutions.com. No social icons until the company shares real
+ * profiles (no href="#").
+ */
+const CORP = "https://tradingsolutions.com";
 
 export default function Footer() {
   const { t } = useLanguage();
 
+  const services = [
+    { label: "Maritime", href: `${CORP}/services/maritime` },
+    { label: "Ground", href: `${CORP}/services/ground` },
+    { label: "Air", href: `${CORP}/services/air` },
+    { label: "Customs", href: `${CORP}/services/customs` },
+  ];
+
+  const linkCls = "block text-sm text-ts-muted hover:text-ts-accent transition-colors";
+
   return (
-    <footer className="bg-ts-ink text-white py-16">
-      <div className="max-w-ts mx-auto px-6 lg:px-10">
-        <div className="grid md:grid-cols-4 gap-10 mb-12">
-          <div>
+    <footer className="bg-ts-surface border-t border-[color:var(--ts-line)]">
+      <div className="max-w-ts mx-auto px-4 sm:px-6 lg:px-10 py-14 md:py-16">
+        <div className="grid gap-10 md:grid-cols-12">
+          <div className="md:col-span-5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={LOGO_TS}
-              alt="Trading Solutions"
-              className={`h-8 w-auto mb-6 ${LOGO_TS_CLASE_EN_OSCURO}`}
-            />
-            <p className="text-sm text-white/60 leading-relaxed">{t.footer.tagline}</p>
+            <img src={LOGO_TS} alt={t.logoAlt} className="h-7 w-auto mb-5" />
+            <p className="text-base text-ts-ink font-medium max-w-xs">{t.footer.tagline}</p>
+            <p className="text-sm text-ts-muted mt-2">{t.footer.hq}</p>
+            <a href={CORP} target="_blank" rel="noopener noreferrer" className="inline-block mt-4 text-sm font-medium text-ts-accent hover:underline">
+              {t.footer.link1}
+            </a>
           </div>
-          <div>
-            <h4 className="font-bold text-sm mb-4">{t.footer.services}</h4>
+
+          <div className="md:col-span-2">
+            <h2 className="text-sm font-medium text-ts-ink mb-4">{t.footer.careersHeading}</h2>
             <div className="space-y-3">
-              <a href="https://tradingsolutions.com" target="_blank" rel="noopener" className="block text-sm text-white/70 hover:text-ts-accent transition-colors">Maritime</a>
-              <a href="https://tradingsolutions.com" target="_blank" rel="noopener" className="block text-sm text-white/70 hover:text-ts-accent transition-colors">Ground</a>
-              <a href="https://tradingsolutions.com" target="_blank" rel="noopener" className="block text-sm text-white/70 hover:text-ts-accent transition-colors">Air</a>
-              <a href="https://tradingsolutions.com" target="_blank" rel="noopener" className="block text-sm text-white/70 hover:text-ts-accent transition-colors">Customs</a>
+              <Link href="/#why" className={linkCls}>{t.nav.whyUs}</Link>
+              <Link href="/vacantes" className={linkCls}>{t.nav.openRoles}</Link>
+              <Link href="/#how-we-hire" className={linkCls}>{t.nav.howWeHire}</Link>
+              <Link href="/#life" className={linkCls}>{t.nav.lifeHere}</Link>
             </div>
           </div>
-          <div>
-            <h4 className="font-bold text-sm mb-4">{t.footer.company}</h4>
+
+          <div className="md:col-span-2">
+            <h2 className="text-sm font-medium text-ts-ink mb-4">{t.footer.servicesHeading}</h2>
             <div className="space-y-3">
-              <a href="https://tradingsolutions.com" target="_blank" rel="noopener" className="block text-sm text-white/70 hover:text-ts-accent transition-colors">{t.footer.companyAbout}</a>
-              <Link href="/" className="block text-sm text-white/70 hover:text-ts-accent transition-colors">{t.footer.companyCareers}</Link>
-              <a href="https://tradingsolutions.com" target="_blank" rel="noopener" className="block text-sm text-white/70 hover:text-ts-accent transition-colors">{t.footer.companyContact}</a>
+              {services.map((s) => (
+                <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" className={linkCls}>
+                  {s.label}
+                </a>
+              ))}
             </div>
           </div>
-          <div>
-            <h4 className="font-bold text-sm mb-4">{t.footer.followUs}</h4>
-            <div className="flex gap-3">
-              <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
-              </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="5" ry="5" stroke="white" strokeWidth="2"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" stroke="white" strokeWidth="2" fill="none"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" stroke="white" strokeWidth="2" strokeLinecap="round"/></svg>
-              </a>
+
+          <div className="md:col-span-3">
+            <h2 className="text-sm font-medium text-ts-ink mb-4">{t.footer.companyHeading}</h2>
+            <div className="space-y-3">
+              <a href={`${CORP}/company/about`} target="_blank" rel="noopener noreferrer" className={linkCls}>{t.footer.about}</a>
+              <a href={`${CORP}/company/contact`} target="_blank" rel="noopener noreferrer" className={linkCls}>{t.footer.contact}</a>
+              <a href={`${CORP}/company/legal`} target="_blank" rel="noopener noreferrer" className={linkCls}>{t.footer.legalLink}</a>
             </div>
           </div>
         </div>
-        <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-xs text-gray-600">&copy; Trading Solutions 2026. {t.footer.rights}</p>
-          <div className="flex gap-6">
-            <a href="#" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">{t.footer.legal}</a>
-            <a href="#" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">{t.footer.privacy}</a>
-          </div>
+
+        <div className="mt-12 pt-6 border-t border-[color:var(--ts-line)] flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+          <p className="text-xs text-ts-muted">{t.footer.legal}</p>
+          <p className="text-xs text-ts-muted">{t.footer.servicesLine}</p>
         </div>
       </div>
     </footer>
