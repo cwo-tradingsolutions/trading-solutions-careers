@@ -1915,7 +1915,7 @@ function CVBankRediscoveryModal({
               </h3>
               <p className="text-xs text-gray-500 max-w-sm mx-auto mb-4">
                 {emptyPool || (
-                  <>Click "Buscar matches" → el AI cruzará el banco de candidatos rechazados/contratados de otras vacantes con los requisitos de <strong>{vacancyTitle}</strong> y devolverá los mejores fits.</>
+                  <>Click Buscar matches: el AI cruzará el banco de candidatos rechazados o contratados de otras vacantes con los requisitos de <strong>{vacancyTitle}</strong> y devolverá los mejores fits.</>
                 )}
               </p>
               <button
