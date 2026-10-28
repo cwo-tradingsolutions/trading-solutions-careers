@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import PublicPage from "@/components/PublicPage";
+import { areaOf } from "@/lib/areas";
 import { useLanguage } from "@/i18n/context";
 import { fetchOpenJobs, type Job } from "@/lib/vacancies-adapter";
 import { ArrowLeft, MapPin, Check, ArrowUpRight, Upload, X, CheckCircle } from "lucide-react";
@@ -50,6 +50,7 @@ export default function JobDetailPage() {
   });
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -72,36 +73,11 @@ export default function JobDetailPage() {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  if (loading) {
-    return (
-      <>
-        <Navbar />
-        <div className="pt-40 pb-20 text-center min-h-screen bg-white">
-          <p className="text-gray-400 text-lg">{locale === "es" ? "Cargando..." : "Loading..."}</p>
-        </div>
-        <Footer />
-      </>
-    );
-  }
-
-  if (!job) {
-    return (
-      <>
-        <Navbar />
-        <div className="pt-40 pb-20 text-center min-h-screen bg-white">
-          <h1 className="section-title mb-4">{t.jobs.notFound}</h1>
-          <Link href="/vacantes" className="pill-btn pill-btn-primary">
-            {t.jobs.viewAll}
-          </Link>
-        </div>
-        <Footer />
-      </>
-    );
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!job) return;
     setSubmitting(true);
+    setSubmitError(false);
     try {
       let cv_filename = null;
       let cv_data = null;
@@ -133,112 +109,143 @@ export default function JobDetailPage() {
       setCvFile(null);
     } catch (err) {
       console.error(err);
-      alert(locale === 'es' ? 'Error al enviar la aplicación. Intenta de nuevo.' : 'Error submitting application. Please try again.');
+      setSubmitError(true);
     } finally {
       setSubmitting(false);
     }
   };
 
-  return (
-    <>
-      <Navbar />
+  if (loading || !job) {
+    return (
+      <PublicPage>
+        <div className="max-w-4xl mx-auto px-5 md:px-6 lg:px-10 py-24 text-center">
+          {loading ? (
+            <p className="text-ts-muted" aria-busy="true">{t.jobs.loading}</p>
+          ) : (
+            <>
+              <h1 className="section-title mb-8">{t.jobs.notFound}</h1>
+              <Link href="/vacantes" className="pill-btn pill-btn-primary">
+                {t.jobs.viewAll}
+                <ArrowUpRight size={16} strokeWidth={2.5} />
+              </Link>
+            </>
+          )}
+        </div>
+      </PublicPage>
+    );
+  }
 
-      {/* Hero header */}
-      <div className="bg-ts-ink text-white pt-32 pb-12">
-        <div className="max-w-4xl mx-auto px-6 lg:px-10">
+  const area = areaOf(job.dept);
+  const deptLabel = deptName(job.dept);
+
+  return (
+    <PublicPage>
+      {/* Header claro, mismo chrome que la home */}
+      <section className="pt-10 md:pt-14 pb-10">
+        <div className="max-w-4xl mx-auto px-5 md:px-6 lg:px-10">
           <Link
             href="/vacantes"
-            className="flex items-center gap-2 text-sm text-white/60 hover:text-white mb-8 transition-colors"
+            className="flex w-fit items-center gap-2 text-sm text-ts-muted hover:text-ts-ink mb-10 transition-colors"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={16} aria-hidden />
             {t.jobs.backToJobs}
           </Link>
-          <span className="tag mb-4 bg-white/10 text-white border-transparent inline-flex items-center gap-2">
-            <span className="ts-mark" aria-hidden />
-            {deptName(job.dept)}
-          </span>
-          <h1 className="text-3xl md:text-5xl font-light mt-4 mb-3 tracking-tight">{job.title[locale]}</h1>
-          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400">
-            <span className="flex items-center gap-1.5">
-              <MapPin size={14} />
-              {job.location}
-            </span>
-            <span>·</span>
-            <span>{modeName(job.mode)}</span>
-            <span>·</span>
-            <span>{job.level}</span>
+          <p className="ts-kicker mb-4">
+            {t.areas[area].title}
+            {deptLabel !== t.areas[area].title && ` · ${deptLabel}`}
+          </p>
+          <h1 className="text-4xl md:text-6xl font-light tracking-[-0.035em] leading-[1.05] mb-6">{job.title[locale]}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            {job.location && (
+              <span className="tag !bg-ts-surface items-center gap-1.5">
+                <MapPin size={12} aria-hidden />
+                {job.location}
+              </span>
+            )}
+            <span className="tag !bg-ts-surface">{modeName(job.mode)}</span>
+            {job.level && <span className="tag !bg-ts-surface">{job.level}</span>}
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Content */}
-      <div className="bg-ts-canvas py-12">
-        <div className="max-w-4xl mx-auto px-6 lg:px-10">
-          <div className="bg-ts-surface rounded-ts-lg border border-[color:var(--ts-line)] p-8 md:p-10">
-          <div className="mb-10">
-            <p className="text-ts-secondary leading-relaxed text-base font-medium">{job.description[locale]}</p>
-            <p className="mt-4 font-bold text-xl">{job.salary}</p>
-          </div>
-
-          <div className="mb-10">
-            <h3 className="font-light text-2xl mb-5">{t.jobs.whatYouDo}</h3>
-            <div className="space-y-3">
-              {job.responsibilities[locale].map((r, i) => (
-                <div key={i} className="flex gap-3">
-                  <div className="w-5 h-5 rounded-full bg-ts-accent flex-shrink-0 flex items-center justify-center mt-0.5">
-                    <Check size={10} className="text-white" strokeWidth={3} />
-                  </div>
-                  <p className="text-sm text-gray-600">{r}</p>
-                </div>
-              ))}
+      <section className="pb-20 md:pb-28">
+        <div className="max-w-4xl mx-auto px-5 md:px-6 lg:px-10">
+          <div className="bg-ts-surface rounded-ts-lg border border-[color:var(--ts-line)] p-7 md:p-12">
+            <div className="mb-12">
+              <p className="text-ts-ink leading-relaxed text-lg">{job.description[locale]}</p>
+              {job.salary && <p className="mt-5 text-lg text-ts-ink ts-tabular">{job.salary}</p>}
             </div>
-          </div>
 
-          <div className="mb-10">
-            <h3 className="font-light text-2xl mb-5">{t.jobs.whatWeSeek}</h3>
-            <div className="space-y-3">
-              {job.requirements[locale].map((r, i) => (
-                <div key={i} className="flex gap-3">
-                  <div className="w-1.5 h-1.5 rounded-full bg-ts-accent flex-shrink-0 mt-2" />
-                  <p className="text-sm text-gray-600">{r}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+            {job.responsibilities[locale].length > 0 && (
+              <div className="mb-12">
+                <h2 className="font-light text-2xl tracking-ts-tight mb-6">{t.jobs.whatYouDo}</h2>
+                <ul className="space-y-3.5">
+                  {job.responsibilities[locale].map((r, i) => (
+                    <li key={i} className="flex gap-3">
+                      <span className="w-5 h-5 rounded-full bg-ts-accent flex-shrink-0 flex items-center justify-center mt-0.5">
+                        <Check size={10} className="text-white" strokeWidth={3} aria-hidden />
+                      </span>
+                      <span className="text-[15px] text-ts-muted leading-relaxed">{r}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
-          <div className="flex flex-wrap gap-2 mb-10">
-            {job.tags.map((tag) => (
-              <span key={tag} className="tag">{tag}</span>
-            ))}
-          </div>
+            {job.requirements[locale].length > 0 && (
+              <div className="mb-12">
+                <h2 className="font-light text-2xl tracking-ts-tight mb-6">{t.jobs.whatWeSeek}</h2>
+                <ul className="space-y-3.5">
+                  {job.requirements[locale].map((r, i) => (
+                    <li key={i} className="flex gap-3">
+                      <span className="w-1.5 h-1.5 rounded-full bg-ts-accent flex-shrink-0 mt-2.5" aria-hidden />
+                      <span className="text-[15px] text-ts-muted leading-relaxed">{r}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
-          <button
-            onClick={() => setShowApply(true)}
-            className="pill-btn pill-btn-primary w-full justify-center text-base"
-          >
-            {t.jobs.applyBtn}
-            <ArrowUpRight size={16} strokeWidth={2.5} />
-          </button>
+            {job.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-12">
+                {job.tags.map((tag) => (
+                  <span key={tag} className="tag">{tag}</span>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={() => { setSubmitError(false); setShowApply(true); }}
+              className="pill-btn pill-btn-primary w-full justify-center text-base"
+            >
+              {t.jobs.applyBtn}
+              <ArrowUpRight size={16} strokeWidth={2.5} />
+            </button>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Apply Modal */}
       {showApply && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-[rgba(var(--ts-ink-rgb),0.45)] backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center sm:p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setShowApply(false); }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="apply-title"
         >
-          <div className="bg-white rounded-2xl max-w-[720px] w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-8 md:p-10">
-              <div className="flex items-center justify-between mb-8">
+          <div className="bg-ts-surface rounded-t-ts-lg sm:rounded-ts-lg max-w-[680px] w-full max-h-[92vh] overflow-y-auto">
+            <div className="p-6 sm:p-10">
+              <div className="flex items-start justify-between gap-4 mb-8">
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">{t.jobs.applyTo}</p>
-                  <h2 className="text-xl font-bold">{job.title[locale]}</h2>
+                  <p className="text-sm text-ts-muted mb-1">{t.jobs.applyTo}</p>
+                  <h2 id="apply-title" className="text-2xl font-light tracking-ts-tight">{job.title[locale]}</h2>
                 </div>
                 <button
                   onClick={() => setShowApply(false)}
-                  className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+                  aria-label={t.jobs.close}
+                  className="w-10 h-10 rounded-full bg-ts-canvas flex items-center justify-center hover:bg-[color:var(--ts-line)] transition-colors shrink-0"
                 >
                   <X size={18} />
                 </button>
@@ -246,55 +253,60 @@ export default function JobDetailPage() {
               <form onSubmit={handleSubmit}>
                 <div className="space-y-5">
                   <div>
-                    <label className="block text-sm font-medium mb-2">{t.jobs.fullName}</label>
-                    <input type="text" required className="input-field" placeholder={t.jobs.fullNamePlaceholder} name="full_name" value={formData.full_name} onChange={handleChange} />
+                    <label htmlFor="ap-name" className="block text-sm font-medium mb-2">{t.jobs.fullName}</label>
+                    <input id="ap-name" type="text" required autoComplete="name" className="input-field" placeholder={t.jobs.fullNamePlaceholder} name="full_name" value={formData.full_name} onChange={handleChange} />
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-5">
+                    <div>
+                      <label htmlFor="ap-email" className="block text-sm font-medium mb-2">{t.jobs.email}</label>
+                      <input id="ap-email" type="email" required autoComplete="email" className="input-field" placeholder={t.jobs.emailPlaceholder} name="email" value={formData.email} onChange={handleChange} />
+                    </div>
+                    <div>
+                      <label htmlFor="ap-phone" className="block text-sm font-medium mb-2">{t.jobs.phone}</label>
+                      <input id="ap-phone" type="tel" autoComplete="tel" className="input-field" placeholder={t.jobs.phonePlaceholder} name="phone" value={formData.phone} onChange={handleChange} />
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2">{t.jobs.email}</label>
-                    <input type="email" required className="input-field" placeholder={t.jobs.emailPlaceholder} name="email" value={formData.email} onChange={handleChange} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">{t.jobs.phone}</label>
-                    <input type="tel" className="input-field" placeholder={t.jobs.phonePlaceholder} name="phone" value={formData.phone} onChange={handleChange} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">{t.jobs.linkedin}</label>
+                    <label htmlFor="ap-linkedin" className="block text-sm font-medium mb-2">{t.jobs.linkedin}</label>
                     {/* type="url" exigía el https:// y el navegador rechazaba
                         "linkedin.com/in/perfil" o "www.linkedin.com/in/perfil",
                         que es exactamente lo que sale al copiar el perfil desde
                         LinkedIn. El mensaje era el genérico del navegador y no
                         explicaba nada. Se normaliza al enviar. */}
-                    <input type="text" inputMode="url" className="input-field" placeholder={t.jobs.linkedinPlaceholder} name="linkedin" value={formData.linkedin} onChange={handleChange} />
+                    <input id="ap-linkedin" type="text" inputMode="url" className="input-field" placeholder={t.jobs.linkedinPlaceholder} name="linkedin" value={formData.linkedin} onChange={handleChange} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2">{t.jobs.cvLabel}</label>
-                    <div 
-                      className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-black transition-colors cursor-pointer"
+                    <span className="block text-sm font-medium mb-2">{t.jobs.cvLabel}</span>
+                    <div
+                      className="border border-dashed border-[color:var(--ts-line)] bg-ts-canvas rounded-ts-md p-8 text-center hover:border-ts-accent transition-colors cursor-pointer"
                       onClick={() => document.getElementById('cv-input')?.click()}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) setCvFile(f); }}
                     >
                       {cvFile ? (
                         <div className="flex items-center justify-center gap-2">
-                          <Check size={18} className="text-green-600" />
+                          <Check size={18} className="text-ts-accent" aria-hidden />
                           <span className="text-sm font-medium">{cvFile.name}</span>
-                          <button type="button" onClick={(e) => { e.stopPropagation(); setCvFile(null); }} className="ml-2 text-gray-400 hover:text-red-500">
+                          <button type="button" aria-label={t.jobs.cancel} onClick={(e) => { e.stopPropagation(); setCvFile(null); }} className="ml-2 text-ts-muted hover:text-ts-ink">
                             <X size={14} />
                           </button>
                         </div>
                       ) : (
                         <>
-                          <Upload size={24} className="mx-auto mb-3 text-gray-400" />
-                          <p className="text-sm text-gray-500">
-                            {t.jobs.cvDrag} <span className="text-black font-medium">{t.jobs.cvSelect}</span>
+                          <Upload size={22} className="mx-auto mb-3 text-ts-muted" aria-hidden />
+                          <p className="text-sm text-ts-muted">
+                            {t.jobs.cvDrag} <span className="text-ts-accent font-medium">{t.jobs.cvSelect}</span>
                           </p>
-                          <p className="text-xs text-gray-400 mt-1">{t.jobs.cvFormats}</p>
+                          <p className="text-xs text-ts-muted mt-1">{t.jobs.cvFormats}</p>
                         </>
                       )}
                       <input id="cv-input" type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={(e) => { if (e.target.files?.[0]) setCvFile(e.target.files[0]); }} />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2">{t.jobs.whyTs}</label>
+                    <label htmlFor="ap-why" className="block text-sm font-medium mb-2">{t.jobs.whyTs}</label>
                     <textarea
+                      id="ap-why"
                       className="input-field"
                       rows={4}
                       placeholder={t.jobs.whyTsPlaceholder}
@@ -304,13 +316,18 @@ export default function JobDetailPage() {
                     />
                   </div>
                 </div>
-                <div className="mt-8 flex gap-3">
-                  <button type="submit" disabled={submitting} className="pill-btn pill-btn-primary flex-1 justify-center disabled:opacity-50">
-                    {submitting ? (locale === 'es' ? 'Enviando...' : 'Submitting...') : t.jobs.submit}
-                    {!submitting && <ArrowUpRight size={16} strokeWidth={2.5} />}
-                  </button>
-                  <button type="button" onClick={() => setShowApply(false)} className="pill-btn pill-btn-outline">
+                {submitError && (
+                  <p role="alert" className="mt-6 text-sm text-[color:var(--ts-red)] bg-[color:var(--ts-red-bg)] rounded-ts-sm px-4 py-3">
+                    {t.jobs.errorGeneric}
+                  </p>
+                )}
+                <div className="mt-8 flex flex-col-reverse sm:flex-row gap-3">
+                  <button type="button" onClick={() => setShowApply(false)} className="pill-btn pill-btn-outline justify-center">
                     {t.jobs.cancel}
+                  </button>
+                  <button type="submit" disabled={submitting} className="pill-btn pill-btn-primary flex-1 justify-center disabled:opacity-50">
+                    {submitting ? t.jobs.submitting : t.jobs.submit}
+                    {!submitting && <ArrowUpRight size={16} strokeWidth={2.5} />}
                   </button>
                 </div>
               </form>
@@ -322,16 +339,19 @@ export default function JobDetailPage() {
       {/* Success Modal */}
       {submitted && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-[rgba(var(--ts-ink-rgb),0.45)] backdrop-blur-sm z-[60] flex items-center justify-center p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setSubmitted(false); }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ok-title"
         >
-          <div className="bg-white rounded-2xl max-w-[480px] w-full">
+          <div className="bg-ts-surface rounded-ts-lg max-w-[480px] w-full">
             <div className="p-10 text-center">
-              <div className="w-16 h-16 bg-ts-accent rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckCircle size={28} className="text-white" />
+              <div className="w-14 h-14 bg-ts-accent rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle size={26} className="text-white" aria-hidden />
               </div>
-              <h3 className="text-2xl font-bold mb-3">{t.jobs.successTitle}</h3>
-              <p className="text-gray-500 mb-8">{t.jobs.successMsg}</p>
+              <h3 id="ok-title" className="text-2xl font-light tracking-ts-tight mb-3">{t.jobs.successTitle}</h3>
+              <p className="text-ts-muted mb-8 leading-relaxed">{t.jobs.successBody}</p>
               <Link href="/vacantes" className="pill-btn pill-btn-primary">
                 {t.jobs.backToJobsBtn}
               </Link>
@@ -339,8 +359,6 @@ export default function JobDetailPage() {
           </div>
         </div>
       )}
-
-      <Footer />
-    </>
+    </PublicPage>
   );
 }
