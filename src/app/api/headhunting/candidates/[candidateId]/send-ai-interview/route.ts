@@ -11,8 +11,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
-import { resolveCandidateLang, EN_SIGNATURE_NAME } from "@/lib/candidate-lang";
+import { resolveCandidateLang } from "@/lib/candidate-lang";
 import crypto from "crypto";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
 
 export async function POST(
   req: NextRequest,
@@ -104,7 +105,7 @@ export async function POST(
       <li>Mejor hacela de corrido, sin pausas largas</li>
     </ul>
     <p>Después de la entrevista nos contactamos contigo para los siguientes pasos. Si te queda alguna duda, contestame este correo.</p>
-    <p>Un abrazo,<br><strong>Kelly Castañeda</strong><br>Talent Acquisition and Development Lead<br>Trading Solutions</p>
+    <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>
   </div>
 </body></html>`;
 
@@ -143,7 +144,7 @@ export async function POST(
             ? `Trading Solutions · Interview for ${vacancyTitle}`
             : `Trading Solutions · Entrevista para ${vacancyTitle}`,
           html,
-          fromName: lang === "en" ? EN_SIGNATURE_NAME : "Kelly Castañeda",
+          fromName: ATS_FROM_NAME,
         });
         if (draftRes.ok) {
           draftId = draftRes.draft_id;

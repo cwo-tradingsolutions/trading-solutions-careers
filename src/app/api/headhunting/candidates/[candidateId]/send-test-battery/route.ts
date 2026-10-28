@@ -16,7 +16,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
-import { resolveCandidateLang, EN_SIGNATURE_NAME } from "@/lib/candidate-lang";
+import { resolveCandidateLang } from "@/lib/candidate-lang";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
 
 export async function POST(
   req: NextRequest,
@@ -114,8 +115,7 @@ export async function POST(
     <p>Cuando termines, contame por este mismo correo. Si surge cualquier duda en el camino, escribime.</p>
 
     <p>Un abrazo,<br>
-    <strong>Kelly Castañeda</strong><br>
-    Talent Acquisition and Development Lead<br>
+    <strong>Talent Acquisition Team</strong><br>
     Trading Solutions</p>
 
     <div class="footer">Antes de enviar, pegá los enlaces personalizados de Bluesite y Psicoalianza.</div>
@@ -180,7 +180,7 @@ export async function POST(
       to: candidate.email,
       subject,
       html: lang === "en" ? htmlEn : html,
-      fromName: lang === "en" ? EN_SIGNATURE_NAME : "Kelly Castañeda",
+      fromName: ATS_FROM_NAME,
     });
 
     if (!draftRes.ok) {

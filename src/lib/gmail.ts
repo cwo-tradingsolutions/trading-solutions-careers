@@ -12,6 +12,31 @@
  * Sin paquete `googleapis` — usamos fetch directo. Más liviano, sin deps extra.
  */
 import { neon } from "@neondatabase/serverless";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
+
+export { ATS_FROM_NAME, ATS_FROM_NAME_EN } from "@/lib/ats-from";
+
+/**
+ * RFC 2047 para el display name. Solo si hay caracteres fuera de ASCII:
+ * «Talent Acquisition Team» se manda literal. Un nombre con ñ sin este
+ * encoding se ve como mojibake (CastaÃ±eda).
+ *
+ * Si algún caller todavía pasa Kelly, se reemplaza: el From de jointheteam@
+ * no es un nombre de persona.
+ */
+export function encodeMailboxDisplayName(name: string | undefined): string {
+  const raw = (name || "").trim();
+  const chosen = !raw || /kelly\s+casta/i.test(raw) ? ATS_FROM_NAME : raw;
+  if (/[^\x20-\x7E]/.test(chosen)) {
+    return `=?UTF-8?B?${Buffer.from(chosen, "utf8").toString("base64")}?=`;
+  }
+  if (/[",<>()]/.test(chosen)) return `"${chosen.replace(/"/g, "")}"`;
+  return chosen;
+}
+
+function formatFrom(name: string | undefined, email: string): string {
+  return `${encodeMailboxDisplayName(name)} <${email}>`;
+}
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
@@ -180,10 +205,8 @@ export async function createDraftViaGmail(opts: {
     return { ok: false, error: "Gmail no conectado. Pide a Kelly que vaya a Settings → Conectar Gmail." };
   }
 
-  const fromDisplay = opts.fromName ?? "Trading Solutions Recruiting";
-  const fromHeader = `${fromDisplay} <${valid.email}>`;
   const rfc822 = buildRfc822({
-    from: fromHeader,
+    from: formatFrom(opts.fromName, valid.email),
     to: opts.to,
     subject: opts.subject,
     html: opts.html,
@@ -214,17 +237,15 @@ export async function sendViaGmail(opts: {
   html: string;
   replyTo?: string;
   bcc?: string;
-  fromName?: string; // Display name (defaults to "Trading Solutions Recruiting")
+  fromName?: string; // Display name (defaults to ATS_FROM_NAME)
 }): Promise<{ ok: true; gmail_id: string } | { ok: false; error: string }> {
   const valid = await getValidAccessToken();
   if (!valid) {
     return { ok: false, error: "Gmail no conectado. Pide a Kelly que vaya a Settings → Conectar Gmail." };
   }
 
-  const fromDisplay = opts.fromName ?? "Trading Solutions Recruiting";
-  const fromHeader = `${fromDisplay} <${valid.email}>`;
   const rfc822 = buildRfc822({
-    from: fromHeader,
+    from: formatFrom(opts.fromName, valid.email),
     to: opts.to,
     subject: opts.subject,
     html: opts.html,
@@ -455,7 +476,7 @@ export async function createDraftWithAttachmentsViaGmail(opts: {
   const b64 = (b: Buffer) => b.toString("base64").replace(/.{1,76}/g, "$&\r\n").trimEnd();
 
   const l: string[] = [];
-  l.push(`From: ${enc(opts.fromName ?? "Trading Solutions")} <${valid.email}>`);
+  l.push(`From: ${formatFrom(opts.fromName, valid.email)}`);
   if (opts.to) l.push(`To: ${opts.to}`);
   if (opts.replyTo) l.push(`Reply-To: ${opts.replyTo}`);
   l.push(`Subject: ${enc(opts.subject)}`);

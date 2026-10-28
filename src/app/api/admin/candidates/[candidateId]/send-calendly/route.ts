@@ -16,8 +16,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
-import { resolveCandidateLang, EN_SIGNATURE_NAME } from "@/lib/candidate-lang";
+import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { agendaDeVacante } from "@/lib/reclutadores";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
 
 export const runtime = "nodejs";
 
@@ -201,7 +202,7 @@ export async function POST(
               ? `Trading Solutions · Choose your interview time for ${vacancyTitle}`
               : `Trading Solutions · Elige tu horario para la entrevista de ${vacancyTitle}`,
             html,
-            fromName: lang === "en" ? EN_SIGNATURE_NAME : host.fullName,
+            fromName: ATS_FROM_NAME,
             replyTo: "jointheteam@tradingsolutions.com",
           });
           if (draftRes.ok) draftId = draftRes.draft_id;
