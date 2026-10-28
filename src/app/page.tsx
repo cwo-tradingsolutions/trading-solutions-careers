@@ -56,16 +56,16 @@ export default function HomePage() {
         {/* ── HERO · cinematic rounded inset on canvas ── */}
         <section className="px-4 sm:px-6 lg:px-10 pt-4 md:pt-8">
           <div className="max-w-[1320px] mx-auto">
-            <div className="relative md:overflow-hidden md:rounded-[28px]">
+            <div className="relative md:overflow-hidden md:rounded-[28px] md:min-h-[min(76vh,700px)] md:flex md:items-end">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/careers/hero-miami-port.webp"
                 alt={t.hero.imageAlt}
-                className="w-full h-[300px] sm:h-[380px] md:h-[min(76vh,700px)] object-cover rounded-ts-lg md:rounded-none"
+                className="w-full h-[300px] sm:h-[380px] md:absolute md:inset-0 md:h-full object-cover rounded-ts-lg md:rounded-none"
                 fetchPriority="high"
               />
               <div className="hidden md:block absolute inset-0 hero-scrim" aria-hidden />
-              <div className="pt-7 pb-2 md:p-12 lg:p-16 md:absolute md:inset-0 md:flex md:flex-col md:justify-end md:text-white">
+              <div className="pt-7 pb-2 md:p-12 lg:p-16 md:relative md:w-full md:text-white">
                 <div className="max-w-[700px]">
                   <p className="ts-kicker md:text-white/85 mb-5">{t.hero.eyebrow}</p>
                   <h1 className="hero-text mb-6">{t.hero.title}</h1>
