@@ -1,63 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase';
 import { isAdminRequest } from '@/lib/bateria/auth';
-import { BATTERY_VERSION } from '@/lib/bateria/items';
 import { asuntoBateria, htmlBateria, textoBateria, FIRMA } from '@/lib/bateria/correo';
 import { asuntoBateriaEn, htmlBateriaEn, textoBateriaEn, FIRMA_EN } from '@/lib/bateria/correo';
 import { resolveCandidateLang, type CandidateLang } from '@/lib/candidate-lang';
 import { createDraftViaGmail, isGmailConnected } from '@/lib/gmail';
 import { getResend, EMAIL_FROM } from '@/lib/resend';
-import { recordStageEvent } from '@/lib/stage-events';
-import { normalizeStage, STAGE_RANK } from '@/lib/stage-labels';
+import { moverABateria, sesionDe, RESPONDER_A, type CandBateria } from '@/lib/bateria/invitar';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
-/** Las respuestas van a la cuenta de reclutamiento, no al remitente tecnico. */
-const RESPONDER_A = 'jointheteam@tradingsolutions.com';
-
-/** La etapa en la que queda quien ya recibio la bateria. */
-const ETAPA_BATERIA = 'pruebas';
-
-/**
- * Mandar la bateria ES lo que pone al candidato en esa etapa. Dejarlo como dos
- * acciones separadas garantiza que tarde o temprano se haga la primera y se
- * olvide la segunda, y entonces el funnel deja de decir la verdad sobre donde
- * esta cada quien — que es justo para lo que sirve.
- *
- * Solo mueve hacia adelante: a quien ya va mas avanzado no se le retrocede por
- * reenviarle su enlace.
- */
-async function moverABateria(candidatoId: string) {
-  const { data: c } = await supabaseAdmin
-    .from('ht_candidates').select('id, stage, vacancy_id').eq('id', candidatoId).single();
-  if (!c) return;
-
-  const actual = normalizeStage(c.stage);
-  const rankActual = STAGE_RANK[actual] ?? 0;
-  const rankBateria = STAGE_RANK[ETAPA_BATERIA] ?? 0;
-  if (rankActual >= rankBateria) return;
-
-  const { error } = await supabaseAdmin
-    .from('ht_candidates')
-    .update({ stage: ETAPA_BATERIA, updated_at: new Date().toISOString() })
-    .eq('id', candidatoId);
-  if (error) { console.error('bateria/enviar · no se pudo mover de etapa', candidatoId, error.message); return; }
-
-  await recordStageEvent({
-    candidateId: candidatoId,
-    fromStage: c.stage ?? null,
-    toStage: ETAPA_BATERIA,
-    vacancyId: c.vacancy_id ?? null,
-    source: 'system',
-    note: 'Batería enviada desde el ATS',
-  });
-}
-
 type Modo = 'previsualizar' | 'borrador' | 'enviar';
-type Cand = { id?: string; nombre?: string; email?: string; vacante?: string };
+type Cand = CandBateria;
 
 /**
  * Idioma de cada candidato · el proceso de China va en ingles.
@@ -96,44 +52,6 @@ async function idiomasDe(candidatos: Cand[]): Promise<Map<string, CandidateLang>
 function idiomaDe(c: Cand, mapa: Map<string, CandidateLang>): CandidateLang {
   const porFicha = c.id ? mapa.get(c.id) : undefined;
   return porFicha ?? resolveCandidateLang({ jobTitle: c.vacante ?? null });
-}
-
-/**
- * Un enlace por persona. Si el candidato ya tiene sesion se reusa la suya:
- * crear una segunda le borraria el avance de la primera y dejaria dos filas
- * compitiendo por el mismo informe.
- */
-async function sesionDe(c: Cand, perfil: string | null, origin: string) {
-  const { data: ya } = await supabaseAdmin
-    .from('ts_bat_sessions')
-    .select('id, token, status, invite_count')
-    .eq('ht_candidate_id', c.id)
-    .limit(1);
-
-  if (ya?.length) {
-    if (perfil) await supabaseAdmin.from('ts_bat_sessions').update({ perfil_cargo: perfil }).eq('id', ya[0].id);
-    return { id: ya[0].id, token: ya[0].token, url: `${origin}/prueba/${ya[0].token}`, reusada: true, invite_count: ya[0].invite_count ?? 0 };
-  }
-
-  const token = crypto.randomBytes(24).toString('base64url');
-  const { data, error } = await supabaseAdmin
-    .from('ts_bat_sessions')
-    .insert({
-      token,
-      battery_version: BATTERY_VERSION,
-      purpose: 'candidato',
-      candidate_name: c.nombre ?? null,
-      candidate_email: c.email ?? null,
-      ht_candidate_id: c.id ?? null,
-      vacancy_title: c.vacante ?? 'Prueba de selección',
-      perfil_cargo: perfil,
-      status: 'created',
-    })
-    .select('id, token')
-    .single();
-
-  if (error || !data) throw new Error(error?.message ?? 'no se pudo crear la sesión');
-  return { id: data.id, token: data.token, url: `${origin}/prueba/${data.token}`, reusada: false, invite_count: 0 };
 }
 
 export async function POST(req: NextRequest) {

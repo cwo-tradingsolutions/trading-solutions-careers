@@ -17,8 +17,10 @@ import crypto from "crypto";
 
 // Las etapas válidas (v4 + legacy) viven en la fuente única de verdad.
 // No declarar listas de etapas acá.
-import { VALID_STAGES } from "@/lib/stage-labels";
+import { VALID_STAGES, KELLY_GATES, normalizeStage, STAGE_RANK } from "@/lib/stage-labels";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
+import { recordStageEvent } from "@/lib/stage-events";
+import { enviarBateriaAuto } from "@/lib/bateria/invitar";
 
 const TS_LINKEDIN_URL = "https://www.linkedin.com/company/trading-sol/";
 
@@ -68,15 +70,21 @@ export async function POST(
   try {
     const { candidateId } = params;
     const body = await req.json();
-    const targetStage = String(body.stage || "");
+    const requestedStage = String(body.stage || "");
     const createRejectionDraft = body.create_rejection_draft !== false;
 
-    if (!VALID_STAGES.includes(targetStage)) {
+    if (!VALID_STAGES.includes(requestedStage)) {
       return NextResponse.json(
         { error: `Stage inválida. Válidas: ${VALID_STAGES.join(", ")}` },
         { status: 400 }
       );
     }
+
+    // Se escribe el code v4. Los únicos históricos que se conservan son los
+    // que sostienen un gate de Kelly sin code propio (Psicométricas,
+    // Entrevista HM): normalizarlos los mandaría a Batería TS o Terna.
+    const GATE_LEGACY = KELLY_GATES.flatMap((g) => g.legacy);
+    const targetStage = GATE_LEGACY.includes(requestedStage) ? requestedStage : normalizeStage(requestedStage);
 
     // Cargar candidato
     const { data: candidate, error: fetchErr } = await supabaseAdmin
@@ -108,7 +116,7 @@ export async function POST(
     let elevareUrl: string | null = null;
 
     // Si se mueve a assessment_invitado: generar token + draft de Elevare
-    if (targetStage === "assessment_invitado") {
+    if (requestedStage === "assessment_invitado") {
       const token = crypto.randomUUID();
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 72);
@@ -215,20 +223,28 @@ export async function POST(
     // Sin esto los "días en etapa" del dashboard vuelven a depender de
     // updated_at, que se pisa con cualquier edición del candidato.
     // Es best-effort: si falla, el movimiento igual quedó guardado.
-    if (candidate.stage !== targetStage) {
-      const { error: eventErr } = await supabaseAdmin
-        .from("ht_candidate_stage_events")
-        .insert({
-          candidate_id: candidateId,
-          vacancy_id: candidate.vacancy_id ?? null,
-          from_stage: candidate.stage ?? null,
-          to_stage: targetStage,
-          changed_at: new Date().toISOString(),
-          source: "ui",
-        });
-      if (eventErr) {
-        console.error("[stage] no se pudo registrar el evento de etapa:", eventErr.message);
-      }
+    // recordStageEvent también emite candidate.stage_changed para los agentes.
+    await recordStageEvent({
+      candidateId,
+      fromStage: candidate.stage ?? null,
+      toStage: targetStage,
+      vacancyId: candidate.vacancy_id ?? null,
+      source: "ui",
+    });
+
+    // ─── Listo para batería → Batería TS automática ───────────────
+    // El reclutador aprueba a alguien que estaba en revisión: es el mismo
+    // "prefiltro pasado" que el automático, así que recibe la batería igual.
+    // `auto_bateria: false` lo apaga para quien solo quiera reclasificar.
+    let bateriaAuto: Awaited<ReturnType<typeof enviarBateriaAuto>> | null = null;
+    let finalStage = targetStage;
+    // Solo desde antes de la batería: a quien se devuelve a Prefiltro desde
+    // más adelante no se le reenvía nada ni se le vuelve a mover.
+    const veniaDeAntes = (STAGE_RANK[normalizeStage(candidate.stage)] ?? 0) < (STAGE_RANK["pruebas"] ?? 0);
+    if (targetStage === "prefiltro_pasado" && veniaDeAntes && body.auto_bateria !== false) {
+      const origin = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+      bateriaAuto = await enviarBateriaAuto(candidateId, origin);
+      if (bateriaAuto.enviado) finalStage = "pruebas";
     }
 
     // ─── Auto-create People + Onboarding when hired ───
@@ -355,7 +371,8 @@ export async function POST(
       success: true,
       candidate_id: candidateId,
       from_stage: candidate.stage,
-      to_stage: targetStage,
+      to_stage: finalStage,
+      bateria_auto: bateriaAuto,
       draft_id: draftId,
       welcome_draft_id: welcomeDraftId,
       elevare_url: elevareUrl,

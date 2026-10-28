@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected, sendViaGmail } from "@/lib/gmail";
 import { recordStageEvent } from "@/lib/stage-events";
+import { enviarBateriaAuto } from "@/lib/bateria/invitar";
 import { resolveCandidateLang, EN_SIGNATURE_NAME } from "@/lib/candidate-lang";
 import { TEMPLATE_ENGLISH_MIN_RANK, TEMPLATE_SALARY_CAP, type TemplateKey } from "@/lib/prefilter-templates";
 
@@ -741,6 +742,19 @@ export async function POST(
     });
   }
 
+  // ─── Prefiltro pasado → Batería TS, sin esperar a nadie ─────────────
+  // Kelly 27-oct: quien pasa el prefiltro recibe la batería de una vez, desde
+  // jointheteam@, y queda en el gate Batería TS. Si no hay canal de correo
+  // (staging), se queda en Prefiltro: moverlo sin invitación sería mentir.
+  let bateriaAuto: Awaited<ReturnType<typeof enviarBateriaAuto>> | null = null;
+  if (decision === "pass") {
+    const origin = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+    bateriaAuto = await enviarBateriaAuto(candidate.id as string, origin);
+    if (!bateriaAuto.enviado) {
+      console.error(`[prefiltro] batería automática no salió para ${candidate.id}: ${bateriaAuto.motivo}`);
+    }
+  }
+
   // ─── Notificación a Kelly (no bloqueante) ─────────────────────────
   try {
     const gmail = await isGmailConnected();
@@ -766,6 +780,7 @@ export async function POST(
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Salario que pidió:</td><td>${body.salary || "—"}</td></tr>
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Inglés:</td><td>${body.english_level || "—"}</td></tr>
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Ciudad:</td><td>${body.city || "—"}</td></tr>
+            ${bateriaAuto ? `<tr><td style="padding: 4px 12px 4px 0; color: #666;">Batería TS:</td><td>${bateriaAuto.enviado ? `enviada automáticamente (${bateriaAuto.canal})` : `<strong>no salió</strong> · ${bateriaAuto.motivo}`}</td></tr>` : ""}
           </table>
           ${enRojo ? `<div style="background: #FEF2F2; padding: 10px 14px; border-radius: 6px; color: #991B1B; font-size: 13px;"><strong>No se rechazó a nadie.</strong> Quedó en rojo esperando tu decisión:<ul style="margin: 8px 0 0; padding-left: 18px;">${listaBloqueos}</ul></div>` : ""}
           <p><a href="${baseUrl}/hr-admin?tab=prefiltros" style="color: #2C64ED;">Ver en HR Admin →</a></p>

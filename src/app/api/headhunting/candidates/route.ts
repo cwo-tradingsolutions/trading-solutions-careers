@@ -9,7 +9,9 @@ export async function GET(req: NextRequest) {
 
   try {
     const vacancyId = req.nextUrl.searchParams.get('vacancy_id');
-    const clientId = req.nextUrl.searchParams.get('client_id');
+    // `clientId` se acepta por compatibilidad: el funnel lo mandó así meses y
+    // el filtro se ignoraba en silencio.
+    const clientId = req.nextUrl.searchParams.get('client_id') ?? req.nextUrl.searchParams.get('clientId');
 
     let query = supabaseAdmin
       .from('ht_candidates')

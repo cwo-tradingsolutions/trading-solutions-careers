@@ -12,6 +12,11 @@
  *   5. Toggle create_rejection_draft (default ON · crea el draft de Gmail)
  *
  * Llama a POST /api/admin/candidates/:id/reject-with-reason cuando confirma.
+ *
+ * Con `bulk` rechaza a varios con el mismo motivo: el mensaje se escribe una
+ * vez con {firstName} y {vacancy} y se personaliza por candidato al enviar.
+ * El rechazo masivo pasaba directo por el cambio de etapa, sin motivo ni
+ * clasificación; por eso ahora usa este mismo modal.
  */
 import { useEffect, useState } from "react";
 import { X, AlertTriangle, BookmarkCheck, Mail } from "lucide-react";
@@ -48,9 +53,11 @@ type Props = {
   vacancyTitle: string;
   onClose: () => void;
   onRejected?: () => void;
+  bulk?: Array<{ id: string; name: string; vacancyTitle: string }>;
 };
 
-export default function RejectionModal({ candidateId, candidateName, vacancyTitle, onClose, onRejected }: Props) {
+export default function RejectionModal({ candidateId, candidateName, vacancyTitle, onClose, onRejected, bulk }: Props) {
+  const esLote = !!bulk && bulk.length > 1;
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -64,6 +71,7 @@ export default function RejectionModal({ candidateId, candidateName, vacancyTitl
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progreso, setProgreso] = useState<string | null>(null);
 
   const firstName = (candidateName || "").split(" ")[0] || "candidato";
 
@@ -83,9 +91,11 @@ export default function RejectionModal({ candidateId, candidateName, vacancyTitl
     // Pre-rellenar nota pública con el mensaje genérico · mismo para todas las
     // categorías. Kelly nunca explica el motivo al candidato (a menos que él
     // llame y pida feedback en vivo).
-    const rendered = GENERIC_REJECTION_TEMPLATE
-      .replace(/\{firstName\}/g, firstName)
-      .replace(/\{vacancy\}/g, vacancyTitle);
+    const rendered = esLote
+      ? GENERIC_REJECTION_TEMPLATE
+      : GENERIC_REJECTION_TEMPLATE
+          .replace(/\{firstName\}/g, firstName)
+          .replace(/\{vacancy\}/g, vacancyTitle);
     setNotePublic(rendered);
     setStep(2);
   }
@@ -100,31 +110,41 @@ export default function RejectionModal({ candidateId, candidateName, vacancyTitl
     setSubmitting(true);
     setError(null);
 
-    try {
-      const res = await fetch(`/api/admin/candidates/${candidateId}/reject-with-reason`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          category_key: selectedCategory.category_key,
-          sub_detail_key: selectedSubDetail,
-          note_private: notePrivate.trim() || null,
-          note_public: notePublic.trim() || null,
-          save_for_future: saveForFuture,
-          create_rejection_draft: createDraft,
-        }),
-      });
-      const j = await res.json();
-      if (!j.success) {
-        setError(j.error || "Error al rechazar");
-        setSubmitting(false);
-        return;
+    const objetivos = bulk && bulk.length ? bulk : [{ id: candidateId, name: candidateName, vacancyTitle }];
+    const fallos: string[] = [];
+    for (let i = 0; i < objetivos.length; i++) {
+      const c = objetivos[i];
+      setProgreso(objetivos.length > 1 ? `${i + 1} de ${objetivos.length}` : null);
+      const nota = notePublic.trim()
+        .replace(/\{firstName\}/g, (c.name || "").split(" ")[0] || "candidato")
+        .replace(/\{vacancy\}/g, c.vacancyTitle);
+      try {
+        const res = await fetch(`/api/admin/candidates/${c.id}/reject-with-reason`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category_key: selectedCategory.category_key,
+            sub_detail_key: selectedSubDetail,
+            note_private: notePrivate.trim() || null,
+            note_public: nota || null,
+            save_for_future: saveForFuture,
+            create_rejection_draft: createDraft,
+          }),
+        });
+        const j = await res.json();
+        if (!j.success) fallos.push(`${c.name}: ${j.error || "Error al rechazar"}`);
+      } catch (e: any) {
+        fallos.push(`${c.name}: ${e?.message || "Error de red"}`);
       }
-      onRejected?.();
-      onClose();
-    } catch (e: any) {
-      setError(e?.message || "Error de red");
-      setSubmitting(false);
     }
+    setProgreso(null);
+    if (fallos.length) {
+      setError(fallos.join(" · "));
+      setSubmitting(false);
+      return;
+    }
+    onRejected?.();
+    onClose();
   }
 
   return (
@@ -140,11 +160,13 @@ export default function RejectionModal({ candidateId, candidateName, vacancyTitl
         {/* Header */}
         <div className="px-6 py-5 border-b border-[var(--ts-gray-10)] flex items-start justify-between">
           <div>
-            <div className="ts-eyebrow text-[var(--ts-red)]">Rechazar candidato</div>
+            <div className="ts-eyebrow text-[var(--ts-red)]">{esLote ? "Rechazar candidatos" : "Rechazar candidato"}</div>
             <h2 className="text-[22px] font-extrabold mt-1" style={{ letterSpacing: "-0.02em" }}>
-              {candidateName}
+              {esLote ? `${bulk!.length} candidatos` : candidateName}
             </h2>
-            <p className="text-[12px] text-[var(--ts-gray-60)] mt-0.5">{vacancyTitle}</p>
+            <p className="text-[12px] text-[var(--ts-gray-60)] mt-0.5">
+              {esLote ? bulk!.map((c) => c.name).join(", ") : vacancyTitle}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -266,6 +288,7 @@ export default function RejectionModal({ candidateId, candidateName, vacancyTitl
                 <p className="text-[10px] text-[var(--ts-gray-60)] mt-1">
                   Mensaje genérico estándar · igual para todas las categorías. El detalle del motivo queda interno
                   (no se le explica al candidato a menos que llame).
+                  {esLote && " {firstName} y {vacancy} se reemplazan por los de cada candidato."}
                 </p>
               </div>
 
@@ -332,7 +355,7 @@ export default function RejectionModal({ candidateId, candidateName, vacancyTitl
               disabled={submitting}
               className="text-[12px] font-bold tracking-[0.5px] uppercase px-6 py-3 bg-[var(--ts-red)] text-white hover:opacity-90 disabled:opacity-50"
             >
-              {submitting ? "Procesando…" : "Confirmar rechazo"}
+              {submitting ? (progreso ? `Procesando ${progreso}…` : "Procesando…") : esLote ? `Rechazar ${bulk!.length}` : "Confirmar rechazo"}
             </button>
           </div>
         )}

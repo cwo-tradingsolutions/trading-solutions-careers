@@ -35,10 +35,13 @@ export async function GET(
 
 /**
  * PATCH /api/headhunting/candidates/[candidateId]
- * Updates whitelisted fields on a candidate. Currently supports: vacancy_id, name, email, phone, stage, status.
+ * Updates whitelisted fields on a candidate. Currently supports: vacancy_id, name, email, phone, status.
+ * La etapa NO se cambia acá: va por POST /stage, que registra el historial y
+ * emite candidate.stage_changed. Un PATCH que la tocara dejaría el tablero y
+ * los agentes sin enterarse.
  * Used for cases like switching a candidate to a different vacancy.
  */
-const ALLOWED_PATCH_FIELDS = ["vacancy_id", "name", "email", "phone", "stage", "status", "preferred_language", "source"];
+const ALLOWED_PATCH_FIELDS = ["vacancy_id", "name", "email", "phone", "status", "preferred_language", "source"];
 
 /**
  * Orígenes con los que se cataloga a un candidato. `cv_proceso_anterior` es
@@ -68,6 +71,12 @@ export async function PATCH(
       return NextResponse.json({ error: 'candidateId requerido' }, { status: 400 });
     }
     const body = await req.json();
+    if (body.stage !== undefined) {
+      return NextResponse.json(
+        { error: `La etapa se cambia con POST /api/headhunting/candidates/${candidateId}/stage` },
+        { status: 400 },
+      );
+    }
     const updates: Record<string, unknown> = {};
     for (const k of ALLOWED_PATCH_FIELDS) {
       if (body[k] !== undefined) updates[k] = body[k];
