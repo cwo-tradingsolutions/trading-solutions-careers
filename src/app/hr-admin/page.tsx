@@ -11,7 +11,6 @@ import {
   LayoutDashboard,
   Briefcase,
   Kanban,
-  Database,
   Video,
   Bot,
   LineChart,
@@ -80,7 +79,6 @@ type Tab =
   | "requisiciones"
   | "vacantes"
   | "funnel"
-  | "cvbank"
   | "rubricas"
   | "nuevebox"
   | "plantillas";
@@ -90,16 +88,15 @@ const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
   { id: "requisiciones", label: "Requisiciones", icon: Inbox },
   { id: "vacantes", label: "Vacantes", icon: Briefcase },
   { id: "funnel", label: "Funnel", icon: Kanban },
-  { id: "cvbank", label: "CV Bank", icon: Database },
   { id: "rubricas", label: "Rúbricas", icon: ClipboardCheck },
   { id: "nuevebox", label: "Decisiones", icon: Grid3x3 },
   { id: "plantillas", label: "Plantillas", icon: SettingsIcon },
 ];
 
-const VALID_TABS: Tab[] = ["dashboard", "requisiciones", "vacantes", "funnel", "cvbank", "rubricas", "nuevebox", "plantillas"];
+const VALID_TABS: Tab[] = ["dashboard", "requisiciones", "vacantes", "funnel", "rubricas", "nuevebox", "plantillas"];
 
-/** Bookmarks de tabs que salieron del nav. #onboarding abre Funnel; el gate 12 del journey sigue. */
-const RETIRED_TO_FUNNEL = new Set(["onboarding"]);
+/** Bookmarks de tabs que salieron del nav. Abren Funnel; el rediscovery HT y el gate 12 siguen. */
+const RETIRED_TO_FUNNEL = new Set(["onboarding", "cvbank"]);
 
 function readHash(): string {
   if (typeof window === "undefined") return "";
@@ -355,7 +352,6 @@ export default function HRAdminPage() {
         {tab === "requisiciones" && <RequisitionsInbox />}
         {tab === "vacantes" && <Vacantes />}
         {tab === "funnel" && <PipelineFunnel />}
-        {tab === "cvbank" && <CVBank />}
         {tab === "rubricas" && <RubricasPanel />}
         {tab === "nuevebox" && <NueveBoxPanel />}
         {tab === "plantillas" && <ReminderRulesEditor />}
@@ -4386,258 +4382,6 @@ function Pipeline() {
           );
         })}
       </div>
-    </>
-  );
-}
-
-/* ======================================================== */
-/* CV Bank                                                  */
-/* ======================================================== */
-function CVBank() {
-  const [pool, setPool] = useState<LiveCandidate[]>([]);
-  const [tokens, setTokens] = useState<LiveToken[]>([]);
-  const [vacs, setVacs] = useState<LiveVacancy[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [activeChip, setActiveChip] = useState("todos");
-  const [matchVacancyId, setMatchVacancyId] = useState<number | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      const [tpR, asR, vacR] = await Promise.all([
-        fetch("/api/talent-pool?limit=1000", { cache: "no-store" }).then((r) => r.json()),
-        fetch("/api/assessments?limit=500", { cache: "no-store" }).then((r) => r.json()),
-        fetch("/api/vacancies", { cache: "no-store" }).then((r) => r.json()),
-      ]);
-      setPool((tpR.data ?? []) as LiveCandidate[]);
-      setTokens((asR.data ?? []) as LiveToken[]);
-      const vacList = (Array.isArray(vacR) ? vacR : vacR.data ?? []) as LiveVacancy[];
-      setVacs(vacList);
-      if (vacList.length > 0) setMatchVacancyId(vacList[0].id);
-      setLoading(false);
-    })();
-  }, []);
-
-  const tokenByEmail = useMemo(() => {
-    const m: Record<string, LiveToken> = {};
-    for (const t of tokens) m[t.candidate_email.toLowerCase()] = t;
-    return m;
-  }, [tokens]);
-
-  // Conteos para los chips
-  const counts = useMemo(() => {
-    const total = pool.length;
-    const fromLI = pool.filter((c) => (c.source ?? "").toLowerCase().includes("linkedin")).length;
-    const fromElevare = pool.filter((c) => (c.source ?? "").toLowerCase().includes("elevare")).length;
-    const fromEmail = pool.filter((c) => (c.source ?? "").toLowerCase().includes("email") || (c.source ?? "").toLowerCase().includes("manual")).length;
-    const baq = pool.filter((c) => `${c.notes ?? ""} ${c.summary ?? ""}`.toLowerCase().includes("barranq")).length;
-    const matchedHigh = pool.filter((c) => {
-      const t = tokenByEmail[c.email.toLowerCase()];
-      return t && t.score && t.score >= 80;
-    }).length;
-    const completedAssessment = pool.filter((c) => {
-      const t = tokenByEmail[c.email.toLowerCase()];
-      return t?.status === "completed";
-    }).length;
-    return { total, fromLI, fromElevare, fromEmail, baq, matchedHigh, completedAssessment };
-  }, [pool, tokenByEmail]);
-
-  const chips = [
-    { id: "todos", label: `Todos · ${counts.total}` },
-    { id: "match80", label: `Match ≥ 80 · ${counts.matchedHigh}` },
-    { id: "evaluados", label: `Candidatos evaluados · ${counts.completedAssessment}` },
-    { id: "linkedin", label: `LinkedIn TS · ${counts.fromLI}` },
-    { id: "elevare", label: `Elevare · ${counts.fromElevare}` },
-    { id: "email", label: `Email/Manual · ${counts.fromEmail}` },
-    { id: "baq", label: `Barranquilla · ${counts.baq}` },
-  ];
-
-  // Filtrado por chip + búsqueda
-  const filtered = useMemo(() => {
-    let list = pool;
-    if (activeChip === "match80")
-      list = list.filter((c) => {
-        const t = tokenByEmail[c.email.toLowerCase()];
-        return t && t.score && t.score >= 80;
-      });
-    else if (activeChip === "evaluados")
-      list = list.filter((c) => tokenByEmail[c.email.toLowerCase()]?.status === "completed");
-    else if (activeChip === "linkedin")
-      list = list.filter((c) => (c.source ?? "").toLowerCase().includes("linkedin"));
-    else if (activeChip === "elevare")
-      list = list.filter((c) => (c.source ?? "").toLowerCase().includes("elevare"));
-    else if (activeChip === "email")
-      list = list.filter((c) => {
-        const s = (c.source ?? "").toLowerCase();
-        return s.includes("email") || s.includes("manual");
-      });
-    else if (activeChip === "baq")
-      list = list.filter((c) => `${c.notes ?? ""} ${c.summary ?? ""}`.toLowerCase().includes("barranq"));
-
-    if (search.trim()) {
-      const s = search.toLowerCase();
-      list = list.filter((c) =>
-        `${c.full_name} ${c.email} ${c.tags ?? ""} ${c.notes ?? ""} ${c.summary ?? ""}`
-          .toLowerCase()
-          .includes(s)
-      );
-    }
-    return list;
-  }, [pool, activeChip, search, tokenByEmail]);
-
-  const matchVac = vacs.find((v) => v.id === matchVacancyId);
-
-  return (
-    <>
-      <PageHead
-        title="CV Bank · Talent Pool"
-        desc={
-          loading
-            ? "Cargando perfiles…"
-            : `${counts.total} perfiles activos · LinkedIn TS, Elevare, Email/Manual · Re-matching contra cualquier vacante`
-        }
-        actions={
-          <>
-            <button className="pill-btn pill-btn-outline text-xs" style={{ padding: "9px 14px" }}>
-              <Download className="w-3.5 h-3.5" /> Export CSV
-            </button>
-            <button className="pill-btn text-xs bg-[#0A66C2] text-white hover:bg-[#084D94]" style={{ padding: "9px 14px" }}>
-              <Linkedin className="w-3.5 h-3.5" /> Importar LinkedIn TS
-            </button>
-          </>
-        }
-      />
-
-      <div className="flex gap-2 mb-3">
-        <div className="flex-1 flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-full">
-          <Search className="w-3.5 h-3.5 text-gray-500" />
-          <input
-            className="flex-1 bg-transparent outline-none text-sm"
-            placeholder="Busca por nombre, email, empresa, skill, idioma…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <select
-          value={matchVacancyId ?? ""}
-          onChange={(e) => setMatchVacancyId(e.target.value ? Number(e.target.value) : null)}
-          className="pill-btn pill-btn-outline text-xs cursor-pointer"
-          style={{ padding: "9px 14px", appearance: "none" }}
-        >
-          {vacs.map((v) => (
-            <option key={v.id} value={v.id}>
-              Match contra: {v.title_es ?? v.title ?? v.slug}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="flex gap-2 flex-wrap mb-4">
-        {chips.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setActiveChip(c.id)}
-            className={`filter-chip ${activeChip === c.id ? "active" : ""}`}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-4 gap-3 mb-5">
-        <KPI label="Total perfiles" value={loading ? "…" : String(counts.total)} delta="En Neon" tone="neutral" />
-        <KPI label="Desde LinkedIn TS" value={String(counts.fromLI)} delta={`${counts.total > 0 ? Math.round((counts.fromLI / counts.total) * 100) : 0}%`} tone="neutral" />
-        <KPI label="Candidatos evaluados" value={String(counts.completedAssessment)} delta="Con score" />
-        <KPI label="Mostrando" value={String(filtered.length)} delta={`de ${counts.total}`} tone="neutral" />
-      </div>
-
-      <h3 className="text-sm font-bold mb-3">
-        {matchVac
-          ? `Match contra · ${matchVac.title_es ?? matchVac.title ?? matchVac.slug}`
-          : "Coincidencias"}{" "}
-        ({filtered.length})
-      </h3>
-      <div className="grid grid-cols-3 gap-3">
-        {filtered.slice(0, 60).map((c) => {
-          const t = tokenByEmail[c.email.toLowerCase()];
-          const score = t?.score ?? null;
-          const init = c.full_name
-            .split(" ")
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((p) => p[0]?.toUpperCase() ?? "")
-            .join("");
-          const src = (c.source ?? "").toLowerCase();
-          const srcLabel = src.includes("linkedin")
-            ? "LinkedIn TS"
-            : src.includes("elevare")
-            ? "Elevare"
-            : src.includes("email") || src.includes("manual")
-            ? "Email"
-            : src || "—";
-          // Sacar primer "rol/empresa" del notes
-          const noteFirst = (c.notes ?? "").split("\n")[0].slice(0, 60);
-          // Detectar inglés del summary/notes
-          const engMatch = `${c.notes ?? ""} ${c.summary ?? ""}`.match(/\b(EN[:\s]*|inglés[:\s]*)?(C[12]|B[12]|A[12]|nativo|bilingüe|advanced)\b/i);
-          const en = engMatch ? engMatch[2].toUpperCase().slice(0, 2) : "—";
-          // Match calculado: si tiene assessment para esta vacante usamos ese score
-          const matchHere = matchVac && t?.vacancy_slug === matchVac.slug ? score : null;
-          return (
-            <div key={c.id} className="bg-white border border-gray-200 rounded-2xl p-4 relative">
-              <span
-                className={`absolute top-2.5 right-2.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                  srcLabel === "LinkedIn TS"
-                    ? "bg-[#E7F1FA] text-[#0A66C2]"
-                    : "bg-gray-100 text-gray-800"
-                }`}
-              >
-                {srcLabel === "LinkedIn TS" && "in · "}
-                {srcLabel}
-              </span>
-              <div className="flex items-center gap-2.5 mb-2">
-                <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center font-bold text-[13px]">
-                  {init || "?"}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold truncate">{c.full_name}</div>
-                  <div className="text-xs text-gray-500 truncate">{noteFirst || c.email}</div>
-                </div>
-              </div>
-              <div className="flex gap-3 text-xs text-gray-500 mt-2">
-                <div>
-                  <b className="block text-black text-[13px] leading-tight">{en}</b>Inglés
-                </div>
-                <div>
-                  <b className="block text-black text-[13px] leading-tight truncate max-w-[80px]">{c.email.split("@")[0]}</b>Email
-                </div>
-              </div>
-              <div className="pt-2.5 mt-2.5 border-t border-gray-100 text-xs text-gray-500">
-                {matchHere !== null ? (
-                  <div className="flex justify-between items-center mt-1">
-                    <span>Match {matchVac?.title_es ?? matchVac?.title}</span>
-                    <Pill color={matchHere >= 85 ? "green" : matchHere >= 75 ? "black" : "amber"}>
-                      {matchHere}
-                    </Pill>
-                  </div>
-                ) : score !== null ? (
-                  <div className="flex justify-between items-center mt-1">
-                    <span className="text-[11px] text-gray-500">Ya completó prueba en otra vacante</span>
-                    <Pill color={score >= 85 ? "green" : score >= 75 ? "black" : "amber"}>
-                      {score}
-                    </Pill>
-                  </div>
-                ) : (
-                  <div className="text-[11px] text-gray-400 italic">Aún no ha sido evaluado</div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {filtered.length > 60 && (
-        <div className="text-center text-xs text-gray-500 mt-4">
-          Mostrando 60 de {filtered.length}. Refina con la búsqueda para ver más.
-        </div>
-      )}
     </>
   );
 }
