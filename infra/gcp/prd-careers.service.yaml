@@ -1,0 +1,105 @@
+# ATS PRODUCCIÓN en Cloud Run con PostgREST como sidecar sobre la base `careers`.
+# NO DESPLEGAR SIN GO DE KELLY. Público por el balanceador HTTPS en
+# https://careers.tradingsolutions.com (bolsa de empleo, pruebas y portal de
+# candidatos); Cloud Run solo acepta tráfico que llegue por el balanceador.
+# Imagen: careers.cloudbuild.yaml con _TAG=prd,_APP_URL=https://careers.tradingsolutions.com
+# Secretos prd-careers-*: los carga cargar-secretos-produccion.sh (repo wxm-app).
+#
+#   gcloud run services replace infra/gcp/prd-careers.service.yaml \
+#     --project wellness-experience-management --region us-west1
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: prd-careers
+  labels:
+    cloud.googleapis.com/location: us-west1
+  annotations:
+    run.googleapis.com/ingress: internal-and-cloud-load-balancing
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/cloudsql-instances: wellness-experience-management:us-west1:wxm-pg
+        run.googleapis.com/container-dependencies: '{"careers":["postgrest"]}'
+    spec:
+      serviceAccountName: sa-careers-run@wellness-experience-management.iam.gserviceaccount.com
+      containerConcurrency: 40
+      timeoutSeconds: 600
+      containers:
+        - name: careers
+          image: us-west1-docker.pkg.dev/wellness-experience-management/trading/careers@sha256:f0d42863774c6d3e7ecd44ce9746ca11770ae19d9198949107c84a013bbcd573
+          ports:
+            - containerPort: 8080
+          resources:
+            limits: { cpu: "1", memory: 1Gi }
+          env:
+            - { name: POSTGREST_DIRECTO, value: "1" }
+            - name: SUPABASE_JWT_SECRET
+              valueFrom: { secretKeyRef: { name: prod-careers-postgrest-jwt-secret, key: latest } }
+            # Tablas que venían de Neon: esquema `neon`, rol careers_app
+            # (su search_path ya apunta ahí). postgres.js lee PG*.
+            - { name: PGHOST, value: "/cloudsql/wellness-experience-management:us-west1:wxm-pg" }
+            - { name: PGUSER, value: careers_app }
+            - { name: PGDATABASE, value: careers }
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: prod-cloudsql-careers_app-password, key: latest } }
+            - { name: ARCHIVOS_GCS_BUCKET, value: wellness-experience-management-careers-archivos }
+            # IA: Gemini en Vertex AI (src/lib/gemini.ts), facturado al mismo
+            # proyecto. Sin llave: entra con la cuenta de servicio.
+            - { name: GEMINI_VERTEX_PROJECT_ID, value: wellness-experience-management }
+            - { name: GEMINI_REGION, value: global }
+            - { name: GEMINI_MODELO_PRO, value: gemini-3.1-pro-preview }
+            - { name: GEMINI_MODELO_RAPIDO, value: gemini-3-flash-preview }
+            # Razonamiento alto: en la evaluación de candidatos coincidió con
+            # Claude en 11 de 12 criterios (bajo: 10); tarda ~45 s en vez de 10.
+            - { name: GEMINI_RAZONAMIENTO, value: high }
+            - name: ADMIN_SECRET
+              valueFrom: { secretKeyRef: { name: prd-careers-ADMIN_SECRET, key: latest } }
+            - name: CRON_SECRET
+              valueFrom: { secretKeyRef: { name: prd-careers-CRON_SECRET, key: latest } }
+            - name: WXM_SERVICE_SECRET
+              valueFrom: { secretKeyRef: { name: prd-careers-WXM_SERVICE_SECRET, key: latest } }
+            # Valores que hoy viven en Vercel. Sin RESEND_API_KEY (no está en
+            # Vercel producción): el ATS envía por Gmail conectado. Los correos de
+            # aviso internos usan los valores por defecto del código.
+            # Remitente decidido por Kelly; requiere tradingsolutions.com verificado en Resend.
+            - { name: EMAIL_FROM, value: "Trading Solutions <jointheteam@tradingsolutions.com>" }
+            - name: EMAIL_BCC
+              valueFrom: { secretKeyRef: { name: prd-careers-EMAIL_BCC, key: latest } }
+            - name: ELEVENLABS_API_KEY
+              valueFrom: { secretKeyRef: { name: prd-careers-ELEVENLABS_API_KEY, key: latest } }
+            - name: ELEVENLABS_AGENT_ID
+              valueFrom: { secretKeyRef: { name: prd-careers-ELEVENLABS_AGENT_ID, key: latest } }
+            - name: LINKEDIN_CLIENT_ID
+              valueFrom: { secretKeyRef: { name: prd-careers-LINKEDIN_CLIENT_ID, key: latest } }
+            - name: LINKEDIN_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: prd-careers-LINKEDIN_CLIENT_SECRET, key: latest } }
+            - name: LINKEDIN_COMPANY_ID
+              valueFrom: { secretKeyRef: { name: prd-careers-LINKEDIN_COMPANY_ID, key: latest } }
+            - name: GOOGLE_CLIENT_ID
+              valueFrom: { secretKeyRef: { name: prd-careers-GOOGLE_CLIENT_ID, key: latest } }
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: prd-careers-GOOGLE_CLIENT_SECRET, key: latest } }
+
+        - name: postgrest
+          image: docker.io/postgrest/postgrest:v16.5
+          resources:
+            limits: { cpu: "1", memory: 256Mi }
+          env:
+            - { name: PGRST_DB_URI, value: "postgres:///careers?host=/cloudsql/wellness-experience-management:us-west1:wxm-pg&user=authenticator" }
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: prod-cloudsql-authenticator-password, key: latest } }
+            - { name: PGRST_DB_SCHEMAS, value: public }
+            - { name: PGRST_DB_ANON_ROLE, value: anon }
+            - { name: PGRST_DB_POOL, value: "5" }
+            - { name: PGRST_SERVER_HOST, value: 0.0.0.0 }
+            - { name: PGRST_SERVER_PORT, value: "3001" }
+            - name: PGRST_JWT_SECRET
+              valueFrom: { secretKeyRef: { name: prod-careers-postgrest-jwt-secret, key: latest } }
+          startupProbe:
+            tcpSocket: { port: 3001 }
+            periodSeconds: 2
+            failureThreshold: 30

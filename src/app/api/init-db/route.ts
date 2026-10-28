@@ -1,4 +1,4 @@
-import { neon } from '@neondatabase/serverless';
+import { neon } from "@/lib/sql";
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 

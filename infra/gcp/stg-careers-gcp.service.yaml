@@ -1,0 +1,84 @@
+# ATS en Cloud Run con PostgREST como sidecar sobre la base `careers` de
+# Cloud SQL. PostgREST no se publica: solo el servidor de Next le habla.
+# Staging: privado (solo invocadores IAM). Se abre desde el Mac con
+#   gcloud run services proxy stg-careers-gcp --region us-west1 --port 8081
+#
+#   gcloud run services replace infra/gcp/stg-careers-gcp.service.yaml \
+#     --project wellness-experience-management --region us-west1
+#
+# Sin RESEND_API_KEY a propósito: en staging no sale ningún correo.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: stg-careers-gcp
+  labels:
+    cloud.googleapis.com/location: us-west1
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "3"
+        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/cloudsql-instances: wellness-experience-management:us-west1:wxm-pg
+        run.googleapis.com/container-dependencies: '{"careers":["postgrest"]}'
+    spec:
+      serviceAccountName: sa-careers-run@wellness-experience-management.iam.gserviceaccount.com
+      containerConcurrency: 40
+      timeoutSeconds: 600
+      containers:
+        - name: careers
+          image: us-west1-docker.pkg.dev/wellness-experience-management/trading/careers:gcp-stg
+          ports:
+            - containerPort: 8080
+          resources:
+            limits: { cpu: "1", memory: 1Gi }
+          env:
+            - { name: POSTGREST_DIRECTO, value: "1" }
+            - name: SUPABASE_JWT_SECRET
+              valueFrom: { secretKeyRef: { name: prod-careers-postgrest-jwt-secret, key: latest } }
+            # Tablas que venían de Neon: esquema `neon`, rol careers_app
+            # (su search_path ya apunta ahí). postgres.js lee PG*.
+            - { name: PGHOST, value: "/cloudsql/wellness-experience-management:us-west1:wxm-pg" }
+            - { name: PGUSER, value: careers_app }
+            - { name: PGDATABASE, value: careers_stg }
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: prod-cloudsql-careers_app-password, key: latest } }
+            - { name: ARCHIVOS_GCS_BUCKET, value: wellness-experience-management-careers-archivos }
+            # IA: Gemini en Vertex AI (src/lib/gemini.ts), facturado al mismo
+            # proyecto. Sin llave: entra con la cuenta de servicio.
+            - { name: GEMINI_VERTEX_PROJECT_ID, value: wellness-experience-management }
+            - { name: GEMINI_REGION, value: global }
+            - { name: GEMINI_MODELO_PRO, value: gemini-3.1-pro-preview }
+            - { name: GEMINI_MODELO_RAPIDO, value: gemini-3-flash-preview }
+            # Razonamiento alto: en la evaluación de candidatos coincidió con
+            # Claude en 11 de 12 criterios (bajo: 10); tarda ~45 s en vez de 10.
+            - { name: GEMINI_RAZONAMIENTO, value: high }
+            - name: ADMIN_SECRET
+              valueFrom: { secretKeyRef: { name: stg-careers-gcp-ADMIN_SECRET, key: latest } }
+            - name: CRON_SECRET
+              valueFrom: { secretKeyRef: { name: stg-careers-gcp-CRON_SECRET, key: latest } }
+            - name: WXM_SERVICE_SECRET
+              valueFrom: { secretKeyRef: { name: stg-careers-gcp-WXM_SERVICE_SECRET, key: latest } }
+
+        - name: postgrest
+          image: docker.io/postgrest/postgrest:v16.5
+          resources:
+            limits: { cpu: "1", memory: 256Mi }
+          env:
+            - { name: PGRST_DB_URI, value: "postgres:///careers_stg?host=/cloudsql/wellness-experience-management:us-west1:wxm-pg&user=authenticator" }
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: prod-cloudsql-authenticator-password, key: latest } }
+            - { name: PGRST_DB_SCHEMAS, value: public }
+            - { name: PGRST_DB_ANON_ROLE, value: anon }
+            - { name: PGRST_DB_POOL, value: "5" }
+            - { name: PGRST_SERVER_HOST, value: 0.0.0.0 }
+            - { name: PGRST_SERVER_PORT, value: "3001" }
+            - name: PGRST_JWT_SECRET
+              valueFrom: { secretKeyRef: { name: prod-careers-postgrest-jwt-secret, key: latest } }
+          startupProbe:
+            tcpSocket: { port: 3001 }
+            periodSeconds: 2
+            failureThreshold: 30

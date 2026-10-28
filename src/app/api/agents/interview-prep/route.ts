@@ -26,7 +26,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 import { getAnthropic } from "@/lib/anthropic";
 
 export const runtime = "nodejs";

@@ -3,22 +3,34 @@
 import { useState, useMemo, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import PublicPage from "@/components/PublicPage";
 import { useLanguage } from "@/i18n/context";
-import { fetchOpenJobs, deriveDepartments, deriveModes, type Job } from "@/lib/vacancies-adapter";
-import { Search, MapPin, Briefcase, ArrowUpRight, ArrowLeft } from "lucide-react";
+import { fill } from "@/i18n/translations";
+import { fetchOpenJobs, deriveModes, type Job } from "@/lib/vacancies-adapter";
+import { AREAS, areaOf, isAreaKey, type AreaKey } from "@/lib/areas";
+import { Search, MapPin, Briefcase, ArrowRight } from "lucide-react";
 
 function VacantesContent() {
   const searchParams = useSearchParams();
-  const initialDept = searchParams.get("dept") || "all";
+  // ?area=operations|corporate|commercial (home). ?dept=Operaciones sigue
+  // funcionando para enlaces viejos (newsletter, LinkedIn).
+  const areaParam = searchParams.get("area");
+  const deptParam = searchParams.get("dept");
+  const initialArea: AreaKey | "all" = isAreaKey(areaParam) ? areaParam : deptParam ? areaOf(deptParam) : "all";
   const { t, locale } = useLanguage();
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [deptFilter, setDeptFilter] = useState(initialDept);
+  const [search, setSearch] = useState(searchParams.get("q") || "");
+  const [areaFilter, setAreaFilter] = useState<AreaKey | "all">(initialArea);
   const [modeFilter, setModeFilter] = useState("all");
+
+  // El buscador ⌘K del shell navega a /vacantes?q=…; si ya estamos aquí,
+  // el parámetro cambia sin remontar la página.
+  const qParam = searchParams.get("q");
+  useEffect(() => {
+    if (qParam !== null) setSearch(qParam);
+  }, [qParam]);
 
   useEffect(() => {
     let active = true;
@@ -34,12 +46,11 @@ function VacantesContent() {
     };
   }, []);
 
-  const departments = useMemo(() => deriveDepartments(jobs), [jobs]);
   const modes = useMemo(() => deriveModes(jobs), [jobs]);
 
   const filtered = useMemo(() => {
     return jobs.filter((j) => {
-      if (deptFilter !== "all" && j.dept !== deptFilter) return false;
+      if (areaFilter !== "all" && areaOf(j.dept) !== areaFilter) return false;
       if (modeFilter !== "all" && j.mode !== modeFilter) return false;
       if (search) {
         const s = search.toLowerCase();
@@ -48,167 +59,144 @@ function VacantesContent() {
       }
       return true;
     });
-  }, [jobs, search, deptFilter, modeFilter, locale]);
+  }, [jobs, search, areaFilter, modeFilter, locale]);
 
   const resetFilters = () => {
     setSearch("");
-    setDeptFilter("all");
+    setAreaFilter("all");
     setModeFilter("all");
   };
 
   const deptName = (d: string) => (t.deptNames as Record<string, string>)[d] || d;
   const modeName = (m: string) => (t.modeNames as Record<string, string>)[m] || m;
+  // Solo el filtro de equipo explica el vacío: mostrar el estado de área.
+  const soloArea = areaFilter !== "all" && !search && modeFilter === "all";
 
   return (
-    <>
-      <Navbar />
-      <div className="pt-28">
-        <section className="py-12 md:py-16 bg-ts-canvas min-h-screen">
-          <div className="max-w-ts mx-auto px-6 lg:px-10">
-            {/* Header */}
-            <div className="mb-10">
-              <Link
-                href="/"
-                className="flex items-center gap-2 text-sm text-ts-muted hover:text-ts-accent mb-6 transition-colors"
-              >
-                <ArrowLeft size={16} />
-                {t.jobs.backHome}
-              </Link>
-              <h1 className="section-title mb-2">{t.jobs.pageTitle}</h1>
-              <p className="text-ts-secondary">{t.jobs.pageSubtitle}</p>
-            </div>
+    <PublicPage>
+      <Link className="back" href="/">‹ {t.shell.home}</Link>
 
-            {/* Search */}
-            <div className="mb-8">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type="text"
-                  placeholder={t.jobs.searchPlaceholder}
-                  className="input-field pl-12"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* Filters */}
-            <div className="mb-10 space-y-4">
-              <div className="flex flex-wrap gap-3">
-                <span className="text-sm font-medium text-ts-muted self-center mr-2">
-                  {t.jobs.deptLabel}
-                </span>
-                <button
-                  className={`filter-chip ${deptFilter === "all" ? "active" : ""}`}
-                  onClick={() => setDeptFilter("all")}
-                >
-                  {t.jobs.all}
-                </button>
-                {departments.map((d) => (
-                  <button
-                    key={d}
-                    className={`filter-chip ${deptFilter === d ? "active" : ""}`}
-                    onClick={() => setDeptFilter(d)}
-                  >
-                    {deptName(d)}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <span className="text-sm font-medium text-ts-muted self-center mr-2">
-                  {t.jobs.modeLabel}
-                </span>
-                <button
-                  className={`filter-chip ${modeFilter === "all" ? "active" : ""}`}
-                  onClick={() => setModeFilter("all")}
-                >
-                  {t.jobs.allFem}
-                </button>
-                {modes.map((m) => (
-                  <button
-                    key={m}
-                    className={`filter-chip ${modeFilter === m ? "active" : ""}`}
-                    onClick={() => setModeFilter(m)}
-                  >
-                    {modeName(m)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Loading */}
-            {loading ? (
-              <div className="text-center py-16">
-                <p className="text-gray-400 text-lg">{locale === "es" ? "Cargando vacantes..." : "Loading positions..."}</p>
-              </div>
-            ) : (
-            <>
-            {/* Count */}
-            <p className="text-sm text-gray-500 mb-6">
-              {filtered.length} {filtered.length === 1 ? t.jobs.resultsSingular : t.jobs.resultsPlural}
-            </p>
-
-            {/* Grid */}
-            {filtered.length > 0 ? (
-              <div className="grid md:grid-cols-2 gap-5">
-                {filtered.map((job) => (
-                  <Link
-                    key={job.id}
-                    href={`/vacantes/${job.id}`}
-                    className="bg-ts-surface rounded-ts-lg p-7 border border-[color:var(--ts-line)] hover:border-ts-accent hover:-translate-y-1 transition-all duration-300"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="font-medium text-lg mb-1">{job.title[locale]}</h3>
-                        <p className="text-sm text-ts-muted">{deptName(job.dept)}</p>
-                      </div>
-                      <span className="tag">{job.level}</span>
-                    </div>
-                    <p className="text-sm text-ts-secondary mb-5 leading-relaxed">
-                      {job.description[locale].substring(0, 120)}...
-                    </p>
-                    <div className="flex flex-wrap gap-2 mb-5">
-                      {job.tags.map((tag) => (
-                        <span key={tag} className="tag">{tag}</span>
-                      ))}
-                    </div>
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                      <div className="flex items-center gap-4">
-                        <span className="flex items-center gap-1.5 text-xs text-gray-500">
-                          <MapPin size={13} />
-                          {job.location}
-                        </span>
-                        <span className="flex items-center gap-1.5 text-xs text-gray-500">
-                          <Briefcase size={13} />
-                          {modeName(job.mode)}
-                        </span>
-                      </div>
-                      <ArrowUpRight size={16} className="text-ts-accent" />
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-16">
-                <p className="text-gray-400 text-lg">{t.jobs.noResults}</p>
-                <button onClick={resetFilters} className="pill-btn pill-btn-outline mt-4 text-sm">
-                  {t.jobs.clearFilters}
-                </button>
-              </div>
-            )}
-            </>
-            )}
-          </div>
-        </section>
+      <div className="sec-head">
+        <div className="left">
+          <div className="eyebrow">{t.shell.roles}</div>
+          <h1 className="page-title">{t.jobs.pageTitle}</h1>
+          <p className="sub">
+            {t.jobs.pageSubtitle} <Link href="/#unete">{t.pool.cta} →</Link>
+          </p>
+        </div>
       </div>
-      <Footer />
-    </>
+
+      <div className="jobs-toolbar">
+        <div className="search-jobs">
+          <Search aria-hidden />
+          <input
+            type="search"
+            aria-label={t.jobs.searchLabel}
+            placeholder={t.jobs.searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
+        <div className="filters">
+          <div className="group" role="group" aria-label={t.jobs.areaLabel}>
+            <span className="lab">{t.jobs.areaLabel}</span>
+            <button type="button" className={areaFilter === "all" ? "is-on" : ""} aria-pressed={areaFilter === "all"} onClick={() => setAreaFilter("all")}>
+              {t.jobs.all}
+            </button>
+            {AREAS.map((a) => (
+              <button key={a} type="button" className={areaFilter === a ? "is-on" : ""} aria-pressed={areaFilter === a} onClick={() => setAreaFilter(a)}>
+                {t.areas[a].title}
+              </button>
+            ))}
+          </div>
+          {modes.length > 1 && (
+            <div className="group" role="group" aria-label={t.jobs.modeLabel}>
+              <span className="lab">{t.jobs.modeLabel}</span>
+              <button type="button" className={modeFilter === "all" ? "is-on" : ""} aria-pressed={modeFilter === "all"} onClick={() => setModeFilter("all")}>
+                {t.jobs.all}
+              </button>
+              {modes.map((m) => (
+                <button key={m} type="button" className={modeFilter === m ? "is-on" : ""} aria-pressed={modeFilter === m} onClick={() => setModeFilter(m)}>
+                  {modeName(m)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {!loading && (
+          <div className="jobs-count" aria-live="polite">
+            {filtered.length === 1 ? t.jobs.resultsOne : fill(t.jobs.resultsMany, { n: filtered.length })}
+          </div>
+        )}
+      </div>
+
+      <div className="jobs-grid">
+        {loading ? (
+          <>
+            <div className="skeleton" aria-busy="true" aria-label={t.jobs.loading} />
+            <div className="skeleton" />
+          </>
+        ) : jobs.length === 0 ? (
+          <EmptyState title={t.jobs.allEmptyTitle} body={t.jobs.allEmptyBody} />
+        ) : filtered.length > 0 ? (
+          filtered.map((job) => (
+            <Link key={job.id} href={`/vacantes/${job.id}`} className="job">
+              <div className="top">
+                <span className="cat">
+                  {t.areas[areaOf(job.dept)].title}
+                  {deptName(job.dept) !== t.areas[areaOf(job.dept)].title && ` · ${deptName(job.dept)}`}
+                </span>
+                {job.level && <span className="lvl">{job.level}</span>}
+              </div>
+              <h2 style={{ font: "700 17px/1.25 var(--font)", letterSpacing: "-.015em" }}>{job.title[locale]}</h2>
+              <p className="desc">{job.description[locale]}</p>
+              <div className="foot">
+                <div className="meta">
+                  {job.location && <span><MapPin size={12} aria-hidden />{job.location}</span>}
+                  <span><Briefcase size={12} aria-hidden />{modeName(job.mode)}</span>
+                </div>
+                <span className="arrow" aria-label={t.jobs.cardCta}>
+                  <ArrowRight aria-hidden />
+                </span>
+              </div>
+            </Link>
+          ))
+        ) : soloArea ? (
+          <EmptyState
+            title={fill(t.jobs.areaEmptyTitle, { Area: t.areas[areaFilter as AreaKey].title })}
+            body={t.jobs.areaEmptyBody}
+            cta={t.jobs.areaEmptyCta}
+            onCta={resetFilters}
+          />
+        ) : (
+          <EmptyState title={t.jobs.noResults} cta={t.jobs.clearFilters} onCta={resetFilters} />
+        )}
+      </div>
+    </PublicPage>
+  );
+}
+
+/** Estado vacío del preview: siempre deja la salida al talent pool. */
+function EmptyState({ title, body, cta, onCta }: { title: string; body?: string; cta?: string; onCta?: () => void }) {
+  const { t } = useLanguage();
+  return (
+    <div className="jobs-empty">
+      <h3>{title}</h3>
+      <p>
+        {body ? `${body} ` : ""}
+        <Link className="inline-link" href="/#unete">{t.pool.cta} →</Link>
+      </p>
+      {cta && onCta && (
+        <button type="button" onClick={onCta} className="btn-ghost-text">{cta}</button>
+      )}
+    </div>
   );
 }
 
 export default function VacantesPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+    <Suspense fallback={<div className="uv" />}>
       <VacantesContent />
     </Suspense>
   );

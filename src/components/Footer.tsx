@@ -2,59 +2,73 @@
 
 import Link from "next/link";
 import { useLanguage } from "@/i18n/context";
-import { LOGO_TS, LOGO_TS_CLASE_EN_OSCURO } from "@/lib/brand";
+import { UNIVERSE_SIMBOLO } from "@/lib/brand";
+
+/**
+ * Pie del preview AJUSTE (pack rev J): marca, Careers, servicios y compañía.
+ * Todo enlace va a una sección real o a páginas de tradingsolutions.com
+ * verificadas el 27-oct; nada de "#". Sin redes: el sitio corporativo no
+ * publica ninguna.
+ */
+const CORP = "https://tradingsolutions.com";
 
 export default function Footer() {
   const { t } = useLanguage();
 
+  const careers = [
+    { label: t.shell.roles, href: "/vacantes" },
+    { label: t.pool.cta, href: "/#unete" },
+    { label: t.shell.people, href: "/#gente" },
+    { label: t.shell.culture, href: "/#cultura" },
+    { label: t.nav.hire, href: "/#crecer" },
+  ];
+  const services = [
+    { label: "Maritime", href: `${CORP}/services/maritime` },
+    { label: "Ground", href: `${CORP}/services/ground` },
+    { label: "Air", href: `${CORP}/services/air` },
+    { label: "Customs", href: `${CORP}/services/customs` },
+  ];
+  const company = [
+    { label: "tradingsolutions.com", href: CORP },
+    { label: t.footer.about, href: `${CORP}/company/about` },
+    { label: t.footer.contact, href: `${CORP}/company/contact` },
+  ];
+
   return (
-    <footer className="bg-ts-ink text-white py-16">
-      <div className="max-w-ts mx-auto px-6 lg:px-10">
-        <div className="grid md:grid-cols-4 gap-10 mb-12">
-          <div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={LOGO_TS}
-              alt="Trading Solutions"
-              className={`h-8 w-auto mb-6 ${LOGO_TS_CLASE_EN_OSCURO}`}
-            />
-            <p className="text-sm text-white/60 leading-relaxed">{t.footer.tagline}</p>
-          </div>
-          <div>
-            <h4 className="font-bold text-sm mb-4">{t.footer.services}</h4>
-            <div className="space-y-3">
-              <a href="https://tradingsolutions.com" target="_blank" rel="noopener" className="block text-sm text-white/70 hover:text-ts-accent transition-colors">Maritime</a>
-              <a href="https://tradingsolutions.com" target="_blank" rel="noopener" className="block text-sm text-white/70 hover:text-ts-accent transition-colors">Ground</a>
-              <a href="https://tradingsolutions.com" target="_blank" rel="noopener" className="block text-sm text-white/70 hover:text-ts-accent transition-colors">Air</a>
-              <a href="https://tradingsolutions.com" target="_blank" rel="noopener" className="block text-sm text-white/70 hover:text-ts-accent transition-colors">Customs</a>
+    <footer className="footer">
+      <div className="footer-inner">
+        <div className="foot-grid">
+          <div className="foot-brand">
+            <div className="wm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={UNIVERSE_SIMBOLO} alt="" width={22} height={22} /> Trading Solutions.
             </div>
+            <p>
+              {t.footer.tagline} {t.footer.hq}.
+            </p>
           </div>
-          <div>
-            <h4 className="font-bold text-sm mb-4">{t.footer.company}</h4>
-            <div className="space-y-3">
-              <a href="https://tradingsolutions.com" target="_blank" rel="noopener" className="block text-sm text-white/70 hover:text-ts-accent transition-colors">{t.footer.companyAbout}</a>
-              <Link href="/" className="block text-sm text-white/70 hover:text-ts-accent transition-colors">{t.footer.companyCareers}</Link>
-              <a href="https://tradingsolutions.com" target="_blank" rel="noopener" className="block text-sm text-white/70 hover:text-ts-accent transition-colors">{t.footer.companyContact}</a>
-            </div>
+          <div className="foot-col">
+            <h4>{t.footer.careers}</h4>
+            {careers.map((l) => (
+              <Link key={l.href} href={l.href}>{l.label}</Link>
+            ))}
           </div>
-          <div>
-            <h4 className="font-bold text-sm mb-4">{t.footer.followUs}</h4>
-            <div className="flex gap-3">
-              <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
-              </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="5" ry="5" stroke="white" strokeWidth="2"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" stroke="white" strokeWidth="2" fill="none"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" stroke="white" strokeWidth="2" strokeLinecap="round"/></svg>
-              </a>
-            </div>
+          <div className="foot-col">
+            <h4>{t.footer.services}</h4>
+            {services.map((l) => (
+              <a key={l.href} href={l.href} target="_blank" rel="noopener">{l.label}</a>
+            ))}
+          </div>
+          <div className="foot-col">
+            <h4>{t.footer.company}</h4>
+            {company.map((l) => (
+              <a key={l.href} href={l.href} target="_blank" rel="noopener">{l.label}</a>
+            ))}
           </div>
         </div>
-        <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-xs text-gray-600">&copy; Trading Solutions 2026. {t.footer.rights}</p>
-          <div className="flex gap-6">
-            <a href="#" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">{t.footer.legal}</a>
-            <a href="#" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">{t.footer.privacy}</a>
-          </div>
+        <div className="foot-bottom">
+          <span>{t.footer.rights}</span>
+          <a href={`${CORP}/company/legal`} target="_blank" rel="noopener">{t.footer.legal}</a>
         </div>
       </div>
     </footer>

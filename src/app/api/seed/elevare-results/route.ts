@@ -14,7 +14,7 @@
  * Llamar UNA VEZ:
  *   curl -X POST https://trading-solutions-careers.vercel.app/api/seed/elevare-results
  */
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";

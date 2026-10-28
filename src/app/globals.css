@@ -1,4 +1,5 @@
 @import "../styles/universe-tokens.css";
+@import "../styles/universe-shell.css";
 
 @tailwind base;
 @tailwind components;

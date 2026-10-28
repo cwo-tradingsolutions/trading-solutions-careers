@@ -16,7 +16,7 @@
  *   POST   /api/assessment-preview?op=complete → marcar run como completo + computar reporte
  *   GET    /api/assessment-preview?run_id=X  → leer un run para revisar después
  */
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 import { NextRequest, NextResponse } from "next/server";
 import { TS_SCENARIOS } from "@/lib/headhunting/scenarios-ts";
 import { TS_BENCHMARK_STATS, TS_DNA_PATTERNS } from "@/lib/headhunting/calibration-data";

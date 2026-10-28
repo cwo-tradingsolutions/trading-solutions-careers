@@ -3,7 +3,7 @@
  *   GET   → datos del token (para la pantalla del candidato y para resultados)
  *   PATCH → actualizar status / score / results
  */
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 import { NextRequest, NextResponse } from "next/server";
 
 const corsHeaders = {

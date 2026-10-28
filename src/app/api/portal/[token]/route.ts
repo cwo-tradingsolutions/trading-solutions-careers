@@ -5,7 +5,7 @@
  * una aplicación dado un portal_token HMAC. El candidato no ve scores ni
  * datos internos — solo su progreso en el funnel y próximo paso esperado.
  */
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyPortalToken, isValidSignatureFor } from "@/lib/portal-token";
 import { resolveCandidateLang, type CandidateLang } from "@/lib/candidate-lang";

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { LanguageProvider } from "@/i18n/context";
+import { translations } from "@/i18n/translations";
 import "./globals.css";
 
 /**
@@ -14,9 +15,19 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
+// Metadatos del portal público (inglés, copy pack Bernabé). HR Admin define
+// los suyos en hr-admin/layout.tsx.
+const meta = translations.en.meta;
+
 export const metadata: Metadata = {
-  title: "Careers — Trading Solutions",
-  description: "Únete al equipo que mueve el mundo. Explora oportunidades en Trading Solutions.",
+  title: meta.title,
+  description: meta.description,
+  openGraph: {
+    title: meta.ogTitle,
+    description: meta.ogDescription,
+    type: "website",
+    images: [{ url: "/careers/hero-miami-port.jpg", width: 2000, height: 1250 }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
