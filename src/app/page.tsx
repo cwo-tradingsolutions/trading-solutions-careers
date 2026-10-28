@@ -8,7 +8,7 @@ import Footer from "@/components/Footer";
 import { useLanguage } from "@/i18n/context";
 import { countLabel } from "@/i18n/translations";
 import { fetchOpenJobs, type Job } from "@/lib/vacancies-adapter";
-import { AREA_KEYS, countByArea, type AreaKey } from "@/lib/careers-areas";
+import { AREA_KEYS, areaOf, countByArea, type AreaKey } from "@/lib/careers-areas";
 import { ArrowRight, ArrowUpRight, Search, MapPin, Route, Anchor, Ear, BookOpen, Globe, Heart, Eye } from "lucide-react";
 
 const AREA_IMAGES: Record<AreaKey, string> = {
@@ -24,19 +24,22 @@ export default function HomePage() {
   const { t } = useLanguage();
   const router = useRouter();
   const [jobs, setJobs] = useState<Job[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [q, setQ] = useState("");
 
   useEffect(() => {
     let active = true;
-    fetchOpenJobs().then((list) => active && setJobs(list));
+    setLoadError(false);
+    fetchOpenJobs().then((list) => active && setJobs(list)).catch(() => active && setLoadError(true));
     return () => {
       active = false;
     };
-  }, []);
+  }, [attempt]);
 
   const counts = useMemo(() => (jobs ? countByArea(jobs) : null), [jobs]);
   const latest = useMemo(() => (jobs ? jobs.slice(0, 3) : []), [jobs]);
-  const deptName = (d: string) => t.deptNames[d] || d;
+  const deptName = (d: string) => t.deptNames[d] || t.areas.items[areaOf(d)].title;
   const modeName = (m: string) => t.modeNames[m] || m;
 
   const onSearch = (e: FormEvent) => {
@@ -53,49 +56,30 @@ export default function HomePage() {
         {/* ── HERO · cinematic rounded inset on canvas ── */}
         <section className="px-4 sm:px-6 lg:px-10 pt-4 md:pt-8">
           <div className="max-w-[1320px] mx-auto">
-            <div className="relative overflow-hidden rounded-ts-lg md:rounded-[28px] bg-ts-ink">
+            <div className="relative md:overflow-hidden md:rounded-[28px]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/careers/hero-miami-port.webp"
                 alt={t.hero.imageAlt}
-                className="w-full h-[300px] sm:h-[380px] md:h-[min(76vh,700px)] object-cover"
+                className="w-full h-[300px] sm:h-[380px] md:h-[min(76vh,700px)] object-cover rounded-ts-lg md:rounded-none"
                 fetchPriority="high"
               />
               <div className="hidden md:block absolute inset-0 hero-scrim" aria-hidden />
-              <div className="hidden md:flex absolute inset-0 items-end">
-                <div className="p-12 lg:p-16 max-w-[820px] text-white">
-                  <p className="ts-kicker ts-kicker-on-dark mb-5">
-                    <span className="ts-mark" aria-hidden />
-                    {t.hero.eyebrow}
-                  </p>
+              <div className="pt-7 pb-2 md:p-12 lg:p-16 md:absolute md:inset-0 md:flex md:flex-col md:justify-end md:text-white">
+                <div className="max-w-[700px]">
+                  <p className="ts-kicker md:text-white/85 mb-5">{t.hero.eyebrow}</p>
                   <h1 className="hero-text mb-6">{t.hero.title}</h1>
-                  <p className="text-lg text-white/85 leading-relaxed max-w-[620px] mb-8">{t.hero.body}</p>
-                  <div className="flex flex-wrap gap-3">
-                    <Link href="/vacantes" className="pill-btn pill-btn-primary text-base">
+                  <p className="text-base md:text-lg text-ts-secondary md:text-white/90 leading-relaxed max-w-[620px] mb-8">{t.hero.body}</p>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Link href="/vacantes" className="pill-btn pill-btn-primary justify-center text-base">
                       {t.hero.ctaPrimary}
                       <ArrowRight size={16} strokeWidth={2.25} />
                     </Link>
-                    <a href="#how-we-hire" className="pill-btn pill-btn-glass text-base">
+                    <a href="#how-we-hire" className="pill-btn justify-center text-base bg-white text-ts-ink md:bg-white/15 md:text-white border border-[color:var(--ts-line)] md:border-white/40 hover:bg-ts-canvas md:hover:bg-white/25">
                       {t.hero.ctaSecondary}
                     </a>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Mobile: copy sits below the photo, on canvas */}
-            <div className="md:hidden pt-7 pb-2">
-              <p className="ts-kicker mb-4">{t.hero.eyebrow}</p>
-              <h1 className="hero-text mb-5">{t.hero.title}</h1>
-              <p className="text-base text-ts-secondary leading-relaxed mb-7">{t.hero.body}</p>
-              <div className="flex flex-col gap-3">
-                <Link href="/vacantes" className="pill-btn pill-btn-primary justify-center text-base">
-                  {t.hero.ctaPrimary}
-                  <ArrowRight size={16} strokeWidth={2.25} />
-                </Link>
-                <a href="#how-we-hire" className="pill-btn pill-btn-outline justify-center text-base">
-                  {t.hero.ctaSecondary}
-                </a>
               </div>
             </div>
           </div>
@@ -233,6 +217,13 @@ export default function HomePage() {
                 );
               })}
             </div>
+
+            {loadError && (
+              <div role="alert" className="mt-10 bg-ts-canvas rounded-ts-lg p-6">
+                <p>{t.jobs.loadError}</p>
+                <button onClick={() => setAttempt((n) => n + 1)} className="pill-btn pill-btn-outline mt-4">{t.jobs.retry}</button>
+              </div>
+            )}
 
             {/* Latest roles — discovery stays visible on the home page */}
             {jobs && (

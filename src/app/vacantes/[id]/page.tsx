@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useLanguage } from "@/i18n/context";
 import { fetchOpenJobs, type Job } from "@/lib/vacancies-adapter";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { areaOf } from "@/lib/careers-areas";
 import { MapPin, Briefcase, Check, ArrowRight, Upload, X, CheckCircle2, Layers } from "lucide-react";
 
@@ -42,6 +43,8 @@ export default function JobDetailPage() {
   const { t } = useLanguage();
 
   const [job, setJob] = useState<Job | undefined>(undefined);
+  const [loadError, setLoadError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showApply, setShowApply] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -50,22 +53,30 @@ export default function JobDetailPage() {
   const [dragOver, setDragOver] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(showApply || submitted, dialogRef, submitted ? "success" : "apply");
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setJob(undefined);
+    setLoadError(false);
     fetchOpenJobs()
       .then((list) => active && setJob(list.find((j) => j.id === Number(id))))
+      .catch(() => active && setLoadError(true))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, attempt]);
 
   // Modal: lock scroll + Escape to close
   useEffect(() => {
     const open = showApply || submitted;
-    document.body.style.overflow = open ? "hidden" : "";
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setShowApply(false);
@@ -74,13 +85,13 @@ export default function JobDetailPage() {
     };
     if (open) window.addEventListener("keydown", onKey);
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKey);
     };
   }, [showApply, submitted]);
 
   const modeName = (m: string) => t.modeNames[m] || m;
-  const deptName = (d: string) => t.deptNames[d] || d;
+  const deptName = (d: string) => t.deptNames[d] || t.areas.items[areaOf(d)].title;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -108,8 +119,9 @@ export default function JobDetailPage() {
         <Navbar />
         <main className="bg-ts-canvas min-h-[70vh] px-4 sm:px-6 lg:px-10 py-20">
           <div className="max-w-xl mx-auto bg-ts-surface rounded-ts-lg border border-[color:var(--ts-line)] p-10 text-center">
-            <h1 className="text-3xl font-light tracking-ts-tight mb-3">{t.jobs.notFound}</h1>
-            <p className="text-ts-secondary mb-8">{t.jobs.notFoundBody}</p>
+            <h1 className="text-3xl font-light tracking-ts-tight mb-3">{loadError ? t.jobs.loadError : t.jobs.notFound}</h1>
+            <p className="text-ts-secondary mb-8">{!loadError && t.jobs.notFoundBody}</p>
+            {loadError && <button onClick={() => setAttempt((n) => n + 1)} className="pill-btn pill-btn-primary mr-3">{t.jobs.retry}</button>}
             <Link href="/vacantes" className="pill-btn pill-btn-primary">
               {t.jobs.backToRoles}
             </Link>
@@ -124,6 +136,7 @@ export default function JobDetailPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting || error === t.jobs.cvInvalid) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -131,8 +144,9 @@ export default function JobDetailPage() {
       let cv_data = null;
       if (cvFile) {
         cv_filename = cvFile.name;
-        cv_data = await new Promise<string>((resolve) => {
+        cv_data = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
+          reader.onerror = () => reject(new Error("Could not read CV"));
           reader.onload = () => resolve(reader.result as string);
           reader.readAsDataURL(cvFile);
         });
@@ -164,7 +178,16 @@ export default function JobDetailPage() {
   };
 
   const pickFile = (f?: File | null) => {
-    if (f) setCvFile(f);
+    if (!f) return;
+    if (!/\.(pdf|doc|docx)$/i.test(f.name) || f.size > 3 * 1024 * 1024) {
+      setCvFile(null);
+      setError(t.jobs.cvInvalid);
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    setError(null);
+    setCvFile(f);
+    if (fileRef.current) fileRef.current.value = "";
   };
 
   return (
@@ -244,7 +267,7 @@ export default function JobDetailPage() {
                 <p className="text-sm text-ts-muted mb-1">{area}</p>
                 <p className="text-lg font-medium text-ts-ink mb-1">{job.title.en}</p>
                 {job.salary && <p className="text-sm text-ts-secondary">{job.salary}</p>}
-                <button onClick={() => setShowApply(true)} className="pill-btn pill-btn-primary w-full justify-center text-base mt-6">
+                <button onClick={() => { setError(null); setShowApply(true); }} className="pill-btn pill-btn-primary w-full justify-center text-base mt-6">
                   {t.jobs.apply}
                   <ArrowRight size={16} strokeWidth={2.25} />
                 </button>
@@ -256,7 +279,7 @@ export default function JobDetailPage() {
 
         {/* Apply bar (mobile / tablet) */}
         <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[color:var(--ts-line)] px-4 py-3">
-          <button onClick={() => setShowApply(true)} className="pill-btn pill-btn-primary w-full justify-center text-base">
+          <button onClick={() => { setError(null); setShowApply(true); }} className="pill-btn pill-btn-primary w-full justify-center text-base">
             {t.jobs.apply}
             <ArrowRight size={16} strokeWidth={2.25} />
           </button>
@@ -270,6 +293,8 @@ export default function JobDetailPage() {
           onClick={(e) => { if (e.target === e.currentTarget) setShowApply(false); }}
         >
           <div
+            ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-labelledby="apply-title"
@@ -361,7 +386,7 @@ export default function JobDetailPage() {
                 <button type="button" onClick={() => setShowApply(false)} className="pill-btn pill-btn-outline justify-center">
                   {t.jobs.cancel}
                 </button>
-                <button type="submit" disabled={submitting} className="pill-btn pill-btn-primary flex-1 justify-center disabled:opacity-50">
+                <button type="submit" disabled={submitting || error === t.jobs.cvInvalid} className="pill-btn pill-btn-primary flex-1 justify-center disabled:opacity-50">
                   {submitting ? t.jobs.submitting : t.jobs.submit}
                   {!submitting && <ArrowRight size={16} strokeWidth={2.25} />}
                 </button>
@@ -377,7 +402,7 @@ export default function JobDetailPage() {
           className="fixed inset-0 z-[70] bg-[rgba(8,20,32,0.45)] backdrop-blur-sm flex items-center justify-center p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setSubmitted(false); }}
         >
-          <div role="dialog" aria-modal="true" aria-labelledby="ok-title" className="bg-ts-surface rounded-ts-lg max-w-[460px] w-full p-10 text-center">
+          <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="ok-title" className="bg-ts-surface rounded-ts-lg max-w-[460px] w-full p-10 text-center">
             <div className="w-14 h-14 rounded-full bg-[var(--ts-blue-bg)] text-ts-accent flex items-center justify-center mx-auto mb-6">
               <CheckCircle2 size={26} aria-hidden />
             </div>

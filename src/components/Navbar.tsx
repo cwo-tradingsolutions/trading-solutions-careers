@@ -16,9 +16,14 @@ export default function Navbar() {
   const { t } = useLanguage();
 
   useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
     };
   }, [open]);
 
@@ -37,7 +42,7 @@ export default function Navbar() {
           <img src={LOGO_TS} alt={t.logoAlt} className="h-6 md:h-7 w-auto" />
         </Link>
 
-        <nav className="hidden md:flex items-center gap-1" aria-label="Main">
+        <nav className="hidden lg:flex items-center gap-1" aria-label="Main">
           {links.map((l) => (
             <Link
               key={l.href}
@@ -49,7 +54,7 @@ export default function Navbar() {
           ))}
         </nav>
 
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden lg:flex items-center gap-3">
           <span
             className="inline-flex items-center gap-1.5 text-xs font-medium text-ts-muted px-2.5 py-1 rounded-full border border-[color:var(--ts-line)]"
             aria-label={t.localeAria}
@@ -65,7 +70,7 @@ export default function Navbar() {
 
         <button
           onClick={() => setOpen(!open)}
-          className="md:hidden -mr-2 p-2 rounded-ts-sm text-ts-ink"
+          className="lg:hidden -mr-2 p-2 rounded-ts-sm text-ts-ink"
           aria-expanded={open}
           aria-controls="mobile-nav"
           aria-label={t.nav.menu}
@@ -75,7 +80,7 @@ export default function Navbar() {
       </div>
 
       {open && (
-        <div id="mobile-nav" className="md:hidden border-t border-[color:var(--ts-line)] bg-ts-surface h-[calc(100dvh-64px)] px-4 pt-4 pb-8 flex flex-col">
+        <div id="mobile-nav" className="lg:hidden border-t border-[color:var(--ts-line)] bg-ts-surface h-[calc(100dvh-64px)] md:h-[calc(100dvh-72px)] px-4 pt-4 pb-8 flex flex-col">
           <nav className="flex flex-col" aria-label="Main">
             {links.map((l) => (
               <Link

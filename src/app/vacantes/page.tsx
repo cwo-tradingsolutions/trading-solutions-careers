@@ -16,33 +16,39 @@ function VacantesContent() {
   const { t } = useLanguage();
 
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [loadError, setLoadError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(params.get("q") || "");
   const initialArea = params.get("area");
   const [area, setArea] = useState<AreaKey | "all">(isAreaKey(initialArea) ? initialArea : "all");
-  const [mode, setMode] = useState("all");
+  const [mode, setMode] = useState(params.get("mode") || "all");
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setLoadError(false);
     fetchOpenJobs()
       .then((list) => active && setJobs(list))
+      .catch(() => active && setLoadError(true))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, []);
+  }, [attempt]);
 
   // Keep ?area / ?q shareable without a navigation.
   useEffect(() => {
     const u = new URL(window.location.href);
     area === "all" ? u.searchParams.delete("area") : u.searchParams.set("area", area);
     search.trim() ? u.searchParams.set("q", search.trim()) : u.searchParams.delete("q");
+    mode === "all" ? u.searchParams.delete("mode") : u.searchParams.set("mode", mode);
     window.history.replaceState(null, "", u.toString());
-  }, [area, search]);
+  }, [area, search, mode]);
 
   const counts = useMemo(() => countByArea(jobs), [jobs]);
   const modes = useMemo(() => (jobs.length ? deriveModes(jobs) : []), [jobs]);
-  const deptName = (d: string) => t.deptNames[d] || d;
+  const deptName = (d: string) => t.deptNames[d] || t.areas.items[areaOf(d)].title;
   const modeName = (m: string) => t.modeNames[m] || m;
 
   const filtered = useMemo(() => {
@@ -143,6 +149,8 @@ function VacantesContent() {
                   <div key={i} className="h-[220px] rounded-ts-lg bg-ts-surface border border-[color:var(--ts-line)] animate-pulse" />
                 ))}
               </div>
+            ) : loadError ? (
+              <EmptyState title={t.jobs.loadError} body="" action={<button onClick={() => setAttempt((n) => n + 1)} className="pill-btn pill-btn-primary">{t.jobs.retry}</button>} />
             ) : jobs.length === 0 ? (
               <EmptyState title={t.empty.allTitle} body={t.empty.allBody} />
             ) : filtered.length === 0 ? (
