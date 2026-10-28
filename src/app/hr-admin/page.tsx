@@ -80,8 +80,7 @@ type Tab =
   | "vacantes"
   | "funnel"
   | "rubricas"
-  | "nuevebox"
-  | "plantillas";
+  | "nuevebox";
 
 const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -90,10 +89,9 @@ const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
   { id: "funnel", label: "Funnel", icon: Kanban },
   { id: "rubricas", label: "Rúbricas", icon: ClipboardCheck },
   { id: "nuevebox", label: "Decisiones", icon: Grid3x3 },
-  { id: "plantillas", label: "Plantillas", icon: SettingsIcon },
 ];
 
-const VALID_TABS: Tab[] = ["dashboard", "requisiciones", "vacantes", "funnel", "rubricas", "nuevebox", "plantillas"];
+const VALID_TABS: Tab[] = ["dashboard", "requisiciones", "vacantes", "funnel", "rubricas", "nuevebox"];
 
 /** Bookmarks de tabs que salieron del nav. Abren Funnel; el rediscovery HT y el gate 12 siguen. */
 const RETIRED_TO_FUNNEL = new Set(["onboarding", "cvbank"]);
@@ -129,7 +127,13 @@ export default function HRAdminPage() {
   const [gmailAuditOpen, setGmailAuditOpen] = useState(false);
   const [decisionsOpen, setDecisionsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<"metas" | "recordatorios">("metas");
   const [bancoVac, setBancoVac] = useState<{ id: string; title: string } | null>(null);
+
+  const openSettings = useCallback((section: "metas" | "recordatorios") => {
+    setSettingsSection(section);
+    setSettingsOpen(true);
+  }, []);
   const [sessionExpired, setSessionExpired] = useState(false);
 
   // Detector global de sesión expirada — interceptamos fetch para detectar 401
@@ -188,6 +192,12 @@ export default function HRAdminPage() {
   useEffect(() => {
     const onHash = () => {
       const h = readHash();
+      if (h === "plantillas") {
+        window.history.replaceState(null, "", "#dashboard");
+        setTabState("dashboard");
+        openSettings("recordatorios");
+        return;
+      }
       const retired = redirectRetiredHash(h);
       if (retired) {
         if (retired !== tab) setTabState(retired);
@@ -197,7 +207,15 @@ export default function HRAdminPage() {
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
-  }, [tab]);
+  }, [tab, openSettings]);
+
+  // #plantillas ya no es tab: abre Settings → Recordatorios (el editor de reglas).
+  useEffect(() => {
+    if (readHash() !== "plantillas") return;
+    window.history.replaceState(null, "", "#dashboard");
+    setTabState("dashboard");
+    openSettings("recordatorios");
+  }, [openSettings]);
 
   // Global Cmd+K / Ctrl+K shortcut to open search
   useEffect(() => {
@@ -272,9 +290,9 @@ export default function HRAdminPage() {
               <span>Agendar</span>
             </button>
             <button
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => openSettings("metas")}
               className="text-white/70 hover:text-white p-1.5"
-              title="Settings · metas del dashboard"
+              title="Settings · metas y recordatorios"
             >
               <SettingsIcon className="w-[18px] h-[18px]" />
             </button>
@@ -357,7 +375,6 @@ export default function HRAdminPage() {
         )}
         {tab === "rubricas" && <RubricasPanel />}
         {tab === "nuevebox" && <NueveBoxPanel />}
-        {tab === "plantillas" && <ReminderRulesEditor />}
       </main>
 
       {searchOpen && <CandidateSearchModal onClose={() => setSearchOpen(false)} onJumpFunnel={() => { setTab('funnel'); setSearchOpen(false); }} />}
@@ -371,7 +388,12 @@ export default function HRAdminPage() {
       }} />}
       {gmailAuditOpen && <GmailAuditModal onClose={() => setGmailAuditOpen(false)} />}
       {decisionsOpen && <DecisionNudgesModal onClose={() => setDecisionsOpen(false)} />}
-      {settingsOpen && <DashboardSettingsModal onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && (
+        <DashboardSettingsModal
+          initialSection={settingsSection}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
       {bancoVac && (
         <CVBankRediscoveryModal
           vacancyId={bancoVac.id}
@@ -6005,7 +6027,8 @@ type DashboardConfig = {
   updated_at: string | null;
 };
 
-function DashboardSettingsModal({ onClose }: { onClose: () => void }) {
+function DashboardSettingsModal({ onClose, initialSection = "metas" }: { onClose: () => void; initialSection?: "metas" | "recordatorios" }) {
+  const [section, setSection] = useState<"metas" | "recordatorios">(initialSection);
   const [config, setConfig] = useState<DashboardConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -6069,7 +6092,7 @@ function DashboardSettingsModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-5xl rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header negro estilo TS */}
         <div className="bg-black text-white px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -6078,7 +6101,9 @@ function DashboardSettingsModal({ onClose }: { onClose: () => void }) {
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-[2.5px] font-semibold text-white/55">Settings</div>
-              <div className="text-base font-bold tracking-tight">Metas del Dashboard</div>
+              <div className="text-base font-bold tracking-tight">
+                {section === "recordatorios" ? "Recordatorios" : "Metas del Dashboard"}
+              </div>
             </div>
           </div>
           <button onClick={onClose} className="text-white/60 hover:text-white">
@@ -6086,8 +6111,26 @@ function DashboardSettingsModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <div className="p-6">
-          {loading ? (
+        <div className="flex gap-1 px-6 pt-3 border-b border-gray-200 bg-white">
+          {([
+            ["metas", "Metas"],
+            ["recordatorios", "Recordatorios"],
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setSection(id)}
+              className={`px-3 py-2 text-[12px] font-semibold border-b-2 -mb-px ${section === id ? "border-black text-black" : "border-transparent text-gray-500 hover:text-black"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="p-6 overflow-y-auto">
+          {section === "recordatorios" ? (
+            <ReminderRulesEditor />
+          ) : loading ? (
             <div className="text-sm text-gray-500 py-8 text-center">Cargando configuración…</div>
           ) : (
             <>
