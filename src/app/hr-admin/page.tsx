@@ -50,6 +50,7 @@ import {
   Flag,
   Inbox,
   Mail,
+  MoreHorizontal,
   Send,
   Hourglass,
   XCircle,
@@ -129,6 +130,8 @@ export default function HRAdminPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<"metas" | "recordatorios">("metas");
   const [bancoVac, setBancoVac] = useState<{ id: string; title: string } | null>(null);
+  const [masOpen, setMasOpen] = useState(false);
+  const masRef = React.useRef<HTMLDivElement>(null);
 
   const openSettings = useCallback((section: "metas" | "recordatorios") => {
     setSettingsSection(section);
@@ -209,6 +212,15 @@ export default function HRAdminPage() {
     return () => window.removeEventListener('hashchange', onHash);
   }, [tab, openSettings]);
 
+  useEffect(() => {
+    if (!masOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!masRef.current?.contains(e.target as Node)) setMasOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [masOpen]);
+
   // #plantillas ya no es tab: abre Settings → Recordatorios (el editor de reglas).
   useEffect(() => {
     if (readHash() !== "plantillas") return;
@@ -258,28 +270,12 @@ export default function HRAdminPage() {
               <kbd className="text-[9px] font-mono bg-white/10 border border-white/15 rounded px-1 py-0.5 ml-1">⌘K</kbd>
             </button>
             <button
-              onClick={() => setImportOpen(true)}
-              className="flex items-center gap-1.5 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
-              title="Importar candidatos desde Excel"
-            >
-              <Download className="w-3.5 h-3.5" style={{ transform: 'rotate(180deg)' }} />
-              <span>Importar</span>
-            </button>
-            <button
-              onClick={() => setGmailAuditOpen(true)}
-              className="flex items-center gap-1.5 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
-              title="Auditar Gmail vs ATS"
-            >
-              <Mail className="w-3.5 h-3.5" />
-              <span>Auditar Gmail</span>
-            </button>
-            <button
               onClick={() => setDecisionsOpen(true)}
               className="flex items-center gap-1.5 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
-              title="Pedir decisión a CWO/Hiring Manager"
+              title="Forzar respuesta a CWO/HM"
             >
               <Hand className="w-3.5 h-3.5" />
-              <span>Decisiones</span>
+              <span>Pendientes HM</span>
             </button>
             <button
               onClick={() => setScheduleOpen(true)}
@@ -296,6 +292,38 @@ export default function HRAdminPage() {
             >
               <SettingsIcon className="w-[18px] h-[18px]" />
             </button>
+            <div className="relative" ref={masRef}>
+              <button
+                type="button"
+                onClick={() => setMasOpen((v) => !v)}
+                className="text-white/70 hover:text-white p-1.5"
+                title="Más"
+                aria-label="Más"
+                aria-expanded={masOpen}
+              >
+                <MoreHorizontal className="w-[18px] h-[18px]" />
+              </button>
+              {masOpen && (
+                <div className="absolute right-0 top-full mt-1 w-52 rounded-lg border border-gray-200 bg-white text-gray-900 shadow-xl py-1 z-[80]">
+                  <button
+                    type="button"
+                    onClick={() => { setMasOpen(false); setImportOpen(true); }}
+                    className="w-full text-left px-3 py-2 text-[12px] font-medium hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <Download className="w-3.5 h-3.5" style={{ transform: "rotate(180deg)" }} />
+                    Importar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setMasOpen(false); setGmailAuditOpen(true); }}
+                    className="w-full text-left px-3 py-2 text-[12px] font-medium hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    Auditar Gmail
+                  </button>
+                </div>
+              )}
+            </div>
             <a
               href="https://mail.google.com/mail/u/0/#drafts"
               target="_blank"
@@ -313,7 +341,8 @@ export default function HRAdminPage() {
             <button
               onClick={() => setReferralsOpen(true)}
               className="text-white/70 hover:text-white relative p-1.5"
-              title={referralsPending > 0 ? `${referralsPending} hojas de vida pendientes de revisar` : 'Sin notificaciones nuevas'}
+              title={referralsPending > 0 ? `Referidos / HV pendientes · ${referralsPending}` : "Referidos / HV pendientes"}
+              aria-label="Referidos / HV pendientes"
             >
               <Bell className="w-[18px] h-[18px]" />
               {referralsPending > 0 ? (
