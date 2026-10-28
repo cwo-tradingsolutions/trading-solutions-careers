@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { Resend } from 'resend';
 import { createDraftViaGmail, isGmailConnected } from '@/lib/gmail';
 import crypto from 'crypto';
+import { ATS_FROM_NAME } from "@/lib/ats-from";
 
 function getResend(): Resend | null {
   const key = process.env.RESEND_API_KEY;
@@ -106,7 +107,7 @@ export async function POST(req: NextRequest) {
           <li>Responde con tu primera reacción</li>
         </ul></div>
       <p>Si tienes alguna pregunta, simplemente responde este correo.</p>
-      <p>Un abrazo,<br><strong>Kelly Castañeda</strong><br>${clientName}</p>
+      <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>${clientName}</p>
     </div>
     <div class="footer">Powered by ELEVARE Career · Evaluación confidencial<br>Este enlace es personal e intransferible.</div>
   </div></body></html>`;
@@ -131,7 +132,7 @@ export async function POST(req: NextRequest) {
           to: candidate.email,
           subject: emailSubject,
           html: emailHtml,
-          fromName: 'Kelly Castañeda',
+          fromName: ATS_FROM_NAME,
         });
         if (draftRes.ok) {
           return NextResponse.json({
@@ -162,7 +163,7 @@ export async function POST(req: NextRequest) {
       });
     }
     const { error: emailError } = await resend.emails.send({
-      from: `Kelly Castaneda <${senderEmail}>`,
+      from: `${ATS_FROM_NAME} <${senderEmail}>`,
       to: candidate.email,
       subject: emailSubject,
       html: emailHtml,

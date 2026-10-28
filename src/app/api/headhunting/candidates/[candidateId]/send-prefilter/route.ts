@@ -10,7 +10,8 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
 import { recordStageEvent } from "@/lib/stage-events";
 import crypto from "crypto";
-import { resolveCandidateLang, EN_SIGNATURE_NAME } from "@/lib/candidate-lang";
+import { resolveCandidateLang } from "@/lib/candidate-lang";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
 
 export async function POST(
   req: NextRequest,
@@ -127,7 +128,7 @@ export async function POST(
       <li>Tus respuestas se guardan automáticamente</li>
     </ul>
     <p>Si tienes alguna pregunta, simplemente responde a este correo.</p>
-    <p>Un abrazo,<br><strong>Kelly Castañeda</strong><br>Trading Solutions</p>
+    <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>
     <div class="footer">Este enlace es personal e intransferible.</div>
   </div>
 </body></html>`;
@@ -138,7 +139,7 @@ export async function POST(
         ? `Trading Solutions · Pre-screening questionnaire for ${vacancyTitle}`
         : `Trading Solutions · Cuestionario inicial para ${candidate.name}`,
       html: lang === "en" ? htmlEn : html,
-      fromName: lang === "en" ? EN_SIGNATURE_NAME : "Kelly Castañeda",
+      fromName: ATS_FROM_NAME,
     });
 
     if (!draftRes.ok) {
