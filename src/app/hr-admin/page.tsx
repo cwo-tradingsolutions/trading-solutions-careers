@@ -129,6 +129,7 @@ export default function HRAdminPage() {
   const [gmailAuditOpen, setGmailAuditOpen] = useState(false);
   const [decisionsOpen, setDecisionsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [bancoVac, setBancoVac] = useState<{ id: string; title: string } | null>(null);
   const [sessionExpired, setSessionExpired] = useState(false);
 
   // Detector global de sesión expirada — interceptamos fetch para detectar 401
@@ -351,7 +352,9 @@ export default function HRAdminPage() {
         {tab === "dashboard" && <Dashboard setTab={setTab} />}
         {tab === "requisiciones" && <RequisitionsInbox />}
         {tab === "vacantes" && <Vacantes />}
-        {tab === "funnel" && <PipelineFunnel />}
+        {tab === "funnel" && (
+          <PipelineFunnel onBuscarBanco={(v) => setBancoVac(v)} />
+        )}
         {tab === "rubricas" && <RubricasPanel />}
         {tab === "nuevebox" && <NueveBoxPanel />}
         {tab === "plantillas" && <ReminderRulesEditor />}
@@ -369,6 +372,13 @@ export default function HRAdminPage() {
       {gmailAuditOpen && <GmailAuditModal onClose={() => setGmailAuditOpen(false)} />}
       {decisionsOpen && <DecisionNudgesModal onClose={() => setDecisionsOpen(false)} />}
       {settingsOpen && <DashboardSettingsModal onClose={() => setSettingsOpen(false)} />}
+      {bancoVac && (
+        <CVBankRediscoveryModal
+          vacancyId={bancoVac.id}
+          vacancyTitle={bancoVac.title}
+          onClose={() => setBancoVac(null)}
+        />
+      )}
       {sessionExpired && (
         <div className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
@@ -1731,6 +1741,8 @@ type CVBankMatch = {
   match_concerns: string[] | null;
   recommendation: 'strong' | 'possible' | 'weak' | 'no' | null;
   computed_at: string;
+  reviewed_decision?: 'contact' | 'skip' | 'already_processed' | null;
+  active_on_vacancy?: boolean;
   candidate: {
     id: string;
     name: string;
@@ -1758,14 +1770,19 @@ function CVBankRediscoveryModal({
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emptyPool, setEmptyPool] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'strong' | 'possible'>('all');
 
   const load = useCallback(() => {
     setLoading(true);
     fetch(`/api/headhunting/vacancies/${vacancyId}/rediscover-cv`, { cache: 'no-store' })
-      .then(r => r.json())
-      .then(j => { setMatches(j.matches || []); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(async r => {
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) setError(j.error || 'No se pudieron cargar los matches');
+        setMatches(j.matches || []);
+        setLoading(false);
+      })
+      .catch((e: any) => { setError(e?.message || 'Error de red'); setLoading(false); });
   }, [vacancyId]);
 
   useEffect(() => { load(); }, [load]);
@@ -1773,11 +1790,15 @@ function CVBankRediscoveryModal({
   const runRediscover = async () => {
     setRunning(true);
     setError(null);
+    setEmptyPool(null);
     try {
       const r = await fetch(`/api/headhunting/vacancies/${vacancyId}/rediscover-cv`, { method: 'POST' });
-      const j = await r.json();
+      const j = await r.json().catch(() => ({}));
       if (!r.ok) {
-        setError(j.error || 'Error');
+        setError(j.error || 'Error al cruzar el banco');
+      } else if (j.empty_pool) {
+        setEmptyPool(j.message || 'El banco no tiene candidatos elegibles para esta vacante.');
+        setMatches([]);
       } else {
         load();
       }
@@ -1838,9 +1859,13 @@ function CVBankRediscoveryModal({
               <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
                 <Search className="w-6 h-6 text-gray-400" />
               </div>
-              <h3 className="text-base font-bold text-gray-900 mb-1">Sin búsqueda aún</h3>
+              <h3 className="text-base font-bold text-gray-900 mb-1">
+                {emptyPool ? 'Banco vacío' : 'Sin búsqueda aún'}
+              </h3>
               <p className="text-xs text-gray-500 max-w-sm mx-auto mb-4">
-                Click "Buscar matches" → el AI cruzará el banco de candidatos rechazados/contratados de otras vacantes con los requisitos de <strong>{vacancyTitle}</strong> y devolverá los mejores fits.
+                {emptyPool || (
+                  <>Click "Buscar matches" → el AI cruzará el banco de candidatos rechazados/contratados de otras vacantes con los requisitos de <strong>{vacancyTitle}</strong> y devolverá los mejores fits.</>
+                )}
               </p>
               <button
                 onClick={runRediscover}
@@ -1892,7 +1917,7 @@ function CVBankRediscoveryModal({
 
               <div className="space-y-2 max-h-[60vh] overflow-y-auto">
                 {visible.map(m => (
-                  <RediscoveryMatchRow key={m.id} match={m} />
+                  <RediscoveryMatchRow key={m.id || m.candidate_id} match={m} vacancyId={vacancyId} onBrought={load} />
                 ))}
               </div>
             </>
@@ -1903,10 +1928,42 @@ function CVBankRediscoveryModal({
   );
 }
 
-function RediscoveryMatchRow({ match }: { match: CVBankMatch }) {
+function RediscoveryMatchRow({ match, vacancyId, onBrought }: { match: CVBankMatch; vacancyId: string; onBrought: () => void }) {
   const [expanded, setExpanded] = useState(false);
+  const [bringing, setBringing] = useState(false);
+  const [brought, setBrought] = useState(match.reviewed_decision === 'contact');
+  const [bringError, setBringError] = useState<string | null>(null);
+  const [already, setAlready] = useState(!!match.active_on_vacancy || match.reviewed_decision === 'already_processed');
   const c = match.candidate;
   if (!c) return null;
+
+  const bring = async () => {
+    setBringing(true);
+    setBringError(null);
+    try {
+      const r = await fetch(`/api/headhunting/vacancies/${vacancyId}/rediscover-cv/bring`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidate_id: match.candidate_id }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.status === 409 || j.error === 'already_active') {
+        setAlready(true);
+        setBringError(j.message || 'Ya está activo en esta vacante');
+        return;
+      }
+      if (!r.ok) {
+        setBringError(j.error || 'No se pudo traer al Funnel');
+        return;
+      }
+      setBrought(true);
+      onBrought();
+    } catch (e: any) {
+      setBringError(e?.message || 'Error de red');
+    } finally {
+      setBringing(false);
+    }
+  };
 
   const recoColor =
     match.recommendation === 'strong' ? { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'STRONG' }
@@ -1973,9 +2030,18 @@ function RediscoveryMatchRow({ match }: { match: CVBankMatch }) {
             )}
           </div>
           <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-100 text-[10px] text-gray-500 flex-wrap">
+            <button
+              type="button"
+              onClick={bring}
+              disabled={bringing || brought || already}
+              className="text-[11px] font-semibold px-3 py-1.5 rounded-full bg-black text-white disabled:bg-gray-200 disabled:text-gray-500"
+            >
+              {already ? 'Ya está en esta vacante' : brought ? 'En el Funnel' : bringing ? 'Trayendo…' : 'Traer al Funnel'}
+            </button>
             <a href={`mailto:${c.email}`} className="text-blue-600 hover:underline inline-flex items-center gap-1">
               <Mail className="w-3 h-3" /> {c.email}
             </a>
+            {bringError && <span className="text-red-700">{bringError}</span>}
             {c.salary_aspiration_cop && (
               <span>· salario aspirado: <strong>COP {c.salary_aspiration_cop.toLocaleString('es-CO')}</strong></span>
             )}

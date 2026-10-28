@@ -303,7 +303,12 @@ const OWNER_STYLE: Record<StageOwner, { label: string; barColor: string; bgTint:
 // cargar significado, y con eso el tablero deja de competir con los nombres
 // de los candidatos.
 
-export default function PipelineFunnel() {
+export default function PipelineFunnel({
+  onBuscarBanco,
+}: {
+  /** Abre el rediscovery HT de la vacante filtrada. Opcional: el dashboard ya lo tiene en la card. */
+  onBuscarBanco?: (vacancy: { id: string; title: string }) => void;
+} = {}) {
   const [candidates, setCandidates] = useState<Cand[]>([]);
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
   /** El equipo de Talent. Si la tabla todavía no existe, queda vacío y el
@@ -697,6 +702,20 @@ export default function PipelineFunnel() {
                   />
                   ver cerradas ({opcionesVacante.cerradas.length})
                 </label>
+              )}
+              {vacFilter !== "all" && onBuscarBanco && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const v = vacancies.find((x) => x.id === vacFilter);
+                    onBuscarBanco({ id: vacFilter, title: v?.title || "Vacante" });
+                  }}
+                  className="text-xs font-bold px-3 py-2.5 border border-black text-black hover:bg-black hover:text-white transition-colors whitespace-nowrap"
+                  style={{ borderRadius: 0 }}
+                  title="Buscar en el banco HT (rechazados o contratados de otras vacantes) y traerlos a esta"
+                >
+                  Buscar en banco
+                </button>
               )}
               {vacFilter !== "all" && (
                 <a
