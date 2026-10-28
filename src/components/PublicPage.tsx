@@ -6,7 +6,7 @@ import Footer from "./Footer";
 
 /**
  * Envoltorio de las páginas públicas (home, vacantes, detalle): shell
- * Universe About (`.uv`, ver styles/universe-shell.css).
+ * Universe × Careers (`.uv`, ver styles/universe-shell.css).
  *
  * El layout raíz declara `lang="es"` porque lo comparte con HR Admin, que va
  * en español. El portal público va en inglés: se marca el bloque con

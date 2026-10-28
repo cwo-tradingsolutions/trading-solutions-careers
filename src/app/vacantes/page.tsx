@@ -8,7 +8,7 @@ import { useLanguage } from "@/i18n/context";
 import { fill } from "@/i18n/translations";
 import { fetchOpenJobs, deriveModes, type Job } from "@/lib/vacancies-adapter";
 import { AREAS, areaOf, isAreaKey, type AreaKey } from "@/lib/areas";
-import { Search, MapPin, Briefcase } from "lucide-react";
+import { Search, MapPin, Briefcase, ArrowRight } from "lucide-react";
 
 function VacantesContent() {
   const searchParams = useSearchParams();
@@ -74,117 +74,121 @@ function VacantesContent() {
 
   return (
     <PublicPage>
-      <Link className="back" href="/">‹ {t.shell.about}</Link>
+      <Link className="back" href="/">‹ {t.shell.home}</Link>
 
-      <div className="detail-head">
-        <p className="eyebrow">{t.jobs.pageEyebrow}</p>
-        <h1>{t.jobs.pageTitle}</h1>
-        <p className="sec sub" style={{ marginBottom: 0 }}>{t.jobs.pageSubtitle}</p>
-      </div>
-
-      {/* Search + filtros · patrón Events del clon */}
-      <div className="jobs-search">
-        <Search aria-hidden />
-        <input
-          type="search"
-          aria-label={t.jobs.searchLabel}
-          placeholder={t.jobs.searchPlaceholder}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-      <div className="jobs-filters">
-        <div className="filters" role="group" aria-label={t.jobs.areaLabel}>
-          <span className="lab">{t.jobs.areaLabel}</span>
-          <button className={areaFilter === "all" ? "is-on" : ""} aria-pressed={areaFilter === "all"} onClick={() => setAreaFilter("all")}>
-            {t.jobs.all}
-          </button>
-          {AREAS.map((a) => (
-            <button key={a} className={areaFilter === a ? "is-on" : ""} aria-pressed={areaFilter === a} onClick={() => setAreaFilter(a)}>
-              {t.areas[a].title}
-            </button>
-          ))}
+      <div className="sec-head">
+        <div className="left">
+          <div className="eyebrow">{t.shell.roles}</div>
+          <h1 className="page-title">{t.jobs.pageTitle}</h1>
+          <p className="sub">
+            {t.jobs.pageSubtitle} <Link href="/#unete">{t.pool.cta} →</Link>
+          </p>
         </div>
-        {modes.length > 1 && (
-          <div className="filters" role="group" aria-label={t.jobs.modeLabel}>
-            <span className="lab">{t.jobs.modeLabel}</span>
-            <button className={modeFilter === "all" ? "is-on" : ""} aria-pressed={modeFilter === "all"} onClick={() => setModeFilter("all")}>
+      </div>
+
+      <div className="jobs-toolbar">
+        <div className="search-jobs">
+          <Search aria-hidden />
+          <input
+            type="search"
+            aria-label={t.jobs.searchLabel}
+            placeholder={t.jobs.searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
+        <div className="filters">
+          <div className="group" role="group" aria-label={t.jobs.areaLabel}>
+            <span className="lab">{t.jobs.areaLabel}</span>
+            <button type="button" className={areaFilter === "all" ? "is-on" : ""} aria-pressed={areaFilter === "all"} onClick={() => setAreaFilter("all")}>
               {t.jobs.all}
             </button>
-            {modes.map((m) => (
-              <button key={m} className={modeFilter === m ? "is-on" : ""} aria-pressed={modeFilter === m} onClick={() => setModeFilter(m)}>
-                {modeName(m)}
+            {AREAS.map((a) => (
+              <button key={a} type="button" className={areaFilter === a ? "is-on" : ""} aria-pressed={areaFilter === a} onClick={() => setAreaFilter(a)}>
+                {t.areas[a].title}
               </button>
             ))}
+          </div>
+          {modes.length > 1 && (
+            <div className="group" role="group" aria-label={t.jobs.modeLabel}>
+              <span className="lab">{t.jobs.modeLabel}</span>
+              <button type="button" className={modeFilter === "all" ? "is-on" : ""} aria-pressed={modeFilter === "all"} onClick={() => setModeFilter("all")}>
+                {t.jobs.all}
+              </button>
+              {modes.map((m) => (
+                <button key={m} type="button" className={modeFilter === m ? "is-on" : ""} aria-pressed={modeFilter === m} onClick={() => setModeFilter(m)}>
+                  {modeName(m)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {!loading && (
+          <div className="jobs-count" aria-live="polite">
+            {filtered.length === 1 ? t.jobs.resultsOne : fill(t.jobs.resultsMany, { n: filtered.length })}
           </div>
         )}
       </div>
 
-      {loading ? (
-        <div className="events-grid" aria-busy="true" aria-label={t.jobs.loading}>
-          <div className="skeleton" />
-          <div className="skeleton" />
-        </div>
-      ) : jobs.length === 0 ? (
-        <EmptyState title={t.jobs.allEmptyTitle} body={t.jobs.allEmptyBody} />
-      ) : (
-        <>
-          <p className="count" aria-live="polite">
-            {filtered.length === 1 ? t.jobs.resultsOne : fill(t.jobs.resultsMany, { n: filtered.length })}
-          </p>
-
-          {filtered.length > 0 ? (
-            <div className="events-grid">
-              {filtered.map((job) => (
-                <Link key={job.id} href={`/vacantes/${job.id}`} className="job-card">
-                  <div className="area-l">
-                    {t.areas[areaOf(job.dept)].title}
-                    {deptName(job.dept) !== t.areas[areaOf(job.dept)].title && ` · ${deptName(job.dept)}`}
-                  </div>
-                  <h2>{job.title[locale]}</h2>
-                  <p>{job.description[locale]}</p>
-                  <div className="foot">
-                    <div className="ev-pills">
-                      {job.location && (
-                        <span><MapPin size={12} aria-hidden />{job.location}</span>
-                      )}
-                      <span><Briefcase size={12} aria-hidden />{modeName(job.mode)}</span>
-                      {job.level && <span>{job.level}</span>}
-                    </div>
-                    <span className="go">{t.jobs.cardCta} →</span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          ) : soloArea ? (
-            <EmptyState
-              title={fill(t.jobs.areaEmptyTitle, { Area: t.areas[areaFilter as AreaKey].title })}
-              body={t.jobs.areaEmptyBody}
-              cta={t.jobs.areaEmptyCta}
-              onCta={resetFilters}
-            />
-          ) : (
-            <EmptyState title={t.jobs.noResults} cta={t.jobs.clearFilters} onCta={resetFilters} />
-          )}
-        </>
-      )}
+      <div className="jobs-grid">
+        {loading ? (
+          <>
+            <div className="skeleton" aria-busy="true" aria-label={t.jobs.loading} />
+            <div className="skeleton" />
+          </>
+        ) : jobs.length === 0 ? (
+          <EmptyState title={t.jobs.allEmptyTitle} body={t.jobs.allEmptyBody} />
+        ) : filtered.length > 0 ? (
+          filtered.map((job) => (
+            <Link key={job.id} href={`/vacantes/${job.id}`} className="job">
+              <div className="top">
+                <span className="cat">
+                  {t.areas[areaOf(job.dept)].title}
+                  {deptName(job.dept) !== t.areas[areaOf(job.dept)].title && ` · ${deptName(job.dept)}`}
+                </span>
+                {job.level && <span className="lvl">{job.level}</span>}
+              </div>
+              <h2 style={{ font: "700 17px/1.25 var(--font)", letterSpacing: "-.015em" }}>{job.title[locale]}</h2>
+              <p className="desc">{job.description[locale]}</p>
+              <div className="foot">
+                <div className="meta">
+                  {job.location && <span><MapPin size={12} aria-hidden />{job.location}</span>}
+                  <span><Briefcase size={12} aria-hidden />{modeName(job.mode)}</span>
+                </div>
+                <span className="arrow" aria-label={t.jobs.cardCta}>
+                  <ArrowRight aria-hidden />
+                </span>
+              </div>
+            </Link>
+          ))
+        ) : soloArea ? (
+          <EmptyState
+            title={fill(t.jobs.areaEmptyTitle, { Area: t.areas[areaFilter as AreaKey].title })}
+            body={t.jobs.areaEmptyBody}
+            cta={t.jobs.areaEmptyCta}
+            onCta={resetFilters}
+          />
+        ) : (
+          <EmptyState title={t.jobs.noResults} cta={t.jobs.clearFilters} onCta={resetFilters} />
+        )}
+      </div>
     </PublicPage>
   );
 }
 
-/** Estado vacío · "soon-state" del clon. */
+/** Estado vacío del preview: siempre deja la salida al talent pool. */
 function EmptyState({ title, body, cta, onCta }: { title: string; body?: string; cta?: string; onCta?: () => void }) {
   const { t } = useLanguage();
-  const label = t.nav.roles;
   return (
-    <div className="soon-state">
-      <div className="badge">{label}</div>
-      <h2>{title}</h2>
-      {body && <p>{body}</p>}
+    <div className="jobs-empty">
+      <h3>{title}</h3>
+      <p>
+        {body ? `${body} ` : ""}
+        <Link className="inline-link" href="/#unete">{t.pool.cta} →</Link>
+      </p>
       {cta && onCta && (
-        <div className="cta-row">
-          <button onClick={onCta} className="btn-ghost">{cta}</button>
-        </div>
+        <button type="button" onClick={onCta} className="btn-ghost-text">{cta}</button>
       )}
     </div>
   );

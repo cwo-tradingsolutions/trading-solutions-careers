@@ -5,6 +5,11 @@
  * Bernabé (CAREERS-COPY-PACK-Bernabe-2026-10-27, v1.0). Antes convivían ES y
  * EN con un selector y la página mezclaba `lang=es` con texto en inglés.
  *
+ * Cifras (pack rev K, Kelly GO): las de tradingsolutions.com — +150 países,
+ * +300 clientes, +52k TEUs, +500 t aire y tierra. El "+10 markets" del copy
+ * pack sale de Universe (oficinas) y no se usa en Careers para no
+ * contradecir el sitio corporativo.
+ *
  * Los tres puntos que el pack deja por confirmar (presupuesto de formación,
  * programas de bienestar, caso en todos los roles) van con su texto de
  * respaldo hasta que Kelly/HR los confirme. Antes de agregar texto nuevo,
@@ -18,10 +23,10 @@ export const translations = {
     meta: {
       title: "Careers at Trading Solutions | Boutique Freight Forwarder, Miami",
       description:
-        "Join a boutique freight forwarder moving cargo by sea, land and air across ten markets. Open roles in Operations, Corporate and Commercial.",
+        "Join a boutique freight forwarder moving cargo by sea, land and air to +150 countries. Open roles in Operations, Corporate and Commercial.",
       ogTitle: "Every shipment has a name behind it. It could be yours.",
       ogDescription:
-        "Careers at Trading Solutions — ten markets, one team. See open roles in Operations, Corporate and Commercial.",
+        "Careers at Trading Solutions — +150 countries, one team. See open roles in Operations, Corporate and Commercial.",
     },
     logoAlt: "Trading Solutions logo",
     nav: {
@@ -32,56 +37,81 @@ export const translations = {
       cta: "See open roles",
       menu: "Menu",
     },
-    // Shell Universe About (clon Clara, pack rev F). La subnav del clon
-    // (About us · Events · Wellness Soon · Brand) va con sus equivalentes de
-    // Careers; "Stories" toma el lugar de "Wellness Soon".
+    // Shell Universe × Careers (preview AJUSTE de Clara, pack rev J). Las
+    // pills del preview (Inicio · Cultura · Gente · Crecer · Vacantes · Únete)
+    // van en inglés: el portal público es un solo idioma.
     shell: {
       workspace: "Workspace",
       company: "Company",
-      workspaceNote: "Workspace is for the Trading Solutions team. You're in Company · Careers.",
+      workspaceTip: "Workspace is for the Trading Solutions team",
       searchPlaceholder: "Search open roles…",
       searchLabel: "Search open roles",
       announcements: "New roles are posted here first",
-      about: "About us",
-      stories: "Stories",
-      soon: "Soon",
-      backToCompany: "Get to know Trading Solutions",
       sections: "Careers sections",
+      home: "Home",
+      culture: "Culture",
+      people: "People",
+      grow: "Grow",
+      roles: "Open roles",
+      join: "Join us",
+      photoPlaceholder: "placeholder until TS photo bank",
     },
-    coverage: {
-      title: "Our coverage",
-      sub: "Where we are and since when. Ten markets, one team.",
-      label: "Our offices",
-      country: "United States",
-      role: "Headquarters",
-      foundedK: "Founded",
-      founded: "April 16, 2019",
-      officeK: "Office",
-      office: "4221 W 91st Place Suite 900, Hialeah, FL 33018",
-      maps: "Open in Google Maps",
-      mapsUrl: "https://maps.google.com/?q=4221+W+91st+Place+Suite+900,+Hialeah,+FL+33018",
-      pin: "Florida",
-      countriesLabel: "Countries with operations · 10",
-      countries: ["United States", "Mexico", "Panama", "Colombia", "Ecuador", "Peru", "Chile", "El Salvador", "China", "Hong Kong"],
+    // Búsqueda junto al hero (patrón SLB).
+    heroSearch: {
+      label: "Search open roles",
+      keyword: "Keyword or role",
+      allTeams: "All teams",
+      anyLocation: "Any location",
+      submit: "Search",
+      cardKicker: "Trading Solutions Careers",
     },
-    marquee: ["Panama", "Chile", "Peru", "Ecuador", "Hong Kong", "China", "Trading Solutions", "Boutique freight forwarder", "United States", "Mexico", "Colombia", "El Salvador"],
+    // Historias de gente: hasta que Bernabé entregue historias reales (con
+    // nombre y foto del banco TS) las tarjetas llevan las tres ideas del
+    // bloque Why, sin citas ni nombres inventados.
+    people: {
+      storyPending: "Team story · coming soon",
+    },
+    // Talent pool "Join us" (Kelly P0). Texto nuestro, pendiente de pasada de
+    // Bernabé: no promete puesto ni llamada, igual que el resto del pack.
+    pool: {
+      eyebrow: "Join us",
+      title: "No role that fits today? Leave your CV.",
+      body: "Send it once and it stays on file with our team. When a role opens that matches your profile, the CVs on file are part of the search.",
+      points: [
+        "One submission. Your CV stays with our team.",
+        "Pick the team where you'd like to contribute.",
+        "If there's a fit, we'll reach out.",
+      ],
+      area: "Team of interest",
+      areaPlaceholder: "Choose a team",
+      areaOther: "Other / open",
+      message: "Message (optional)",
+      messagePlaceholder: "Tell us what you're looking for.",
+      cvFormats: "PDF, DOC or DOCX (max. 5 MB)",
+      cvTooBig: "That file is over 5 MB. Please upload a smaller PDF or Word file.",
+      submit: "Send my CV",
+      successTitle: "CV received. Thank you.",
+      successBody: "It's on file with our team. If a role opens that fits your profile, we'll reach out.",
+      again: "Send another",
+      cta: "Leave your CV",
+    },
     hero: {
       eyebrow: "Careers at Trading Solutions",
       title: "Every shipment has a name behind it. It could be yours.",
-      body: "We're a boutique freight forwarder headquartered in Miami, moving cargo by sea, land and air across ten markets. We look for curious, committed people who like owning the details — and answering the phone when it rings.",
+      body: "We're a boutique freight forwarder headquartered in Miami, moving cargo by sea, land and air to +150 countries. We look for curious, committed people who like owning the details — and answering the phone when it rings.",
       ctaPrimary: "See open roles",
       ctaSecondary: "How we hire",
       imageAlt: "A Trading Solutions container vessel arriving at the Port of Miami",
     },
     stats: [
-      { value: "+10", label: "Markets of operation" },
-      { value: "+300", label: "Active clients" },
+      { value: "+150", label: "Countries of operation" },
+      { value: "+300", label: "Clients" },
       { value: "+52k", label: "Maritime TEUs" },
       { value: "+500", label: "Tons by air & land" },
     ],
     why: {
       eyebrow: "Why Trading Solutions",
-      title: "Ten markets. One team. A seat that matters.",
+      title: "+150 countries. One team. A seat that matters.",
       lead: "We're not a giant with a call center. We're a team that knows every client by name and every shipment by its route. Here, your work doesn't disappear into a process — it shows up at a port, a border or a warehouse, on time.",
       pillars: [
         {
@@ -90,7 +120,7 @@ export const translations = {
         },
         {
           title: "Real cargo, real markets",
-          body: "Maritime, ground, air and customs across ten markets. Every day brings a real problem with a real client on the other end — and a team that solves it together.",
+          body: "Maritime, ground, air and customs to +150 countries. Every day brings a real problem with a real client on the other end — and a team that solves it together.",
         },
         {
           title: "Small enough to be heard",
@@ -102,7 +132,7 @@ export const translations = {
         "That's the promise we make to our clients. It only works because of the people who keep it. If you like being the person others can count on — at 9 a.m. or when a container is stuck at 6 p.m. — you'll feel at home here.",
       tags: ["Maritime", "Ground", "Air", "Customs"],
       miniStats: [
-        { value: "+10", label: "Markets of operation" },
+        { value: "+150", label: "Countries of operation" },
         { value: "+52k", label: "Maritime TEUs moved" },
         { value: "+500", label: "Tons by air & land" },
       ],
@@ -169,7 +199,7 @@ export const translations = {
         },
         {
           title: "International exposure",
-          body: "Work every day with partners, clients and colleagues across ten markets. Your network grows with every shipment.",
+          body: "Work every day with partners, clients and colleagues in +150 countries. Your network grows with every shipment.",
         },
         {
           title: "Well-being that's real",
@@ -189,7 +219,7 @@ export const translations = {
       secondaryUrl: "https://tradingsolutions.com",
     },
     footer: {
-      tagline: "Boutique freight forwarding. Ten markets, one team.",
+      tagline: "Boutique freight forwarding. One team.",
       hq: "Headquartered in Miami, FL",
       careers: "Careers",
       services: "Services",

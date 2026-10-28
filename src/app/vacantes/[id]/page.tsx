@@ -122,12 +122,13 @@ export default function JobDetailPage() {
         {loading ? (
           <div className="skeleton" aria-busy="true" aria-label={t.jobs.loading} />
         ) : (
-          <div className="soon-state">
-            <div className="badge">{t.nav.roles}</div>
-            <h2>{t.jobs.notFound}</h2>
-            <div className="cta-row">
-              <Link href="/vacantes" className="btn-reg">{t.jobs.viewAll} →</Link>
-            </div>
+          <div className="jobs-empty">
+            <h3>{t.jobs.notFound}</h3>
+            <p>
+              <Link className="inline-link" href="/vacantes">{t.jobs.viewAll} →</Link>
+              {" · "}
+              <Link className="inline-link" href="/#unete">{t.pool.cta} →</Link>
+            </p>
           </div>
         )}
       </PublicPage>
@@ -148,7 +149,7 @@ export default function JobDetailPage() {
           {deptLabel !== t.areas[area].title && ` · ${deptLabel}`}
         </p>
         <h1>{job.title[locale]}</h1>
-        <div className="ev-pills">
+        <div className="pills">
           {job.location && <span><MapPin size={12} aria-hidden />{job.location}</span>}
           <span>{modeName(job.mode)}</span>
           {job.level && <span>{job.level}</span>}
@@ -185,7 +186,7 @@ export default function JobDetailPage() {
           {job.tags.length > 0 && (
             <div className="chip-row" style={{ marginTop: 28 }}>
               {job.tags.map((tag) => (
-                <span key={tag} className="chip blue">{tag}</span>
+                <span key={tag} className="chip">{tag}</span>
               ))}
             </div>
           )}
@@ -194,17 +195,19 @@ export default function JobDetailPage() {
         <aside className="apply-box">
           <div className="t">{job.title[locale]}</div>
           <p className="b">{t.process.steps[0].body}</p>
-          <button onClick={openApply} className="btn-reg lg">
-            {t.jobs.applyBtn} →
+          <button onClick={openApply} className="btn-blue">
+            {t.jobs.applyBtn} <span aria-hidden>↗</span>
           </button>
+          <Link href="/#unete" className="btn-ghost-text">{t.pool.cta} →</Link>
         </aside>
       </div>
 
       {/* Apply Modal */}
       {showApply && (
         <div
-          className="modal-bg"
+          className="modal-back"
           onClick={(e) => { if (e.target === e.currentTarget) setShowApply(false); }}
+          onKeyDown={(e) => { if (e.key === "Escape") setShowApply(false); }}
           role="dialog"
           aria-modal="true"
           aria-labelledby="apply-title"
@@ -212,20 +215,20 @@ export default function JobDetailPage() {
           <div className="modal">
             <div className="modal-head">
               <div>
-                <p className="k">{t.jobs.applyTo}</p>
-                <h2 id="apply-title">{job.title[locale]}</h2>
+                <h3 id="apply-title">{t.jobs.applyTo} {job.title[locale]}</h3>
+                <div className="role">{deptLabel}{job.location ? ` · ${job.location}` : ""}</div>
               </div>
-              <button type="button" className="x" onClick={() => setShowApply(false)} aria-label={t.jobs.close}>
-                <X size={16} />
+              <button type="button" className="modal-x" onClick={() => setShowApply(false)} aria-label={t.jobs.close}>
+                <X size={14} />
               </button>
             </div>
             <form onSubmit={handleSubmit}>
-              <div className="fields">
+              <div>
                 <div className="field">
                   <label htmlFor="ap-name">{t.jobs.fullName}</label>
                   <input id="ap-name" type="text" required autoComplete="name" placeholder={t.jobs.fullNamePlaceholder} name="full_name" value={formData.full_name} onChange={handleChange} />
                 </div>
-                <div className="two">
+                <div className="row">
                   <div className="field">
                     <label htmlFor="ap-email">{t.jobs.email}</label>
                     <input id="ap-email" type="email" required autoComplete="email" placeholder={t.jobs.emailPlaceholder} name="email" value={formData.email} onChange={handleChange} />
@@ -256,7 +259,7 @@ export default function JobDetailPage() {
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "var(--ink)" }}>
                         <Check size={16} aria-hidden />
                         {cvFile.name}
-                        <button type="button" className="x" style={{ width: 24, height: 24 }} aria-label={t.jobs.cancel} onClick={(e) => { e.stopPropagation(); setCvFile(null); }}>
+                        <button type="button" className="modal-x" style={{ width: 24, height: 24 }} aria-label={t.jobs.cancel} onClick={(e) => { e.stopPropagation(); setCvFile(null); }}>
                           <X size={12} />
                         </button>
                       </span>
@@ -279,14 +282,9 @@ export default function JobDetailPage() {
               {submitError && (
                 <p role="alert" className="alert">{t.jobs.errorGeneric}</p>
               )}
-              <div className="modal-actions">
-                <button type="button" onClick={() => setShowApply(false)} className="btn-ghost">
-                  {t.jobs.cancel}
-                </button>
-                <button type="submit" disabled={submitting} className="btn-reg lg">
-                  {submitting ? t.jobs.submitting : `${t.jobs.submit} →`}
-                </button>
-              </div>
+              <button type="submit" disabled={submitting} className="btn-blue">
+                {submitting ? t.jobs.submitting : t.jobs.submit}
+              </button>
             </form>
           </div>
         </div>
@@ -295,17 +293,19 @@ export default function JobDetailPage() {
       {/* Success Modal */}
       {submitted && (
         <div
-          className="modal-bg"
+          className="modal-back"
           onClick={(e) => { if (e.target === e.currentTarget) setSubmitted(false); }}
           role="dialog"
           aria-modal="true"
           aria-labelledby="ok-title"
         >
-          <div className="modal sm">
-            <div className="ok"><CheckCircle size={24} aria-hidden /></div>
-            <h2 id="ok-title" style={{ font: "800 24px/1.2 var(--font)", letterSpacing: "-.02em", marginBottom: 10 }}>{t.jobs.successTitle}</h2>
-            <p style={{ font: "400 15px/1.5 var(--font)", color: "var(--mute)", marginBottom: 22 }}>{t.jobs.successBody}</p>
-            <Link href="/vacantes" className="btn-reg lg">{t.jobs.backToJobsBtn}</Link>
+          <div className="modal">
+            <div className="done">
+              <div className="ok"><CheckCircle size={24} aria-hidden /></div>
+              <h3 id="ok-title">{t.jobs.successTitle}</h3>
+              <p>{t.jobs.successBody}</p>
+              <Link href="/vacantes" className="btn-blue">{t.jobs.backToJobsBtn}</Link>
+            </div>
           </div>
         </div>
       )}
