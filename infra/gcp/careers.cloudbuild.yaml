@@ -60,6 +60,7 @@ steps:
     args:
       - -c
       - |
+        set -e
         if [ -z "${_SERVICIO}" ]; then echo "Sin _SERVICIO: solo imagen."; exit 0; fi
         gcloud run services update ${_SERVICIO} --region us-west1 --project $PROJECT_ID --container careers --image ${_IMAGEN}:${_TAG}
         # Staging puede tener el tráfico fijado a una revisión (previews con
