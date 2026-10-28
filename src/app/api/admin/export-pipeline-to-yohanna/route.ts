@@ -24,6 +24,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sql } from "@/lib/db";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
 
 export const runtime = "nodejs";
 
@@ -498,7 +499,7 @@ export async function POST(req: NextRequest) {
         to: toEmail,
         subject: `Handoff pipeline · ${totalCount} candidatos · ${vacancyTitles.slice(0, 80)}`,
         html,
-        fromName: "Kelly Castañeda",
+        fromName: ATS_FROM_NAME,
         replyTo: "jointheteam@tradingsolutions.com",
       });
       if (draftRes.ok) draftId = draftRes.draft_id;

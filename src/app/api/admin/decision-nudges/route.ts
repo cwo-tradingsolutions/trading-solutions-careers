@@ -9,6 +9,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
 import crypto from "crypto";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -99,8 +100,7 @@ function buildEmail(opts: {
 
       <div class="footer">
         Un abrazo,<br/>
-        <strong>Kelly Castañeda</strong><br/>
-        Talent Acquisition and Development Lead · Trading Solutions
+        <strong>Talent Acquisition Team</strong>
       </div>
     </div>
   </div>
@@ -257,7 +257,7 @@ export async function POST(req: NextRequest) {
       to: normalizedTo,
       subject,
       html,
-      fromName: 'Kelly Castañeda',
+      fromName: ATS_FROM_NAME,
       replyTo: 'jointheteam@tradingsolutions.com',
     });
 

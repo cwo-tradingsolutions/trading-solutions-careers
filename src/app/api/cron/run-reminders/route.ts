@@ -26,6 +26,7 @@ import {
 import { requireAdmin } from "@/lib/admin-auth";
 import { recordStageEvent } from "@/lib/stage-events";
 import crypto from "crypto";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -239,7 +240,7 @@ export async function GET(req: NextRequest) {
           to: cand.email,
           subject: rendered.email_subject,
           html: rendered.email_body.replace(/\n/g, "<br>"),
-          fromName: "Kelly Castañeda",
+          fromName: ATS_FROM_NAME,
           replyTo: "jointheteam@tradingsolutions.com",
         });
 
