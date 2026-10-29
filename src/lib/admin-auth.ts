@@ -26,14 +26,15 @@ function isValidSessionCookie(token: string | undefined, secret: string): boolea
 }
 
 export function requireAdmin(req: NextRequest): NextResponse | null {
-  const secret = process.env.ADMIN_SECRET;
+  const secret = (process.env.ADMIN_SECRET ?? '').trim();
   if (!secret) {
     return NextResponse.json({ error: 'ADMIN_SECRET not configured' }, { status: 500 });
   }
 
   // (a) Bearer token
   const auth = req.headers.get('authorization');
-  if (auth === `Bearer ${secret}`) return null;
+  const bearer = auth?.startsWith('Bearer ') ? auth.slice('Bearer '.length).trim() : '';
+  if (bearer && bearer === secret) return null;
 
   // (b) HR Admin session cookie
   const sessionToken = req.cookies.get(SESSION_COOKIE)?.value;

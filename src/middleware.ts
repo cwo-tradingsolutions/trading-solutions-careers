@@ -51,7 +51,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next();
     }
     const token = request.cookies.get(SESSION_COOKIE)?.value;
-    const secret = process.env.ADMIN_SECRET;
+    const secret = (process.env.ADMIN_SECRET ?? '').trim();
     const ok = await isValidSession(token, secret);
     if (!ok) {
       const url = request.nextUrl.clone();
