@@ -5663,6 +5663,7 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
   const [q, setQ] = useState('');
   const [results, setResults] = useState<CandidateSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [filterStage, setFilterStage] = useState<string>('');
   const [filterMinScore, setFilterMinScore] = useState<string>('');
   const [debouncedQ, setDebouncedQ] = useState('');
@@ -5703,6 +5704,7 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
 
   const runSearch = useCallback(async () => {
     setLoading(true);
+    setSearchError(null);
     const params = new URLSearchParams();
     if (debouncedQ) params.set('q', debouncedQ);
     if (filterStage) params.set('stage', filterStage);
@@ -5710,10 +5712,16 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
     params.set('limit', '25');
     try {
       const r = await fetch(`/api/headhunting/candidates/search?${params.toString()}`, { cache: 'no-store' });
-      const j = await r.json();
-      setResults(j.results || []);
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setResults([]);
+        setSearchError(j.error || 'Error de búsqueda');
+      } else {
+        setResults(j.results || []);
+      }
     } catch {
       setResults([]);
+      setSearchError('Error de búsqueda');
     }
     setLoading(false);
   }, [debouncedQ, filterStage, filterMinScore]);
@@ -5799,7 +5807,10 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
 
         {/* Results */}
         <div ref={listRef} className="max-h-[60vh] overflow-y-auto">
-          {!loading && results.length === 0 && (
+          {!loading && searchError && (
+            <div className="px-4 py-3 text-xs text-red-700">{searchError}</div>
+          )}
+          {!loading && !searchError && results.length === 0 && (
             <div className="text-center py-12 px-4">
               <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-gray-100 flex items-center justify-center">
                 <Search className="w-5 h-5 text-gray-400" />
@@ -7003,6 +7014,7 @@ function ScheduleInterviewModal({ onClose }: { onClose: () => void }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState<CandidateSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [debouncedQ, setDebouncedQ] = useState('');
   const [picked, setPicked] = useState<CandidateSearchResult | null>(null);
 
@@ -7031,13 +7043,30 @@ function ScheduleInterviewModal({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (step !== 'pick') return;
     setLoading(true);
+    setSearchError(null);
     const params = new URLSearchParams();
     if (debouncedQ) params.set('q', debouncedQ);
     params.set('limit', '15');
+    let cancelled = false;
     fetch(`/api/headhunting/candidates/search?${params.toString()}`, { cache: 'no-store' })
-      .then(r => r.json())
-      .then(j => { setResults(j.results || []); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!r.ok) {
+          setResults([]);
+          setSearchError(j.error || 'Error de búsqueda');
+        } else {
+          setResults(j.results || []);
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setResults([]);
+        setSearchError('Error de búsqueda');
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, [debouncedQ, step]);
 
   const submit = async () => {
@@ -7117,7 +7146,10 @@ function ScheduleInterviewModal({ onClose }: { onClose: () => void }) {
             </div>
             <div className="max-h-[40vh] overflow-y-auto -mx-4">
               {loading && <div className="px-4 py-3 text-xs text-gray-400">Cargando…</div>}
-              {!loading && results.length === 0 && (
+              {!loading && searchError && (
+                <div className="px-4 py-2 text-xs text-red-700">{searchError}</div>
+              )}
+              {!loading && !searchError && results.length === 0 && (
                 <div className="px-4 py-6 text-center text-xs text-gray-500">Sin resultados</div>
               )}
               {results.map(c => (
