@@ -4,8 +4,10 @@
  * el orden de los gates sale de KELLY_GATES, no de una lista copiada.
  *
  * Gates 6 y 8 no tienen StageCode propio: se muestran y se saltan en la
- * conversión (el paso es 5→7 y 7→9). El SLA se evalúa por código y se
- * enrolla al gate; en Prefiltro y Médicos/Seguridad no se suman los SLA.
+ * conversión (el paso es 5→7 y 7→9). El % fuera de SLA mira solo el código
+ * en el que el candidato está ahora, contra STAGE_SLA_DAYS de ese código.
+ * Prefiltro y Médicos/Seguridad no suman sus SLA. Un incumplimiento viejo,
+ * ya saldado, no entra al porcentaje.
  * Offer accept = llegó a gate ≥10 y a gate 12. Docs va después de Oferta
  * y no cambia esa cuenta.
  */
@@ -374,12 +376,36 @@ export function spansEnGate(events: DashEvent[], gateId: string, asOf: string): 
   return out;
 }
 
+export type SlaActual = {
+  /** Hay reloj fiable del código en el que está ahora. */
+  evaluable: boolean;
+  breached: boolean;
+  days: number | null;
+  sla: number | null;
+};
+
 /**
- * El candidato está fuera de SLA del gate si ALGÚN código de ese gate
- * superó su propio SLA. No se compara contra la suma.
+ * Fuera de SLA = días en el código ACTUAL > STAGE_SLA_DAYS de ese código.
+ *
+ * No se recorre el historial del gate: haberse pasado en prefiltro enviado
+ * y estar hoy dentro del SLA de prefiltro pasado no cuenta. Tampoco se
+ * suma el SLA de los códigos del gate.
  */
+export function slaActual(events: DashEvent[], gateId: string, asOf: string): SlaActual {
+  const current = spansEnGate(events, gateId, asOf).at(-1);
+  if (!current || current.approx || current.sla == null) {
+    return { evaluable: false, breached: false, days: null, sla: current?.sla ?? null };
+  }
+  return {
+    evaluable: true,
+    breached: current.days > current.sla,
+    days: current.days,
+    sla: current.sla,
+  };
+}
+
 export function fueraDeSlaEnGate(events: DashEvent[], gateId: string, asOf: string): boolean {
-  return spansEnGate(events, gateId, asOf).some((s) => s.breached);
+  return slaActual(events, gateId, asOf).breached;
 }
 
 export function offerAccept(
@@ -630,19 +656,16 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
     const bucket = slaByGate.get(g.id);
     if (!bucket) continue;
     bucket.people += 1;
-    const spans = spansEnGate(row.evs, g.id, asOf);
-    const reliable = spans.filter((s) => !s.approx && s.sla != null);
-    if (g.stages.length === 0 || reliable.length === 0) {
+    const clock = slaActual(row.evs, g.id, asOf);
+    if (g.stages.length === 0 || !clock.evaluable) {
       bucket.approx += 1;
       slaApprox += 1;
       continue;
     }
-    const current = spans[spans.length - 1];
-    if (current && !current.approx) bucket.days.push(current.days);
-    const breached = reliable.some((s) => s.breached);
+    if (clock.days != null) bucket.days.push(clock.days);
     bucket.eval += 1;
     slaEval += 1;
-    if (breached) {
+    if (clock.breached) {
       bucket.over += 1;
       slaOver += 1;
     }
@@ -764,7 +787,7 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
     for (const row of people) {
       const g = gateActual(row.c.stage);
       if (g.rechazado || !g.gate || g.gate.id === "onboarding") continue;
-      const breached = g.gate.stages.length > 0 && fueraDeSlaEnGate(row.evs, g.gate.id, asOf);
+      const breached = g.gate.stages.length > 0 && slaActual(row.evs, g.gate.id, asOf).breached;
       if (breached) overSla += 1;
       const cur = gateCounts.get(g.gate.id) ?? { n: 0, over: 0, label: g.gate.label };
       cur.n += 1;
@@ -942,12 +965,10 @@ export function buildDrill(input: DashboardInput, vacancyId: string): { vacancy:
     const g = gateActual(c.stage);
     if (g.rechazado || !g.gate || g.gate.id === "onboarding") continue;
     const evs = prep.eventsByCand.get(c.id) ?? [];
-    const spans = spansEnGate(evs, g.gate.id, input.now);
-    const reliable = spans.filter((s) => !s.approx && s.sla != null);
     const noCode = g.gate.stages.length === 0;
-    const breached = !noCode && reliable.some((s) => s.breached);
-    if (!breached) continue;
-    const current = spans[spans.length - 1];
+    const clock = slaActual(evs, g.gate.id, input.now);
+    if (noCode || !clock.breached) continue;
+    const current = spansEnGate(evs, g.gate.id, input.now).at(-1);
     const last = [...evs].sort(
       (a, b) => new Date(b.changed_at).getTime() - new Date(a.changed_at).getTime(),
     )[0];

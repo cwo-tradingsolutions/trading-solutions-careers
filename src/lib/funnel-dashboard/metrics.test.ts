@@ -167,18 +167,18 @@ describe("SLA por código, sin sumar", () => {
   });
 
   it("un código pasado de su SLA saca al candidato aunque la suma del gate no", () => {
-    // 6 días en prefiltro enviado (SLA 5). La suma del gate es 9: no se usa.
+    // 6 días en el código actual (enviado, SLA 5). La suma del gate es 9: no se usa.
     const passed = [ev("prefiltro_enviado", 0)];
     assert.equal(fueraDeSlaEnGate(passed, "prefiltro", at(6)), true);
     assert.equal(daySpan(at(0), at(6)) < 9, true);
 
-    // 3 + 1 + 1, cada código dentro de su SLA.
+    // 3 + 1 + 1, el código actual dentro de su SLA.
     const inside = [ev("prefiltro_enviado", 0), ev("prefiltro_pasado", 3), ev("prefiltro_revision", 4)];
     assert.equal(fueraDeSlaEnGate(inside, "prefiltro", at(5)), false);
 
-    // 3 días en enviado (ok) y 3 en pasado (SLA 2): el pasado solo ya incumple.
-    const anyCode = [ev("prefiltro_enviado", 0), ev("prefiltro_pasado", 3)];
-    assert.equal(fueraDeSlaEnGate(anyCode, "prefiltro", at(6)), true);
+    // El código actual es pasado (SLA 2) y ya lleva 3 días.
+    const ahoraPasado = [ev("prefiltro_enviado", 0), ev("prefiltro_pasado", 3)];
+    assert.equal(fueraDeSlaEnGate(ahoraPasado, "prefiltro", at(6)), true);
 
     // Justo en el SLA no es fuera (> estricto).
     assert.equal(fueraDeSlaEnGate([ev("prefiltro_enviado", 0)], "prefiltro", at(5)), false);
@@ -188,6 +188,34 @@ describe("SLA por código, sin sumar", () => {
       fueraDeSlaEnGate([ev("prefiltro_enviado", 0, "backfill")], "prefiltro", at(30)),
       false,
     );
+  });
+
+  it("solo cuenta quien se pasa en el código actual", () => {
+    // 6 días en enviado (SLA 5) y hoy 1 día en pasado (SLA 2): el incumplimiento ya pasó.
+    const yaNo = [ev("prefiltro_enviado", 0), ev("prefiltro_pasado", 6)];
+    assert.equal(fueraDeSlaEnGate(yaNo, "prefiltro", at(7)), false);
+
+    // Sigue en enviado y ya va en 6 días.
+    const ahora = [ev("prefiltro_enviado", 0)];
+    assert.equal(fueraDeSlaEnGate(ahora, "prefiltro", at(6)), true);
+
+    const input = baseInput();
+    input.now = at(7);
+    input.vacancies = [
+      { id: "v", title: "V", area: "A", country: "Colombia", status: "open", owner_recruiter_id: null },
+    ];
+    input.candidates = [
+      { id: "past", name: "Pasado", vacancy_id: "v", stage: "prefiltro_pasado", source: "web", created_at: at(0), rejected: false },
+      { id: "now", name: "Ahora", vacancy_id: "v", stage: "prefiltro_enviado", source: "web", created_at: at(0), rejected: false },
+    ];
+    input.events = [
+      { candidate_id: "past", to_stage: "prefiltro_enviado", changed_at: at(0), source: "ui" },
+      { candidate_id: "past", to_stage: "prefiltro_pasado", changed_at: at(6), source: "ui" },
+      { candidate_id: "now", to_stage: "prefiltro_enviado", changed_at: at(0), source: "ui" },
+    ];
+    const d = buildDashboard(input);
+    assert.equal(d.kpis.sla.n, 2);
+    assert.equal(d.kpis.sla.over, 1);
   });
 
   it("el filtro de etapa mueve el SLA y no el embudo", () => {
