@@ -1935,7 +1935,8 @@ function BulkActionBar({
           </select>
           <button
             onClick={() => runBulk("advance")}
-            className="text-xs font-bold px-3 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700"
+            className="text-xs font-bold px-3 py-1.5 rounded-full hover:opacity-90"
+            style={{ background: "#1d1d1f", color: "#ffffff" }}
             title="Avanzar cada uno a su siguiente etapa"
           >
             → Avanzar etapa
