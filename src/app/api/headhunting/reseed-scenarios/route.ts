@@ -12,8 +12,8 @@ export async function POST(req: NextRequest) {
   if (authError) return authError;
 
   // Check admin authentication using x-admin-secret header
-  const adminSecret = req.headers.get('x-admin-secret');
-  const expectedSecret = process.env.ADMIN_SECRET || 'elevare-admin-2026-secure';
+  const adminSecret = (req.headers.get('x-admin-secret') ?? '').trim();
+  const expectedSecret = (process.env.ADMIN_SECRET ?? '').trim() || 'elevare-admin-2026-secure';
 
   if (!adminSecret || adminSecret !== expectedSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
