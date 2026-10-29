@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { InvitarEntrevistaModal } from "@/components/InvitarEntrevistaModal";
 import {
   buildInviteArtifacts,
+  PREVIEW_GOOGLE_CONNECT_LABEL,
   RECONNECT_CALENDAR_LABEL,
 } from "@/lib/interview-invite";
 
@@ -98,6 +99,35 @@ export default function InvitarEntrevistaPreviewPage({
             event: es.event,
             meet_url: null,
             reconnect: { label: RECONNECT_CALENDAR_LABEL, href: "/api/google/auth" },
+          },
+        }}
+      />
+      )}
+
+      {parte === "conectar" && (
+      <InvitarEntrevistaModal
+        embedded
+        candidateId="preview"
+        candidateName="Ana Restrepo"
+        fixture={{
+          load: {
+            wellness_exists: false,
+            table_ready: false,
+            candidate_tz: null,
+            google: { connected: false, calendar_scope_ok: false, connect_label: PREVIEW_GOOGLE_CONNECT_LABEL },
+            preview: {
+              active: true,
+              allowlist_configured: true,
+              allowlist_expected: "cwo@tradingsolutions.com,jointheteam@tradingsolutions.com",
+            },
+            defaults: {
+              tz: "America/Bogota",
+              duration_min: 45,
+              hm_name: "Jaime",
+              hm_email: "coo@tradingsolutions.com",
+              wellness_interviewer_name: "Talent Acquisition Team",
+              wellness_interviewer_email: "jointheteam@tradingsolutions.com",
+            },
           },
         }}
       />

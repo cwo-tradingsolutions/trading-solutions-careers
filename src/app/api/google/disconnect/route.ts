@@ -1,6 +1,7 @@
 /**
- * POST /api/google/disconnect — borra los tokens de Gmail.
- * Después de esto, los emails vuelven a salir vía Resend (default).
+ * POST /api/google/disconnect — borra el token de Google de ESTE ambiente.
+ * En preview no borra la fila de producción. Después, los emails de este
+ * ambiente vuelven a salir vía Resend (default).
  */
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
