@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from '@/lib/supabase';
 import { TS_SCENARIOS } from '@/lib/headhunting/scenarios-ts';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 const MODEL_ID = '186c9e42-5448-40b0-9a87-0f8e8a2f2af0';
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   // Escritura solo para HR Admin. Antes esta ruta aceptaba cambios de
   // cualquiera en internet.
   const authError = requireAdmin(req);

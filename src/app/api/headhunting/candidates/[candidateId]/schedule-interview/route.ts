@@ -24,6 +24,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { getResend, EMAIL_FROM, EMAIL_BCC } from "@/lib/resend";
 import { buildIcs, buildGoogleCalendarUrl } from "@/lib/ics";
 import crypto from "crypto";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 const TYPE_LABEL: Record<string, string> = {
   recruiter: 'Entrevista con Recruiter',
@@ -47,6 +48,10 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { candidateId: string } }
 ) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

@@ -10,6 +10,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
 import crypto from "crypto";
 import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -178,6 +179,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

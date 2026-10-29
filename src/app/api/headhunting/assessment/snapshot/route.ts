@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 /**
  * Uploads a single proctoring snapshot (base64 JPEG) to Supabase Storage.
@@ -7,6 +8,10 @@ import { supabaseAdmin } from '@/lib/supabase';
  * Also inserts a row in ht_proctoring_snapshots for quick indexing.
  */
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   try {
     const body = await req.json();
     const { token, scenario_id, snapshot_base64, captured_at, scenario_index } = body;

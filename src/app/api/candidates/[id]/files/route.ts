@@ -7,6 +7,7 @@ import {
   esTipoValido,
   slugArchivo,
 } from '@/lib/adjuntos';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -51,6 +52,10 @@ export async function GET(req: NextRequest, { params }: Ctx) {
 
 /** Sube un documento y lo indexa contra el candidato. */
 export async function POST(req: NextRequest, { params }: Ctx) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   if (!isAdminRequest(req)) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
   try {
@@ -128,6 +133,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
 /** Elimina un adjunto: primero el objeto, después la fila. */
 export async function DELETE(req: NextRequest, { params }: Ctx) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   if (!isAdminRequest(req)) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
   const fileId = req.nextUrl.searchParams.get('fileId');

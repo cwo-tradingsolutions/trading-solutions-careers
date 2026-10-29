@@ -4,10 +4,15 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { TS_TOP_PERFORMERS, TS_DNA_PATTERNS } from '@/lib/headhunting/calibration-data';
 import { TS_SCENARIOS } from '@/lib/headhunting/scenarios-ts';
 import { TS_IDEAL_PROFILES } from '@/lib/headhunting/match-calculator';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 // POST /api/headhunting/seed — Seeds Trading Solutions data
 // This creates the client, competency model, vacancies, and scenarios
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

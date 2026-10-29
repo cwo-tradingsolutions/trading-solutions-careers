@@ -30,6 +30,7 @@ import {
   semaforo,
   type Veredicto,
 } from "@/lib/evaluacion";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,6 +65,10 @@ export async function GET(req: NextRequest) {
  * decidió, tiene que poder verse qué se calificó, cuándo, y qué había antes.
  */
 export async function PATCH(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   if (!isAdminRequest(req)) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
@@ -147,6 +152,10 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   if (!isAdminRequest(req)) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {

@@ -45,6 +45,7 @@ import {
   REJECTION_REPLY_TO,
 } from "@/lib/rejection-email";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 
 export const runtime = "nodejs";
@@ -53,6 +54,10 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { candidateId: string } },
 ) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

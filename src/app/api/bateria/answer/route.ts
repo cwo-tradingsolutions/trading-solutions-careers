@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { findItem, ITEMS } from '@/lib/bateria/items';
 import { cerrarSesion } from '@/lib/bateria/cerrar';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 export const dynamic = 'force-dynamic';
 
 /** Guardado incremental: cada respuesta se persiste al momento. */
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   try {
     const { token, item_code, answer, latency_ms } = await req.json();
     if (!token || !item_code) return NextResponse.json({ error: 'Parámetros faltantes' }, { status: 400 });

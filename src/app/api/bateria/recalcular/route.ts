@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { isAdminRequest } from '@/lib/bateria/auth';
 import { cerrarSesion } from '@/lib/bateria/cerrar';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 export const dynamic = 'force-dynamic';
 
 /** Recalcula los puntajes de una sesion desde sus respuestas guardadas. */
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   if (!isAdminRequest(req)) return NextResponse.json({ error: 'No autorizado · vuelva a entrar a hr-admin' }, { status: 401 });
   try {
     const { token } = await req.json();

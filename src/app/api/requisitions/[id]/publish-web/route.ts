@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { supabaseAdmin } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 export const runtime = "nodejs";
 
@@ -42,6 +43,10 @@ function aLista(texto?: string | null): string[] {
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

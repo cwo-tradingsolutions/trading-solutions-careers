@@ -20,6 +20,7 @@ import {
   diasEnEstado,
 } from "@/lib/requisitions";
 import { modeloDeCompetencias, nivelDeJerarquia, TS_CLIENT_ID } from "@/lib/competency-model";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 export const runtime = "nodejs";
 
@@ -53,6 +54,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

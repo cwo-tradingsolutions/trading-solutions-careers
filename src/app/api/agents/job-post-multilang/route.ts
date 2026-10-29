@@ -33,6 +33,7 @@ import {
   TS_BRAND, TS_POST_FORMAT, INSTRUCCION_IDIOMA, INSTRUCCION_TONO, CAMPOS_REQUISICION,
   type Tono,
 } from "@/lib/job-post-format";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -92,6 +93,10 @@ function perfilDelLider(perfil: unknown): string {
 }
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

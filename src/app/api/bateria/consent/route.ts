@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { CONSENT_TEXT_VERSION } from '@/lib/bateria/items';
 import { consentVersionFor, batteryVersionFor, type BatLang } from '@/lib/bateria/i18n';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,10 @@ export const dynamic = 'force-dynamic';
  * todas las fotos. Antes eso pasaba en silencio; ahora la prueba no arranca.
  */
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   try {
     const { token, camera, name, email, lang: langRaw } = await req.json();
     // El idioma lo manda la pantalla que el candidato acaba de leer.

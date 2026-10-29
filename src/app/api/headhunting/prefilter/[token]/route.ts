@@ -17,6 +17,7 @@ import { createDraftViaGmail, isGmailConnected, sendViaGmail } from "@/lib/gmail
 import { recordStageEvent } from "@/lib/stage-events";
 import { resolveCandidateLang, EN_SIGNATURE_NAME } from "@/lib/candidate-lang";
 import { TEMPLATE_ENGLISH_MIN_RANK, TEMPLATE_SALARY_CAP, type TemplateKey } from "@/lib/prefilter-templates";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 // Techos por vacancy_id (en COP mensuales)
 const SALARY_CAPS: Record<string, number> = {
@@ -347,6 +348,10 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { token: string } }
 ) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const body = await req.json();
 
   const { data: candidate, error } = await supabaseAdmin

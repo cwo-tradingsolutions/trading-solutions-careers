@@ -4,65 +4,39 @@ import FunnelTiming from "@/components/FunnelTiming";
 import RubricasPanel from "@/components/RubricasPanel";
 import NueveBoxPanel from "@/components/NueveBoxPanel";
 import BateriaDashboard from "@/components/BateriaDashboard";
-import { LOGO_TS_SIMBOLO, LOGO_TS_CLASE_EN_OSCURO } from "@/lib/brand";
-
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
-  LayoutDashboard,
-  Briefcase,
-  Kanban,
-  Database,
-  Video,
   Bot,
-  LineChart,
   Linkedin,
   Brain,
-  ClipboardCheck,
   Bell,
   Plus,
   Download,
   Search,
   Calendar,
-  Filter,
-  ArrowUpRight,
   CheckCircle2,
   Clock,
   FileText,
-  Share2,
-  Play,
   ExternalLink,
   LogOut,
   Sparkles,
   ChevronRight,
-  // Corporate icon set — replace emojis
   Target,
   Trophy,
   Hand,
-  AlertOctagon,
-  Moon,
   AlertTriangle,
-  TrendingUp,
-  Users,
-  Mic,
-  Headphones,
   BarChart3,
   Globe,
   Award,
-  Flag,
-  Inbox,
   Mail,
   Send,
   Hourglass,
   XCircle,
-  MessageSquare,
-  Building2,
   UserCheck,
-  PartyPopper,
   Eye,
   RefreshCw,
   ArrowRight,
   Settings as SettingsIcon,
-  Grid3x3,
 } from "lucide-react";
 import { jobs } from "@/data/jobs";
 // La bandeja donde caen las vacantes que piden los líderes desde WXM.
@@ -70,10 +44,12 @@ import RequisitionsInbox from "@/components/RequisitionsInbox";
 import NuevaVacanteModal from "@/components/NuevaVacanteModal";
 import { factorXTS } from "@/data/assessments";
 import { STAGE_SLA_DAYS, STAGE_ACTION } from "@/lib/stage-labels";
+import { stageLabelUi } from "@/lib/hr-pipeline-look";
 import PrefiltrosPanel from "@/components/PrefiltrosPanel";
 import PipelineFunnel from "@/components/PipelineFunnel";
 import RejectionReasonsCard from "@/components/RejectionReasonsCard";
 import ReminderRulesEditor from "@/components/ReminderRulesEditor";
+import { FilterMenu, FilterPills } from "@/components/universe/Filters";
 
 type Tab =
   | "dashboard"
@@ -85,18 +61,6 @@ type Tab =
   | "rubricas"
   | "nuevebox"
   | "plantillas";
-
-const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "requisiciones", label: "Requisiciones", icon: Inbox },
-  { id: "vacantes", label: "Vacantes", icon: Briefcase },
-  { id: "funnel", label: "Funnel", icon: Kanban },
-  { id: "onboarding", label: "Onboarding", icon: ClipboardCheck },
-  { id: "cvbank", label: "CV Bank", icon: Database },
-  { id: "rubricas", label: "Rúbricas", icon: ClipboardCheck },
-  { id: "nuevebox", label: "Decisiones", icon: Grid3x3 },
-  { id: "plantillas", label: "Plantillas", icon: SettingsIcon },
-];
 
 const VALID_TABS: Tab[] = ["dashboard", "requisiciones", "vacantes", "funnel", "onboarding", "cvbank", "rubricas", "nuevebox", "plantillas"];
 
@@ -168,6 +132,7 @@ export default function HRAdminPage() {
     setTabState(next);
     if (typeof window !== 'undefined') {
       window.history.replaceState(null, '', `#${next}`);
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
     }
   }, []);
 
@@ -180,6 +145,12 @@ export default function HRAdminPage() {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, [tab]);
+
+  useEffect(() => {
+    const open = () => setSearchOpen(true);
+    window.addEventListener("hr-admin-search", open);
+    return () => window.removeEventListener("hr-admin-search", open);
+  }, []);
 
   // Global Cmd+K / Ctrl+K shortcut to open search
   useEffect(() => {
@@ -196,67 +167,47 @@ export default function HRAdminPage() {
   }, [searchOpen]);
 
   return (
-    // data-ui="universe" vive en el layout de /hr-admin (globals.css).
+    // data-ui="universe" y el sidebar viven en el layout de /hr-admin.
     <div className="min-h-screen">
-      <header className="sticky top-0 z-50 text-white" style={{ background: "var(--ts-ink)" }}>
-        <div className="max-w-ts mx-auto px-5 h-14 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <img
-              src={LOGO_TS_SIMBOLO}
-              alt="Trading Solutions"
-              className={`h-[22px] w-auto ${LOGO_TS_CLASE_EN_OSCURO}`}
-            />
-            <span className="text-[14px] font-medium flex items-center gap-2">
-              <span className="ts-mark" aria-hidden />
-              HR Panel
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setSearchOpen(true)}
-              className="flex items-center gap-2 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
-              title="Buscar candidatos (Cmd+K)"
-            >
-              <Search className="w-3.5 h-3.5" />
-              <span>Buscar</span>
-              <kbd className="text-[9px] font-mono bg-white/10 border border-white/15 rounded px-1 py-0.5 ml-1">⌘K</kbd>
-            </button>
-            <button
-              onClick={() => setImportOpen(true)}
-              className="flex items-center gap-1.5 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
-              title="Importar candidatos desde Excel"
-            >
-              <Download className="w-3.5 h-3.5" style={{ transform: 'rotate(180deg)' }} />
-              <span>Importar</span>
-            </button>
-            <button
-              onClick={() => setGmailAuditOpen(true)}
-              className="flex items-center gap-1.5 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
-              title="Auditar Gmail vs ATS"
-            >
-              <Mail className="w-3.5 h-3.5" />
-              <span>Auditar Gmail</span>
-            </button>
-            <button
-              onClick={() => setDecisionsOpen(true)}
-              className="flex items-center gap-1.5 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
-              title="Pedir decisión a CWO/Hiring Manager"
-            >
-              <Hand className="w-3.5 h-3.5" />
-              <span>Decisiones</span>
-            </button>
+      <header className="border-b border-black/5 bg-[var(--ts-journal)]">
+        <div className="px-5 lg:px-8 py-3 flex items-center justify-end gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setScheduleOpen(true)}
-              className="flex items-center gap-1.5 bg-ts-accent hover:bg-[var(--ts-accent-hover)] text-white text-[12px] font-medium px-3.5 py-1.5 rounded-ts-sm transition-colors"
+              className="pill-btn pill-btn-primary !py-2.5"
               title="Agendar entrevista"
             >
               <Calendar className="w-3.5 h-3.5" />
-              <span>Agendar</span>
+              Agendar
+            </button>
+            <button
+              onClick={() => setImportOpen(true)}
+              className="flex items-center gap-1.5 text-ts-ink-soft hover:text-ts-ink text-[12px] px-2.5 py-2 rounded-ts-sm"
+              title="Importar candidatos desde Excel"
+            >
+              <Download className="w-3.5 h-3.5" style={{ transform: 'rotate(180deg)' }} />
+              <span className="hidden lg:inline">Importar</span>
+            </button>
+            <button
+              onClick={() => setGmailAuditOpen(true)}
+              className="flex items-center gap-1.5 text-ts-ink-soft hover:text-ts-ink text-[12px] px-2.5 py-2 rounded-ts-sm"
+              title="Auditar Gmail vs ATS"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">Auditar Gmail</span>
+            </button>
+            <button
+              onClick={() => setDecisionsOpen(true)}
+              className="flex items-center gap-1.5 text-ts-ink-soft hover:text-ts-ink text-[12px] px-2.5 py-2 rounded-ts-sm"
+              title="Pedir decisión a CWO/Hiring Manager"
+            >
+              <Hand className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">Decisiones</span>
             </button>
             <button
               onClick={() => setSettingsOpen(true)}
-              className="text-white/70 hover:text-white p-1.5"
-              title="Settings · metas del dashboard"
+              className="text-ts-ink-soft hover:text-ts-ink p-1.5"
+              title="Ajustes · metas del tablero"
             >
               <SettingsIcon className="w-[18px] h-[18px]" />
             </button>
@@ -264,31 +215,31 @@ export default function HRAdminPage() {
               href="https://mail.google.com/mail/u/0/#drafts"
               target="_blank"
               rel="noreferrer"
-              className="text-white/70 hover:text-white relative p-1.5"
+              className="text-ts-ink-soft hover:text-ts-ink relative p-1.5"
               title={draftsPending > 0 ? `${draftsPending} drafts esperando tu revisión en Gmail (últimas 48h)` : 'Sin drafts pendientes'}
             >
               <Mail className="w-[18px] h-[18px]" />
               {draftsPending > 0 ? (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-ts-highlight text-ts-ink text-[9px] font-medium flex items-center justify-center px-1 ring-2 ring-[var(--ts-ink)] tabular-nums">
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-ts-accent text-white text-[9px] font-medium flex items-center justify-center px-1 tabular-nums">
                   {draftsPending > 99 ? '99+' : draftsPending}
                 </span>
               ) : null}
             </a>
             <button
               onClick={() => setReferralsOpen(true)}
-              className="text-white/70 hover:text-white relative p-1.5"
+              className="text-ts-ink-soft hover:text-ts-ink relative p-1.5"
               title={referralsPending > 0 ? `${referralsPending} hojas de vida pendientes de revisar` : 'Sin notificaciones nuevas'}
             >
               <Bell className="w-[18px] h-[18px]" />
               {referralsPending > 0 ? (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-ts-accent text-white text-[9px] font-medium flex items-center justify-center px-1 ring-2 ring-[var(--ts-ink)] tabular-nums">
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-ts-accent text-white text-[9px] font-medium flex items-center justify-center px-1 tabular-nums">
                   {referralsPending > 99 ? '99+' : referralsPending}
                 </span>
               ) : null}
             </button>
-            <div className="flex items-center gap-2 pl-2 ml-1 border-l border-white/15">
-              <Avatar name="Kelly Castañeda" size={28} className="ring-2 ring-white/40" />
-              <span className="text-[12px] font-medium hidden sm:inline">Kelly Castañeda</span>
+            <div className="flex items-center gap-2 pl-2 ml-1 border-l border-ts-hairline">
+              <Avatar name="Kelly Castañeda" size={28} />
+              <span className="text-[12px] hidden sm:inline text-ts-ink">Kelly</span>
             </div>
             <button
               onClick={async () => {
@@ -299,7 +250,7 @@ export default function HRAdminPage() {
                 }
               }}
               title="Cerrar sesión"
-              className="flex items-center gap-1.5 text-white/70 hover:text-white text-[12px] font-medium px-2.5 py-1.5 rounded-ts-sm hover:bg-white/10 transition-colors"
+              className="flex items-center gap-1.5 text-ts-ink-soft hover:text-ts-ink text-[12px] px-2 py-1.5 rounded-ts-sm"
             >
               <LogOut className="w-[14px] h-[14px]" />
             </button>
@@ -307,30 +258,7 @@ export default function HRAdminPage() {
         </div>
       </header>
 
-      {/* Secciones · control segmentado en vez de pestañas subrayadas:
-          ocupa menos alto y deja claro que son excluyentes. */}
-      <nav className="sticky top-14 z-40 bg-ts-surface border-b border-[color:var(--ts-line)]">
-        <div className="max-w-ts mx-auto px-3 py-1.5">
-          <div className="ts-seg flex overflow-x-auto">
-            {TABS.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                aria-current={tab === id}
-                onClick={() => {
-                  setTab(id);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                className="ts-seg-item flex items-center justify-center gap-2 flex-1 whitespace-nowrap"
-              >
-                <Icon className="w-[15px] h-[15px]" />
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-ts mx-auto px-5 py-5 pb-12">
+      <main className="px-5 lg:px-8 py-6 pb-12">
         {tab === "dashboard" && <Dashboard setTab={setTab} />}
         {tab === "requisiciones" && <RequisitionsInbox />}
         {tab === "vacantes" && <Vacantes />}
@@ -355,7 +283,7 @@ export default function HRAdminPage() {
       {decisionsOpen && <DecisionNudgesModal onClose={() => setDecisionsOpen(false)} />}
       {settingsOpen && <DashboardSettingsModal onClose={() => setSettingsOpen(false)} />}
       {sessionExpired && (
-        <div className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[300] ts-scrim flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
             <div className="flex items-start gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
@@ -454,26 +382,11 @@ function TSHeroBanner({ image = TS_IMG.hero, title = "Talent that moves the worl
 /**
  * Section banner compacto — imagen TS de 100px con título superpuesto, para encabezar tabs/secciones.
  */
-function TSSectionBanner({ image, title, subtitle, icon }: { image: string; title: string; subtitle?: string; icon?: string }) {
+function TSSectionBanner({ title, subtitle }: { image?: string; title: string; subtitle?: string; icon?: string }) {
   return (
-    <div className="relative -mx-5 mb-4 overflow-hidden rounded-ts-md" style={{ height: 112 }}>
-      <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url(${image})` }}
-      />
-      <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(var(--ts-ink-rgb),0.88) 0%, rgba(var(--ts-ink-rgb),0.4) 100%)' }} />
-      <div className="absolute inset-0 flex items-center px-8">
-        <div className="max-w-ts w-full mx-auto">
-          <div className="flex items-center gap-3">
-            <span className="ts-mark" aria-hidden />
-            {icon && <span className="text-3xl">{icon}</span>}
-            <div>
-              <h2 className="text-white font-display font-light text-2xl tracking-[-0.02em] leading-tight">{title}</h2>
-              {subtitle && <p className="text-white/70 text-xs font-medium mt-0.5">{subtitle}</p>}
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="mb-5 pb-4 border-b border-ts-hairline">
+      <h2 className="ts-heading text-[28px] text-ts-ink">{title}</h2>
+      {subtitle && <p className="text-[13px] text-ts-muted mt-1">{subtitle}</p>}
     </div>
   );
 }
@@ -774,7 +687,7 @@ function CandidatesImportModal({ onClose, onDone }: { onClose: () => void; onDon
                 )}
                 {quickResult.inserted > 0 && (
                   <button onClick={onDone} className="mt-3 bg-black hover:bg-gray-800 text-white text-xs font-semibold px-4 py-2 rounded-full">
-                    Ver Funnel →
+                    Ver candidatos →
                   </button>
                 )}
               </div>
@@ -1004,7 +917,7 @@ function CandidatesImportModal({ onClose, onDone }: { onClose: () => void; onDon
               onClick={onDone}
               className="bg-black hover:bg-gray-800 text-white font-semibold px-6 py-3 rounded-full text-sm"
             >
-              Ver Funnel →
+              Ver candidatos →
             </button>
           </div>
         )}
@@ -1059,7 +972,7 @@ function PageHead({ title, desc, actions }: { title: string; desc?: string; acti
   return (
     <div className="flex items-end justify-between flex-wrap gap-4 mb-5">
       <div>
-        <h1 className="text-[28px] font-extrabold tracking-tight m-0">{title}</h1>
+        <h1 className="ts-heading text-[28px] m-0">{title}</h1>
         {desc && <p className="text-gray-500 mt-1.5 text-sm">{desc}</p>}
       </div>
       {actions && <div className="flex gap-2 items-center flex-wrap">{actions}</div>}
@@ -1213,29 +1126,31 @@ function Dashboard({ setTab }: { setTab: (t: Tab) => void }) {
   return (
     <>
       <PageHead
-        title="Dashboard"
+        title="Tablero"
         desc="Dónde se te está quedando la gente, y qué necesita cada vacante abierta."
         actions={
-          <div className="flex items-center gap-2">
-            <select
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <FilterMenu
+              ariaLabel="Vacante"
               value={selectedVacancy}
-              onChange={(e) => setSelectedVacancy(e.target.value)}
-              className="text-[13px] border border-neutral-200 rounded-md px-2.5 py-1.5 bg-white"
-            >
-              <option value="all">Todas las vacantes{vacanciesList.length ? ` (${vacanciesList.length})` : ""}</option>
-              {vacanciesList.map((v) => (
-                <option key={v.id} value={v.id}>{v.title}</option>
-              ))}
-            </select>
-            <select
+              onChange={setSelectedVacancy}
+              groups={[{
+                options: [
+                  { value: "all", label: `Todas las vacantes${vacanciesList.length ? ` (${vacanciesList.length})` : ""}` },
+                  ...vacanciesList.map((v) => ({ value: v.id, label: v.title })),
+                ],
+              }]}
+            />
+            <FilterPills
+              ariaLabel="País"
               value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              className="text-[13px] border border-neutral-200 rounded-md px-2.5 py-1.5 bg-white"
-            >
-              <option value="all">Todos los países</option>
-              <option value="Colombia">Colombia</option>
-              <option value="China">China</option>
-            </select>
+              onChange={setCountry}
+              options={[
+                { value: "all", label: "Todos los países" },
+                { value: "Colombia", label: "Colombia" },
+                { value: "China", label: "China" },
+              ]}
+            />
           </div>
         }
       />
@@ -1260,7 +1175,7 @@ function Dashboard({ setTab }: { setTab: (t: Tab) => void }) {
 
       <p className="text-[12px] text-neutral-400 mt-4">
         El detalle del pipeline (kanban, mover candidatos) sigue en la pestaña{" "}
-        <button onClick={() => setTab("funnel")} className="font-semibold underline">Funnel</button>. Aquí solo el diagnóstico.
+        <button onClick={() => setTab("funnel")} className="font-semibold underline">Candidatos</button>. Aquí solo el diagnóstico.
       </p>
     </>
   );
@@ -1513,8 +1428,12 @@ function VacanciesOverview({ vacancyFilter = 'all', onlyOpen = false }: { vacanc
 function OpenVacancyCard({ v, onResearch, onRediscover, onClose }: { v: VacancyOverview; onResearch: () => void; onRediscover?: () => void; onClose?: () => void }) {
   const m = v.milestones;
   const hasLinkedIn = !!m.linkedin_active_date;
-  const healthColor = v.health.score === 'green' ? '#10B981' : v.health.score === 'yellow' ? '#F59E0B' : '#EF4444';
-  const healthBg = v.health.score === 'green' ? '#ECFDF5' : v.health.score === 'yellow' ? '#FFFBEB' : '#FEF2F2';
+  const healthColor = v.health.score === 'green'
+    ? 'var(--ts-green)'
+    : v.health.score === 'yellow'
+      ? 'var(--ts-amber)'
+      : 'var(--ts-alert)';
+  const healthLabel = v.health.score === 'green' ? 'Al día' : v.health.score === 'yellow' ? 'Atención' : 'Crítico';
   const targetPct = v.metrics.target_days > 0
     ? Math.min(100, Math.round(((v.metrics.days_active || 0) / v.metrics.target_days) * 100))
     : 0;
@@ -1535,18 +1454,15 @@ function OpenVacancyCard({ v, onResearch, onRediscover, onClose }: { v: VacancyO
           className="absolute inset-0"
           style={{ background: `linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.55) 100%)` }}
         />
-        {/* Top accent bar - color del health */}
-        <div className="absolute top-0 left-0 right-0 h-[4px]" style={{ background: healthColor }} />
-        {/* Area name superpuesta */}
         <div className="absolute bottom-1.5 left-3 right-3 flex items-end justify-between text-white">
           <span className="text-[10px] uppercase tracking-[1.5px] font-semibold opacity-85">{v.area || '—'}</span>
           <span
-            className="flex-shrink-0 inline-flex items-center gap-1 bg-black/40 backdrop-blur px-1.5 py-0.5 rounded-full"
+            className="flex-shrink-0 inline-flex items-center gap-1.5 rounded-ts-pill bg-ts-surface px-2 py-0.5"
             title={v.health.reason}
           >
             <span className="w-1.5 h-1.5 rounded-full" style={{ background: healthColor }} />
-            <span className="text-[9px] font-bold uppercase tracking-wider">
-              {v.health.score === 'green' ? 'On track' : v.health.score === 'yellow' ? 'Atención' : 'Crítico'}
+            <span className="text-[11px] font-medium" style={{ color: healthColor }}>
+              {healthLabel}
             </span>
           </span>
         </div>
@@ -1576,17 +1492,17 @@ function OpenVacancyCard({ v, onResearch, onRediscover, onClose }: { v: VacancyO
       </div>
 
       {/* Days vs target progress */}
-      <div className="mb-3 p-2 rounded-lg" style={{ background: healthBg }}>
+      <div className="mb-3 p-2 rounded-lg bg-ts-canvas">
         <div className="flex items-baseline justify-between mb-1">
-          <span className="text-[10px] uppercase font-bold" style={{ color: healthColor }}>Health</span>
-          <span className="text-[10px] font-bold" style={{ color: healthColor }}>
-            {v.metrics.days_active}d / {v.metrics.target_days}d target
+          <span className="text-[10px] uppercase font-medium" style={{ color: healthColor }}>Estado</span>
+          <span className="text-[10px] text-ts-ink-soft">
+            {v.metrics.days_active}d / {v.metrics.target_days}d meta
           </span>
         </div>
-        <div className="h-1.5 bg-white/60 rounded-full overflow-hidden">
+        <div className="h-1 bg-ts-surface-2 rounded-full overflow-hidden">
           <div className="h-full rounded-full transition-all" style={{ width: `${targetPct}%`, background: healthColor }} />
         </div>
-        <div className="text-[9px] mt-1 leading-tight" style={{ color: healthColor }}>
+        <div className="text-[11px] mt-1 leading-tight text-ts-muted">
           {v.health.reason}
         </div>
       </div>
@@ -1668,7 +1584,7 @@ function OpenVacancyCard({ v, onResearch, onRediscover, onClose }: { v: VacancyO
       {/* Footer counts */}
       <div className="flex justify-between text-[10px] pt-2 border-t border-gray-100">
         <span className="text-gray-500">Total: <strong className="text-gray-800">{v.metrics.candidates_total}</strong></span>
-        <span className="text-red-600">Rechazados: <strong>{v.metrics.rechazados}</strong></span>
+        <span className="text-ts-muted">Rechazados: <strong className="text-ts-ink">{v.metrics.rechazados}</strong></span>
       </div>
 
       {/* CTAs estilo TS minimal */}
@@ -2511,14 +2427,7 @@ function fmtDate(iso?: string | null): string {
 }
 
 function stageLabelShort(s: string): string {
-  const map: Record<string, string> = {
-    aplico: 'Aplicó', prefiltro_enviado: 'Pref. enviado', prefiltro_pasado: 'Pref. ✓',
-    prefiltro_revision: 'Pref. (rev)', assessment_invitado: 'Integ. inv', assessment_en_progreso: 'Integ. prog',
-    assessment_completado: 'Integ. ✓', entrevista_ia: 'IA', bateria_psicometrica: 'Batería',
-    recruiter_interview: 'Recr.', cwo_interview: 'CWO', touring: 'Touring', terna: 'Terna', oferta: 'Oferta',
-    contratado: 'Contratado', rechazado: 'Rechazado',
-  };
-  return map[s] || s;
+  return stageLabelUi(s);
 }
 
 function Funnel({
@@ -4471,7 +4380,7 @@ function CVBank() {
   return (
     <>
       <PageHead
-        title="CV Bank · Talent Pool"
+        title="Banco de hojas de vida"
         desc={
           loading
             ? "Cargando perfiles…"
@@ -5732,7 +5641,7 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
   };
 
   return (
-    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-start justify-center pt-[8vh] px-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[200] ts-scrim flex items-start justify-center pt-[8vh] px-4" onClick={onClose}>
       <div
         className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden"
         onClick={e => e.stopPropagation()}
@@ -5754,47 +5663,49 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
           <kbd className="text-[9px] font-mono bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5 text-gray-500">ESC</kbd>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-gray-100 bg-gray-50">
-          <span className="text-[10px] uppercase font-bold text-gray-500">Filtros:</span>
-          <select
+        <div className="flex flex-col gap-2 px-4 py-3 border-b border-ts-hairline bg-ts-canvas">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[11px] text-ts-ink-mute">Etapa</span>
+            <span className="text-[11px] text-ts-ink-mute">
+              {loading ? 'Buscando…' : `${results.length} resultado${results.length !== 1 ? 's' : ''}`}
+            </span>
+          </div>
+          <FilterPills
+            ariaLabel="Etapa"
             value={filterStage}
-            onChange={e => setFilterStage(e.target.value)}
-            className="text-xs border border-gray-200 rounded px-2 py-1 bg-white focus:outline-none focus:border-black"
-          >
-            <option value="">Todos los stages</option>
-            <optgroup label="Activos">
-              {['aplico','prefiltro_enviado','prefiltro_pasado','prefiltro_revision','assessment_invitado','assessment_en_progreso','assessment_completado','entrevista_ia','bateria_psicometrica','recruiter_interview','cwo_interview','touring','terna','oferta'].map(s => (
-                <option key={s} value={s}>{stageLabelShort(s)}</option>
-              ))}
-            </optgroup>
-            <optgroup label="Cerrados">
-              <option value="contratado">Contratados</option>
-              <option value="rechazado">Rechazados</option>
-            </optgroup>
-          </select>
-          <select
-            value={filterMinScore}
-            onChange={e => setFilterMinScore(e.target.value)}
-            className="text-xs border border-gray-200 rounded px-2 py-1 bg-white focus:outline-none focus:border-black"
-          >
-            <option value="">Score mínimo</option>
-            <option value="50">≥ 50</option>
-            <option value="70">≥ 70</option>
-            <option value="80">≥ 80</option>
-            <option value="90">≥ 90</option>
-          </select>
-          {(filterStage || filterMinScore) && (
-            <button
-              onClick={() => { setFilterStage(''); setFilterMinScore(''); }}
-              className="text-[10px] text-red-600 font-bold hover:underline"
-            >
-              Limpiar filtros
-            </button>
-          )}
-          <span className="ml-auto text-[10px] text-gray-500">
-            {loading ? 'Buscando…' : `${results.length} resultado${results.length !== 1 ? 's' : ''}`}
-          </span>
+            onChange={setFilterStage}
+            options={[
+              { value: '', label: 'Todas' },
+              ...['aplico','prefiltro_enviado','prefiltro_pasado','prefiltro_revision','assessment_invitado','assessment_en_progreso','assessment_completado','entrevista_ia','bateria_psicometrica','recruiter_interview','cwo_interview','touring','terna','oferta','contratado','rechazado'].map((stage) => ({
+                value: stage,
+                label: stageLabelShort(stage),
+              })),
+            ]}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] text-ts-ink-mute">Puntaje mínimo</span>
+            <FilterPills
+              ariaLabel="Puntaje mínimo"
+              value={filterMinScore}
+              onChange={setFilterMinScore}
+              options={[
+                { value: '', label: 'Cualquiera' },
+                { value: '50', label: '50 o más' },
+                { value: '70', label: '70 o más' },
+                { value: '80', label: '80 o más' },
+                { value: '90', label: '90 o más' },
+              ]}
+            />
+            {(filterStage || filterMinScore) && (
+              <button
+                type="button"
+                onClick={() => { setFilterStage(''); setFilterMinScore(''); }}
+                className="text-[12px] text-ts-accent-deep"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Results */}
@@ -5806,7 +5717,7 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
               </div>
               <div className="text-sm font-bold text-gray-700">Sin resultados</div>
               <div className="text-xs text-gray-500 mt-1">
-                {debouncedQ ? `No encontramos candidatos para "${debouncedQ}"` : 'Empezá a escribir para buscar'}
+                {debouncedQ ? `No encontramos candidatos para "${debouncedQ}"` : 'Empieza a escribir para buscar'}
               </div>
             </div>
           )}
@@ -5826,7 +5737,10 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-bold text-gray-900">{c.name}</span>
-                    <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${STAGE_CHIP_COLOR[c.stage] || 'bg-gray-100 text-gray-700'}`}>
+                    <span
+                      className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${STAGE_CHIP_COLOR[c.stage] || 'bg-gray-100 text-gray-700'}`}
+                      title={`stage: ${c.stage}`}
+                    >
                       {stageLabelShort(c.stage)}
                     </span>
                     {c.overall_score != null && (
@@ -5835,7 +5749,7 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
                         c.overall_score >= 60 ? 'bg-amber-100 text-amber-800' :
                         'bg-gray-100 text-gray-700'
                       }`}>
-                        Score {c.overall_score}
+                        Puntaje {c.overall_score}
                       </span>
                     )}
                   </div>
@@ -5862,7 +5776,7 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
             <span><kbd className="bg-white border border-gray-200 rounded px-1 py-0.5 text-[9px] font-mono">↵</kbd> abrir</span>
             <span><kbd className="bg-white border border-gray-200 rounded px-1 py-0.5 text-[9px] font-mono">ESC</kbd> cerrar</span>
           </div>
-          <span>Click en candidato → Funnel</span>
+          <span>Clic abre Candidatos</span>
         </div>
       </div>
     </div>
@@ -7131,7 +7045,10 @@ function ScheduleInterviewModal({ onClose }: { onClose: () => void }) {
                       <div className="text-sm font-bold">{c.name}</div>
                       <div className="text-[10px] text-gray-500 truncate">{c.email} · {c.vacancy_title}</div>
                     </div>
-                    <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${STAGE_CHIP_COLOR[c.stage] || 'bg-gray-100 text-gray-700'}`}>
+                    <span
+                      className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${STAGE_CHIP_COLOR[c.stage] || 'bg-gray-100 text-gray-700'}`}
+                      title={`stage: ${c.stage}`}
+                    >
                       {stageLabelShort(c.stage)}
                     </span>
                   </div>
@@ -7697,8 +7614,8 @@ function OnboardingTab() {
     <div>
       <TSSectionBanner
         image={TS_IMG.contact}
-        title="Onboarding"
-        subtitle="Plan 30/60/90 para nuevos hires · integrado con People file"
+        title="Inducción"
+        subtitle="Plan 30/60/90 para personas que ingresan"
         icon="🎉"
       />
 
@@ -7729,7 +7646,7 @@ function OnboardingTab() {
         <KpiTile label="Día 30" value={counts.day30} accent={MS_COLOR.day30} />
         <KpiTile label="Día 60" value={counts.day60} accent={MS_COLOR.day60} />
         <KpiTile label="Día 90" value={counts.day90} accent={MS_COLOR.day90} />
-        <KpiTile label="At risk" value={counts.at_risk} accent="#EF4444" />
+        <KpiTile label="En riesgo" value={counts.at_risk} accent="var(--ts-alert)" />
       </div>
 
       {/* Filter pills */}
@@ -7801,8 +7718,8 @@ function KpiTile({ label, value, accent }: { label: string; value: number; accen
 }
 
 function OnboardingCard({ item, onClick }: { item: OnboardingItem; onClick: () => void }) {
-  const healthColor = item.health === 'at_risk' ? '#EF4444' : item.health === 'behind' ? '#F59E0B' : '#10B981';
-  const healthLabel = item.health === 'at_risk' ? 'At risk' : item.health === 'behind' ? 'Atrasado' : 'On track';
+  const healthColor = item.health === 'at_risk' ? 'var(--ts-alert)' : item.health === 'behind' ? 'var(--ts-amber)' : 'var(--ts-green)';
+  const healthLabel = item.health === 'at_risk' ? 'En riesgo' : item.health === 'behind' ? 'Atrasado' : 'Al día';
   const mColor = MS_COLOR[item.current_milestone];
 
   return (
@@ -7810,8 +7727,6 @@ function OnboardingCard({ item, onClick }: { item: OnboardingItem; onClick: () =
       onClick={onClick}
       className="text-left bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow relative overflow-hidden"
     >
-      <div className="absolute top-0 left-0 right-0 h-[4px]" style={{ background: healthColor }} />
-
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex-1 min-w-0">
@@ -7819,8 +7734,8 @@ function OnboardingCard({ item, onClick }: { item: OnboardingItem; onClick: () =
           <div className="text-[10px] text-gray-500 truncate">{item.person.role} · {item.person.area || '—'}</div>
         </div>
         <span
-          className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase"
-          style={{ background: `${healthColor}1A`, color: healthColor }}
+          className="text-[11px] font-medium px-2 py-0.5 rounded-ts-pill bg-ts-canvas"
+          style={{ color: healthColor }}
         >
           {healthLabel}
         </span>

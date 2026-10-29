@@ -5,12 +5,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 // Node.js runtime para aceptar bodies grandes (CV base64 puede ser hasta ~7MB)
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   try {
     const body = await req.json();
 

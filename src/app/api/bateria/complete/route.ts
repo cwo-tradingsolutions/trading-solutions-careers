@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { cerrarSesion } from '@/lib/bateria/cerrar';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   try {
     const { token } = await req.json();
     if (!token) return NextResponse.json({ error: 'Token requerido' }, { status: 400 });

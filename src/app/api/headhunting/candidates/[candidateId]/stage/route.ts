@@ -18,8 +18,20 @@ import crypto from "crypto";
 // Las etapas válidas (v4 + legacy) viven en la fuente única de verdad.
 // No declarar listas de etapas acá.
 import { VALID_STAGES } from "@/lib/stage-labels";
+import { compEventNote } from "@/lib/hr-pipeline-look";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { ATS_FROM_NAME } from "@/lib/ats-from";
+import {
+  buildCompJobOfferPreview,
+  deliverCompJobOfferPreview,
+  loadOfertaCompSource,
+  logCompPreviewSkip,
+  manualCompPreviewRequested,
+  resolveCompHookPlan,
+  type CompJobOfferPreviewPayload,
+  type CompPreviewResult,
+} from "@/lib/comp-job-offer-preview";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 const TS_LINKEDIN_URL = "https://www.linkedin.com/company/trading-sol/";
 
@@ -63,6 +75,10 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { candidateId: string } }
 ) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 
@@ -203,13 +219,92 @@ export async function POST(
       }
     }
 
-    const { error: updateErr } = await supabaseAdmin
+    // Comp preview · solo al ENTRAR a la etapa existente `oferta`.
+    // Samuel marca la etapa. Este bloque no la mueve: si faltan name/email/cargo
+    // y el preview está armado, responde 400 y no escribe. Si Comp no está
+    // configurado, o el deploy es prod, se omite y la etapa sí se guarda.
+    let compPreview: CompPreviewResult | null = null;
+    let pendingCompPayload: CompJobOfferPreviewPayload | null = null;
+    let pendingCompUrl: string | null = null;
+    let pendingCompKey: string | null = null;
+    let pendingPreviewKey: string | null = null;
+    if (targetStage === "oferta") {
+      const plan = resolveCompHookPlan({
+        fromStage: (candidate.stage as string | null) ?? null,
+        toStage: targetStage,
+        manualPreview: manualCompPreviewRequested(body.comp_preview),
+        candidateId,
+        vacancyId: (candidate.vacancy_id as string | null) ?? null,
+      });
+      if (plan.kind === "skip") {
+        logCompPreviewSkip(plan.result.reason, plan.result.idempotency_key);
+        compPreview = plan.result;
+      } else {
+        const source = await loadOfertaCompSource(supabaseAdmin, candidateId);
+        const built = source
+          ? buildCompJobOfferPreview(source)
+          : { ok: false as const, missing: ["name", "email", "cargo"] as Array<"name" | "email" | "cargo"> };
+        if (!built.ok) {
+          console.info("[comp-job-offer-preview] incomplete", {
+            missing: built.missing,
+            idempotency_key: plan.idempotency_key,
+          });
+          return NextResponse.json(
+            {
+              error: "comp_preview_incomplete",
+              detail: "Faltan name, email o cargo para el preview de Comp. No se inventan y la etapa no cambia.",
+              missing: built.missing,
+            },
+            { status: 400 },
+          );
+        }
+        pendingCompPayload = built.payload;
+        pendingCompUrl = plan.url;
+        pendingCompKey = plan.idempotency_key;
+        pendingPreviewKey = plan.previewKey;
+      }
+    }
+
+    const updateBase = supabaseAdmin
       .from("ht_candidates")
       .update(updates)
       .eq("id", candidateId);
+    // La llamada a Comp va después de ganar la escritura. Si otra petición
+    // ya movió la fila, esta no reenvía (clave candidate_id:vacancy_id).
+    const updateQuery = !pendingCompPayload
+      ? updateBase
+      : candidate.stage == null
+        ? updateBase.is("stage", null)
+        : updateBase.eq("stage", candidate.stage as string);
+    const { data: updatedRows, error: updateErr } = await updateQuery.select("id");
 
     if (updateErr) {
       return NextResponse.json({ error: "save_failed", detail: updateErr.message }, { status: 500 });
+    }
+
+    if (pendingCompPayload && pendingCompKey && (!updatedRows || updatedRows.length === 0)) {
+      logCompPreviewSkip("already_moved", pendingCompKey);
+      return NextResponse.json({
+        success: false,
+        error: "stage_conflict",
+        detail: "La etapa cambió en paralelo. No se llamó a Comp.",
+        candidate_id: candidateId,
+        from_stage: candidate.stage,
+        to_stage: targetStage,
+        comp_preview: {
+          status: "skipped",
+          reason: "already_moved",
+          idempotency_key: pendingCompKey,
+        },
+      }, { status: 409 });
+    }
+
+    if (pendingCompPayload && pendingCompUrl && pendingCompKey && pendingPreviewKey) {
+      compPreview = await deliverCompJobOfferPreview(pendingCompPayload, {
+        url: pendingCompUrl,
+        idempotencyKey: pendingCompKey,
+        previewKey: pendingPreviewKey,
+      });
     }
 
     // ─── Historial de etapa ────────────────────────────────────────
@@ -217,6 +312,7 @@ export async function POST(
     // updated_at, que se pisa con cualquier edición del candidato.
     // Es best-effort: si falla, el movimiento igual quedó guardado.
     if (candidate.stage !== targetStage) {
+      const compNote = compEventNote(compPreview?.status);
       const { error: eventErr } = await supabaseAdmin
         .from("ht_candidate_stage_events")
         .insert({
@@ -226,9 +322,26 @@ export async function POST(
           to_stage: targetStage,
           changed_at: new Date().toISOString(),
           source: "ui",
+          // Omit when null so a production move (Comp held) writes the same
+          // columns as before. A missing `note` column must not drop the event.
+          ...(compNote ? { note: compNote } : {}),
         });
       if (eventErr) {
         console.error("[stage] no se pudo registrar el evento de etapa:", eventErr.message);
+      }
+      // Columna opcional. Si no existe en esta base, el evento de arriba
+      // igual deja el chip. No se tocan variables de Comp en producción.
+      if (compNote) {
+        const stored = await supabaseAdmin
+          .from("ht_candidates")
+          .update({
+            comp_preview_status: compNote === "comp:sent" ? "sent" : "fail",
+            comp_preview_at: new Date().toISOString(),
+          })
+          .eq("id", candidateId);
+        if (stored.error) {
+          console.info("[comp-job-offer-preview] status not stored on row", stored.error.message);
+        }
       }
     }
 
@@ -362,6 +475,7 @@ export async function POST(
       elevare_url: elevareUrl,
       person_id: personId,
       onboarding_id: onboardingId,
+      ...(compPreview ? { comp_preview: compPreview } : {}),
     });
   } catch (err) {
     console.error("stage update error:", err);

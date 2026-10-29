@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import Anthropic from "@anthropic-ai/sdk";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 // Permitir hasta 90s — los 3 agentes Claude en paralelo con transcripts de
 // 14K chars pueden tardar 40-60s. Vercel Pro permite hasta 90s.
@@ -221,6 +222,10 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { token: string } }
 ) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const { token } = params;
 
   try {

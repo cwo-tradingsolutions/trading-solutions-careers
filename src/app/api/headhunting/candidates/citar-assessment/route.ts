@@ -13,6 +13,7 @@ import {
   fechaLegible, horaLegible, inicioEnBogota, duracionMinutos, type DatosCitacion,
 } from '@/lib/citacion-assessment';
 import { buildGoogleCalendarUrl } from '@/lib/ics';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,6 +32,10 @@ function faltantes(b: any): string[] {
 }
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

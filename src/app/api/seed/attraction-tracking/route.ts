@@ -19,6 +19,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import seedData from "@/data/seed/attraction_tracking.json";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,6 +78,10 @@ function generateToken(): string {
 }
 
 export async function POST() {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const sql = neon(process.env.DATABASE_URL!);
   const data = seedData as {
     pipeline: PipelineRow[];

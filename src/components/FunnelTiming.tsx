@@ -46,16 +46,32 @@ interface Data {
   stages: Stage[]; phases: PhaseSummary[]; totals: Totals; approx_ratio: number;
 }
 
-const STATUS_CHIP: Record<Status, { label: string; cls: string; dot: string }> = {
-  ok:       { label: "En SLA",        cls: "text-green-700 border-green-200 bg-green-50",   dot: "bg-green-600" },
-  warning:  { label: "Al límite",     cls: "text-amber-700 border-amber-200 bg-amber-50",   dot: "bg-amber-500" },
-  serious:  { label: "Pasado de SLA", cls: "text-orange-700 border-orange-200 bg-orange-50",dot: "bg-orange-500" },
-  critical: { label: "Crítico",       cls: "text-red-700 border-red-200 bg-red-50",         dot: "bg-red-600" },
+const STATUS_CHIP: Record<Status, { label: string; color: string; bg: string; border: string }> = {
+  ok:       { label: "En SLA",        color: "var(--ts-green)", bg: "var(--ts-green-bg)", border: "var(--ts-green-border)" },
+  warning:  { label: "Al límite",     color: "var(--ts-amber)", bg: "var(--ts-amber-bg)", border: "var(--ts-amber-border)" },
+  serious:  { label: "Pasado de SLA", color: "var(--ts-amber)", bg: "var(--ts-amber-bg)", border: "var(--ts-amber-border)" },
+  critical: { label: "Crítico",       color: "var(--ts-alert)", bg: "var(--ts-alert-bg)", border: "var(--ts-alert-border)" },
 };
 
 const BAR_COLOR: Record<Status, string> = {
-  ok: "#2a78d6", warning: "#2a78d6", serious: "#ec835a", critical: "#d03b3b",
+  ok: "var(--ts-accent)",
+  warning: "var(--ts-accent)",
+  serious: "var(--ts-amber)",
+  critical: "var(--ts-alert)",
 };
+
+function StatusChip({ status }: { status: Status }) {
+  const chip = STATUS_CHIP[status];
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[11.5px] font-medium px-2 py-0.5 rounded-full border"
+      style={{ color: chip.color, background: chip.bg, borderColor: chip.border }}
+    >
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: chip.color }} />
+      {chip.label}
+    </span>
+  );
+}
 
 function fmt(n: number): string {
   return n.toFixed(1).replace(".", ",").replace(",0", "");
@@ -121,7 +137,7 @@ export default function FunnelTiming({
         <Tile label="Estancados · pasados de SLA"
               value={String(totals.stuck)}
               valueSmall={totals.active ? `de ${totals.active} · ${totals.stuck_pct}%` : undefined}
-              valueClass={totals.stuck > 0 ? "text-red-700" : ""}
+              valueClass=""
               foot={totals.stuck > 0 ? "Requiere acción" : "Todo dentro de SLA"} />
         {totals.most_stuck ? (
           <Tile label="El más estancado"
@@ -164,7 +180,6 @@ export default function FunnelTiming({
             {stages.map((s, i) => {
               const first = i === 0 || stages[i - 1].phase !== s.phase;
               const ph = phases.find((p) => p.id === s.phase);
-              const chip = STATUS_CHIP[s.count ? s.status : "ok"];
               const isOpen = !!open[s.id];
               return (
                 // La key va en el Fragment, no en los hijos: es el elemento que
@@ -204,9 +219,7 @@ export default function FunnelTiming({
                     <td className="px-4 py-2.5 text-right tabular-nums">{s.count}</td>
                     <td className="px-4 py-2.5">
                       {s.count > 0 ? (
-                        <span className={`inline-flex items-center gap-1 text-[11.5px] font-medium px-2 py-0.5 rounded-full border ${chip.cls}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${chip.dot}`} />{chip.label}
-                        </span>
+                        <StatusChip status={s.status} />
                       ) : <span className="text-[11.5px] text-neutral-300">vacía</span>}
                     </td>
                   </tr>
@@ -230,7 +243,6 @@ export default function FunnelTiming({
                               </thead>
                               <tbody>
                                 {s.breakdown.map((b) => {
-                                  const bc = STATUS_CHIP[b.count ? b.status : "ok"];
                                   return (
                                     <tr key={b.id} className="border-t border-neutral-200">
                                       <td className="py-1.5 pr-3 font-medium">{b.label}</td>
@@ -240,9 +252,7 @@ export default function FunnelTiming({
                                       <td className="py-1.5 pr-3 text-right tabular-nums text-neutral-400">{b.sla}</td>
                                       <td className="py-1.5">
                                         {b.count > 0 ? (
-                                          <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border ${bc.cls}`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${bc.dot}`} />{bc.label}
-                                          </span>
+                                          <StatusChip status={b.status} />
                                         ) : <span className="text-[11px] text-neutral-300">—</span>}
                                       </td>
                                     </tr>
@@ -300,7 +310,7 @@ export default function FunnelTiming({
         </table>
         <div className="flex items-center gap-2 px-4 py-2 border-t border-neutral-200 text-[11.5px] text-neutral-400">
           <span className="inline-block w-0.5 h-3 bg-neutral-600 rounded-sm" />
-          La marca vertical sobre cada barra es el SLA de esa etapa · barra naranja o roja = pasada del SLA
+          La marca vertical sobre cada barra es el SLA de esa etapa · la barra ámbar o suave marca que se pasó del SLA
         </div>
       </div>
     </div>

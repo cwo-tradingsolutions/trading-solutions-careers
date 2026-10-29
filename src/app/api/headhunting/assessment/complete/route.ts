@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { recordStageEvent } from '@/lib/stage-events';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 function calculateIntegrityScore(proctoring: {
   camera_enabled?: boolean;
@@ -19,6 +20,10 @@ function calculateIntegrityScore(proctoring: {
 }
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   try {
     const { token, total_time_seconds, proctoring } = await req.json();
 

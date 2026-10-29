@@ -10,12 +10,17 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { armarInforme } from "@/lib/informe-vacante/datos";
 import { renderInformePdf } from "@/lib/informe-vacante/pdf";
 import { baseDe, nombreArchivo, textosEditados } from "@/lib/informe-vacante/entrada";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest, { params }: { params: { vacancyId: string } }) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
   try {

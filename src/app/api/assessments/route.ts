@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { getResend, EMAIL_FROM, EMAIL_BCC } from "@/lib/resend";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -156,6 +157,10 @@ function buildEmailHtml(opts: {
 }
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   // Escritura solo para HR Admin. Antes esta ruta aceptaba cambios de
   // cualquiera en internet.
   const authError = requireAdmin(req);

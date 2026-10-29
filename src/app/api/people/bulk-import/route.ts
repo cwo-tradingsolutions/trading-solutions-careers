@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 const KNOWN_FIELDS = new Set([
   'name','email','role','area','role_level','start_date','status',
@@ -41,6 +42,10 @@ type ImportResult = {
 };
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

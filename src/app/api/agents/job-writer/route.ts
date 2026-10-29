@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { getAnthropic } from "@/lib/anthropic";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 export const runtime = "nodejs";
 
@@ -48,6 +49,10 @@ Formato salida:
 `.trim();
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   // Escritura solo para HR Admin. Antes esta ruta aceptaba cambios de
   // cualquiera en internet.
   const authError = requireAdmin(req);

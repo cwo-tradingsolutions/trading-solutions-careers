@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase';
 import { isAdminRequest } from '@/lib/bateria/auth';
 import { BATTERY_VERSION } from '@/lib/bateria/items';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,10 @@ export const dynamic = 'force-dynamic';
  * si el candidato ya tiene sesion se devuelve la suya, nunca la de otro.
  */
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   if (!isAdminRequest(req)) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   try {
     const { candidatos, perfil } = await req.json();

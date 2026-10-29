@@ -16,6 +16,19 @@ import { rubricaDeVacante } from "@/lib/rubricas";
 import { escucharPedidos, tomarPedidoDeCandidato } from "@/lib/abrirCandidato";
 import HistorialContactos from "@/components/HistorialContactos";
 import SeguimientoVacante from "@/components/SeguimientoVacante";
+import { FilterMenu, FilterPills } from "@/components/universe/Filters";
+import {
+  HIRING_EMPLOYER,
+  accionHoy,
+  compStatusOf,
+  daysSince,
+  nombreCorto,
+  paisDe,
+  shortCandidateId,
+  slaFor,
+  stageLabelUi,
+  stageTechTip,
+} from "@/lib/hr-pipeline-look";
 
 // Map de stage → icono Lucide. Centralizado para reutilizar en cualquier render.
 const STAGE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -57,7 +70,11 @@ type Cand = {
   /** De dónde salió el candidato · 'cv_proceso_anterior' = HV cargada de un
    *  banco o de una búsqueda previa, no aplicó por la web. */
   source?: string | null;
-  ht_vacancies?: { title: string };
+  ht_vacancies?: { title?: string; country?: string | null };
+  location?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
+  comp_preview_status?: "sent" | "fail" | null;
   // Rejection metadata · llenado al rechazar con motivo
   rejection_category?: string | null;
   rejection_sub_detail?: string | null;
@@ -166,6 +183,7 @@ type Vacancy = {
   owner_recruiter_id?: string | null;
   /** Quien puede operarla igual sin aparecer frente al candidato. */
   support_recruiter_id?: string | null;
+  country?: string | null;
 };
 
 /** El equipo de Talent, para saber de quién es cada vacante. */
@@ -313,6 +331,10 @@ export default function PipelineFunnel() {
   const [verCerradas, setVerCerradas] = useState(false);
   /** Origen: separa lo que se cargó de un proceso anterior de lo que llegó solo. */
   const [origenFilter, setOrigenFilter] = useState<"all" | "cv_proceso_anterior" | "web">("all");
+  const [miVacante, setMiVacante] = useState(false);
+  const [soloP0, setSoloP0] = useState(false);
+  const [soloAging, setSoloAging] = useState(false);
+  const [paisFilter, setPaisFilter] = useState("all");
   // Inicializar vacFilter desde URL query (?vacancy=UUID) — persiste entre reloads.
   // Usamos query string (no hash) porque el HR Admin ya usa el hash para el tab.
   const [vacFilter, setVacFilterState] = useState(() => {
@@ -513,7 +535,7 @@ export default function PipelineFunnel() {
     [duenoFilter, vacantesVisibles],
   );
 
-  const filtered = useMemo(() => {
+  const baseFiltered = useMemo(() => {
     let base: Cand[];
     if (vacFilter !== "all") base = candidates.filter(c => c.vacancy_id === vacFilter);
     else if (idsDelDueno) base = candidates.filter(c => c.vacancy_id && idsDelDueno.has(c.vacancy_id));
@@ -531,6 +553,54 @@ export default function PipelineFunnel() {
     }
     return base;
   }, [candidates, vacFilter, verCerradas, idsAbiertas, origenFilter, idsDelDueno]);
+
+  const vacById = useMemo(() => {
+    const map = new Map<string, Vacancy>();
+    for (const vacancy of vacancies) map.set(vacancy.id, vacancy);
+    return map;
+  }, [vacancies]);
+
+  const fichas = useMemo(() => {
+    return baseFiltered.map((c) => {
+      const vac = vacById.get(c.vacancy_id);
+      const stage = normalizeStage(c.stage) || "aplico";
+      const days = daysSince(c.updated_at || c.created_at);
+      const sla = slaFor(stage);
+      const pais = paisDe({
+        vacancyCountry: vac?.country ?? c.ht_vacancies?.country,
+        location: c.location,
+        city: c.prefilter_data?.city || c.prefilter_data?.current_city,
+      });
+      return { c, vac, stage, days, sla, pais, hoy: accionHoy(days, sla) };
+    });
+  }, [baseFiltered, vacById]);
+
+  const paises = useMemo(() => {
+    const set = new Set<string>();
+    for (const ficha of fichas) if (ficha.pais) set.add(ficha.pais);
+    return [...set].sort((a, b) => a.localeCompare(b, "es"));
+  }, [fichas]);
+
+  const scoped = useMemo(() => {
+    let list = fichas;
+    if (miVacante && vacFilter === "all") {
+      list = list.filter((ficha) => Boolean(ficha.vac?.owner_recruiter_id));
+    }
+    if (paisFilter !== "all") list = list.filter((ficha) => ficha.pais === paisFilter);
+    return list;
+  }, [fichas, miVacante, vacFilter, paisFilter]);
+
+  const agingRows = useMemo(() => {
+    return scoped
+      .filter((ficha) => ficha.hoy && ficha.stage !== "contratado" && ficha.stage !== "rechazado")
+      .sort((a, b) => b.days - a.days)
+      .slice(0, 8);
+  }, [scoped]);
+
+  const filtered = useMemo(() => {
+    const list = soloP0 || soloAging ? scoped.filter((ficha) => ficha.hoy) : scoped;
+    return list.map((ficha) => ficha.c);
+  }, [scoped, soloP0, soloAging]);
 
   /** Dentro de cada columna, quien ya tiene resultado de bateria va primero y
    *  de mayor a menor match. El orden ES el ranking: no hace falta abrir otra
@@ -578,9 +648,9 @@ export default function PipelineFunnel() {
       <div className="mb-8 pb-6 border-b border-[var(--ts-gray-10)]">
         <div className="flex items-end justify-between flex-wrap gap-6">
           <div>
-            <div className="ts-eyebrow mb-3">Talent Acquisition · Pipeline</div>
-            <h1 className="ts-display text-[44px] md:text-[56px] text-[var(--ts-black)] m-0">
-              Funnel
+            <div className="ts-eyebrow mb-3">Selección</div>
+            <h1 className="text-[24px] font-medium tracking-[-0.3px] text-[#0e0e0e] m-0">
+              Candidatos
             </h1>
             <p className="text-[15px] text-[var(--ts-gray-60)] mt-3 max-w-[640px] leading-[1.55]">
               Vista del proceso completo · {totals} candidatos
@@ -590,88 +660,80 @@ export default function PipelineFunnel() {
               <span className="text-[var(--ts-gray-40)]"> · </span>
               <span className="ts-tabular text-[var(--ts-green)]">{hiredCount}</span> contratados
               <span className="text-[var(--ts-gray-40)]"> · </span>
-              <span className="ts-tabular text-[var(--ts-red)]">{rejectedCount}</span> rechazados
+              <span className="ts-tabular text-[var(--ts-muted)]">{rejectedCount}</span> rechazados
               <span className="text-[var(--ts-gray-40)]"> · </span>
               <a href="/hr-admin/trazabilidad" className="underline text-[var(--ts-black)] font-semibold">
                 Trazabilidad de contactos
               </a>
             </p>
           </div>
-          <div className="flex flex-col items-end gap-1.5">
+          <div className="flex flex-col items-end gap-3">
             {/* Quién lleva el proceso. Aparece solo cuando hay equipo cargado:
                 con una sola persona reclutando, el filtro es ruido. */}
             {reclutadores.length > 1 && (
               <div className="flex items-center gap-2">
                 <span className="ts-eyebrow text-[10px]">Reclutador</span>
-                <select
+                <FilterMenu
+                  ariaLabel="Reclutador"
                   value={duenoFilter}
-                  onChange={(e) => {
-                    setDuenoFilter(e.target.value);
+                  onChange={(value) => {
+                    setDuenoFilter(value);
                     setVacFilter("all");
                   }}
-                  className="text-xs font-medium border border-[var(--ts-gray-20)] bg-white px-2 py-1 hover:border-[var(--ts-black)] focus:border-[var(--ts-black)] outline-none transition-colors"
-                  style={{ borderRadius: 0 }}
-                  title="Muestra solo las vacantes de esa persona, como dueña o como apoyo"
-                >
-                  <option value="all">Todo el equipo</option>
-                  {reclutadores
-                    .filter((r) => r.rol !== "hiring_manager")
-                    .map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.nombre}
-                      </option>
-                    ))}
-                </select>
+                  groups={[{
+                    options: [
+                      { value: "all", label: "Todo el equipo" },
+                      ...reclutadores
+                        .filter((r) => r.rol !== "hiring_manager")
+                        .map((r) => ({ value: r.id, label: r.nombre })),
+                    ],
+                  }]}
+                />
                 <a
                   href="/hr-admin/reclutadores"
                   className="text-[11px] underline text-[var(--ts-gray-60)] hover:text-[var(--ts-black)] whitespace-nowrap"
-                  title="Equipo de Talent y dueños de vacante"
+                  title="Equipo de selección y dueños de vacante"
                 >
                   equipo
                 </a>
               </div>
             )}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
               <span className="ts-eyebrow text-[10px]">Origen</span>
-              <select
+              <FilterPills
+                ariaLabel="Origen"
                 value={origenFilter}
-                onChange={(e) => setOrigenFilter(e.target.value as "all" | "cv_proceso_anterior" | "web")}
-                className="text-xs font-medium border border-[var(--ts-gray-20)] bg-white px-2 py-1 hover:border-[var(--ts-black)] focus:border-[var(--ts-black)] outline-none transition-colors"
-                style={{ borderRadius: 0 }}
-                title="Separa las hojas de vida cargadas de un proceso anterior de quienes aplicaron por la web"
-              >
-                <option value="all">Todos</option>
-                <option value="cv_proceso_anterior">CV proceso anterior</option>
-                <option value="web">Aplicaron por la web</option>
-              </select>
+                onChange={(value) => setOrigenFilter(value as "all" | "cv_proceso_anterior" | "web")}
+                options={[
+                  { value: "all", label: "Todos" },
+                  { value: "cv_proceso_anterior", label: "CV de un proceso anterior" },
+                  { value: "web", label: "Aplicaron por la web" },
+                ]}
+              />
             </div>
             <span className="ts-eyebrow text-[10px]">Vacante</span>
-            <div className="flex items-center gap-2">
-              <select
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <FilterMenu
+                ariaLabel="Vacante"
                 value={vacFilter}
-                onChange={(e) => setVacFilter(e.target.value)}
-                className="text-sm font-medium border border-[var(--ts-gray-20)] bg-white px-4 py-2.5 hover:border-[var(--ts-black)] focus:border-[var(--ts-black)] outline-none transition-colors min-w-[240px]"
-                style={{ borderRadius: 0 }}
-              >
-                <option value="all">Todas las vacantes</option>
-                {opcionesVacante.abiertas.map(o => (
-                  <option key={o.id} value={o.id}>{o.label}</option>
-                ))}
-                {/* Las cerradas solo aparecen si se piden. Se sigue mostrando
-                    la que esté seleccionada aunque esté cerrada: si no, el
-                    selector quedaría en blanco filtrando por algo invisible. */}
-                {opcionesVacante.cerradas
-                  .filter(o => verCerradas || o.id === vacFilter)
-                  .length > 0 && (
-                  <optgroup label="Cerradas (con candidatos)">
-                    {opcionesVacante.cerradas
-                      .filter(o => verCerradas || o.id === vacFilter)
-                      .map(o => (
-                        <option key={o.id} value={o.id}>{o.label}</option>
-                      ))}
-                  </optgroup>
-                )}
-              </select>
+                onChange={setVacFilter}
+                groups={[
+                  {
+                    options: [
+                      { value: "all", label: "Todas las vacantes" },
+                      ...opcionesVacante.abiertas.map((o) => ({ value: o.id, label: o.label })),
+                    ],
+                  },
+                  ...(opcionesVacante.cerradas.filter((o) => verCerradas || o.id === vacFilter).length > 0
+                    ? [{
+                        label: "Cerradas (con candidatos)",
+                        options: opcionesVacante.cerradas
+                          .filter((o) => verCerradas || o.id === vacFilter)
+                          .map((o) => ({ value: o.id, label: o.label })),
+                      }]
+                    : []),
+                ]}
+              />
               {opcionesVacante.cerradas.length > 0 && (
                 <label
                   className="flex items-center gap-1.5 text-[11px] text-[var(--ts-gray-60)] whitespace-nowrap cursor-pointer"
@@ -755,6 +817,73 @@ export default function PipelineFunnel() {
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2 mb-4" role="group" aria-label="Filtros del pipeline">
+        <button
+          type="button"
+          className={`hr-pill ${miVacante ? "on" : ""}`}
+          aria-pressed={miVacante}
+          onClick={() => setMiVacante((on) => !on)}
+        >
+          Mi vacante
+        </button>
+        <button
+          type="button"
+          className={`hr-pill warn ${soloP0 ? "on" : ""}`}
+          aria-pressed={soloP0}
+          onClick={() => setSoloP0((on) => !on)}
+        >
+          P0
+        </button>
+        <button
+          type="button"
+          className={`hr-pill ${soloAging ? "on" : ""}`}
+          aria-pressed={soloAging}
+          onClick={() => setSoloAging((on) => !on)}
+        >
+          Aging / bloqueados
+        </button>
+        <button
+          type="button"
+          className={`hr-pill ${paisFilter === "all" ? "on" : ""}`}
+          aria-pressed={paisFilter === "all"}
+          onClick={() => setPaisFilter("all")}
+        >
+          Todos los países
+        </button>
+        {paises.map((pais) => (
+          <button
+            key={pais}
+            type="button"
+            className={`hr-pill ${paisFilter === pais ? "on" : ""}`}
+            aria-pressed={paisFilter === pais}
+            onClick={() => setPaisFilter(pais)}
+          >
+            {pais}
+          </button>
+        ))}
+      </div>
+
+      <section className="ts-aging mb-5" aria-label="Aging y bloqueados">
+        <h2 className="text-[13px] font-semibold m-0 mb-2.5 text-[#0e0e0e]">Aging · bloqueados (acción hoy)</h2>
+        {agingRows.length === 0 ? (
+          <p className="text-[12px] text-[#8a8a8a] m-0">Nadie pasado de SLA en esta vista.</p>
+        ) : agingRows.map((ficha) => (
+          <button
+            key={ficha.c.id}
+            type="button"
+            className="ts-aging-row"
+            onClick={() => setSelectedCand(ficha.c)}
+          >
+            <span className="ts-chip ts-chip-hoy">{ficha.days}d · SLA {ficha.sla}</span>
+            <strong className="font-semibold text-[#0e0e0e]">{ficha.c.name}</strong>
+            <span className="truncate">
+              {stageLabelUi(ficha.stage)}
+              {ficha.c.ht_vacancies?.title ? ` · ${ficha.c.ht_vacancies.title}` : ""}
+            </span>
+          </button>
+        ))}
+      </section>
+
       {/* Seguimiento de contactos de la vacante elegida: quién espera
           respuesta nuestra y quién no tiene ningún contacto. */}
       {vacFilter !== "all" && (
@@ -769,7 +898,23 @@ export default function PipelineFunnel() {
       )}
 
       {loading ? (
-        <div className="text-center py-16 ts-eyebrow text-[var(--ts-gray-40)]">Cargando pipeline…</div>
+        <div className="py-6" aria-busy="true" aria-live="polite">
+          <p className="text-sm text-ts-muted mb-4">Cargando candidatos…</p>
+          <div className="flex gap-2 overflow-hidden">
+            {["Aplicó", "Prefiltro", "Entrevista", "Oferta", "Decisión"].map((label) => (
+              <div key={label} className="w-[220px] shrink-0 rounded-ts-md border border-ts-hairline bg-ts-surface overflow-hidden">
+                <div className="px-3 py-3 border-b border-ts-hairline bg-ts-canvas">
+                  <div className="h-3 w-16 rounded-ts-pill bg-ts-surface-2" />
+                  <p className="mt-2 text-[12px] text-ts-ink-mute">{label}</p>
+                </div>
+                <div className="p-3 space-y-2">
+                  <div className="h-14 rounded-ts-sm bg-ts-canvas" />
+                  <div className="h-14 rounded-ts-sm bg-ts-canvas" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : (
         <>
           {/* ════════════════ LEYENDA DE OWNERS ════════════════ */}
@@ -790,9 +935,10 @@ export default function PipelineFunnel() {
                 const cands = byStage[stage.id] || [];
                 const stageSelected = cands.filter(c => selectedIds.has(c.id)).length;
                 const ownerStyle = OWNER_STYLE[stage.owner];
-                const OwnerIcon = stage.owner === 'candidate' ? User : stage.owner === 'recruiter' ? UserCheck : stage.owner === 'shared' ? Users : null;
+                const compSent = cands.filter((c) => compStatusOf(c.comp_preview_status) === "sent").length;
+                const compFail = cands.filter((c) => compStatusOf(c.comp_preview_status) === "fail").length;
                 return (
-                  <div key={stage.id} className="w-[260px] flex-shrink-0">
+                  <div key={stage.id} className="w-[280px] flex-shrink-0">
                     {/* Cabecera de etapa · opción C
                         El contraste sale del peso de la letra y de un fondo
                         apenas marcado, no de una barra negra: cinco barras
@@ -807,7 +953,9 @@ export default function PipelineFunnel() {
                           style={{ background: ownerStyle.barColor }}
                           title={`Depende de: ${ownerStyle.label}`}
                         />
-                        <span className="ts-etapa-nombre flex-1 min-w-0">{stage.label}</span>
+                        <span className="ts-etapa-nombre flex-1 min-w-0" title={stageTechTip(stage.id)}>
+                          {stageLabelUi(stage.id)}
+                        </span>
                         {cands.length > 0 && (
                           <button
                             onClick={() => stageSelected === cands.length ? cands.forEach(c => toggleSelect(c.id)) : selectAllInStage(stage.id)}
@@ -821,7 +969,11 @@ export default function PipelineFunnel() {
                           {cands.length}
                         </span>
                       </div>
-                      <div className="ts-etapa-duenio mt-1 pl-[15px]">{ownerStyle.label}</div>
+                      <div className="ts-etapa-duenio mt-1 pl-[15px] flex flex-wrap items-center gap-1.5">
+                        <span>{ownerStyle.label}</span>
+                        {compSent > 0 && <span className="ts-chip ts-chip-ok">Comp sent {compSent}</span>}
+                        {compFail > 0 && <span className="ts-chip ts-chip-fail">Comp fail {compFail}</span>}
+                      </div>
                     </div>
                     {/* Column body */}
                     <div
@@ -833,49 +985,75 @@ export default function PipelineFunnel() {
                         </div>
                       ) : cands.map(c => {
                         const isSelected = selectedIds.has(c.id);
+                        const vac = vacById.get(c.vacancy_id);
+                        const stageId = normalizeStage(c.stage) || stage.id;
+                        const days = daysSince(c.updated_at || c.created_at);
+                        const sla = slaFor(stageId);
+                        const hoy = accionHoy(days, sla);
+                        const pais = paisDe({
+                          vacancyCountry: vac?.country ?? c.ht_vacancies?.country,
+                          location: c.location,
+                          city: c.prefilter_data?.city || c.prefilter_data?.current_city,
+                        });
+                        const dueno = reclutadores.find((r) => r.id === vac?.owner_recruiter_id);
+                        const quien = nombreCorto(dueno?.nombre);
+                        const comp = compStatusOf(c.comp_preview_status);
                         return (
                           <div
                             key={c.id}
-                            className={`relative bg-white border p-3 mb-2 transition-all ${
-                              isSelected
-                                ? "border-[var(--ts-black)] shadow-sm"
-                                : "border-[var(--ts-gray-10)] hover:border-[var(--ts-gray-60)]"
-                            }`}
+                            className={`ts-pipe-card relative mb-2.5 ${isSelected ? "ring-1 ring-[#0e0e0e]" : ""}`}
+                            title={stageTechTip(c.stage || stage.id)}
+                            data-stage={c.stage || stage.id}
                           >
                             <input
                               type="checkbox"
                               checked={isSelected}
                               onChange={(e) => { e.stopPropagation(); toggleSelect(c.id); }}
                               onClick={(e) => e.stopPropagation()}
-                              className="absolute top-2.5 right-2.5 w-3.5 h-3.5 cursor-pointer accent-[var(--ts-black)]"
+                              className="absolute top-3.5 right-3 w-3.5 h-3.5 cursor-pointer accent-[#0e0e0e]"
                               title="Seleccionar para acción masiva"
                             />
                             <button onClick={() => setSelectedCand(c)} className="w-full text-left pr-5">
-                              <div className="text-[14px] font-bold leading-tight text-[var(--ts-black)]" style={{ letterSpacing: '-0.01em' }}>
-                                {c.name}
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-[14px] font-semibold leading-tight text-[#0e0e0e] m-0">{c.name}</p>
+                                <span
+                                  className={hoy ? "ts-chip ts-chip-hoy" : "ts-chip ts-chip-sla"}
+                                  title={hoy ? "Acción hoy · pasado el SLA" : "Dentro del SLA"}
+                                >
+                                  {days}d · SLA {sla ?? "—"}
+                                </span>
                               </div>
-                              <div className="text-[11px] text-[var(--ts-gray-60)] truncate mt-1 ts-tabular">
-                                {c.email}
+                              <p className="text-[12px] text-[#6a6a6a] truncate mt-1 mb-2.5">{c.email}</p>
+                              <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+                                <span className="text-[11px] text-[#8a8a8a] tabular-nums">{shortCandidateId(c.id)}</span>
+                                {pais && <span className="ts-chip-meta">{pais}</span>}
+                                <span className="ts-chip-meta">{c.ht_vacancies?.title || "Sin vacante"}</span>
+                                <span className="ts-chip-meta">{HIRING_EMPLOYER}</span>
                               </div>
                               {esperandoIds.has(c.id) && (
                                 <div
-                                  className="mt-1.5 inline-block text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5"
+                                  className="mb-2 inline-block text-[10px] font-medium text-[#6a4a10] bg-[#fff8eb] border border-[#f0d9a8] px-1.5 py-0.5 rounded-full"
                                   title="El último mensaje es del candidato y no le hemos respondido"
                                 >
-                                  ✉ Espera respuesta
+                                  Espera respuesta
                                 </div>
                               )}
-                              <div className="mt-2 inline-block ts-eyebrow text-[9px] tracking-[1.5px] text-[var(--ts-gray-90)] border border-[var(--ts-gray-20)] px-1.5 py-0.5">
-                                {c.ht_vacancies?.title || "—"}
-                              </div>
                               {c.source === "cv_proceso_anterior" && (
                                 <div
-                                  className="mt-1.5 inline-block ts-eyebrow text-[9px] tracking-[1.5px] text-[var(--ts-gray-60)] bg-[var(--ts-gray-10)] px-1.5 py-0.5"
+                                  className="mb-2 inline-block text-[10px] text-[#6a6a6a] bg-[#f5f5f7] px-1.5 py-0.5 rounded"
                                   title="Hoja de vida cargada de un proceso anterior · no aplicó por la web"
                                 >
                                   CV proceso anterior
                                 </div>
                               )}
+                              <div className="flex items-center justify-between gap-2 mt-1">
+                                <div className="flex items-center gap-1.5 text-[11px] text-[#3a3a3a] min-w-0">
+                                  <span className="ts-av" aria-hidden>{quien.initials}</span>
+                                  <span className="truncate">{quien.short}</span>
+                                </div>
+                                {comp === "sent" && <span className="ts-chip ts-chip-ok">Comp sent</span>}
+                                {comp === "fail" && <span className="ts-chip ts-chip-fail">Comp fail</span>}
+                              </div>
                             </button>
                             <ChipBateria est={bateria[c.id]} />
                           </div>

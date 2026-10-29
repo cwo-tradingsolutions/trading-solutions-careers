@@ -11,11 +11,16 @@ import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import crypto from "crypto";
 import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: { candidateId: string } }
 ) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

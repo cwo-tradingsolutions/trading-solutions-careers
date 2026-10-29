@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { guardarContactos, huella, sincronizarGmailCandidato, type Canal, type Direccion } from "@/lib/contactos";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +41,8 @@ export async function GET(req: NextRequest, { params }: { params: { candidateId:
   let sync: { ok: boolean; nuevos?: number; error?: string } | null = null;
   const vencido =
     !cand.contactos_sync_at || Date.now() - new Date(cand.contactos_sync_at).getTime() > 30 * 60_000;
-  if (req.nextUrl.searchParams.get("sync") !== "0" && vencido) {
+  // Preview reads the stored history and does not pull Gmail into production.
+  if (process.env.VERCEL_ENV !== "preview" && req.nextUrl.searchParams.get("sync") !== "0" && vencido) {
     const r = await sincronizarGmailCandidato(cand);
     sync = r.ok ? { ok: true, nuevos: r.nuevos } : { ok: false, error: r.error };
   }
@@ -88,6 +90,10 @@ export async function GET(req: NextRequest, { params }: { params: { candidateId:
 }
 
 export async function POST(req: NextRequest, { params }: { params: { candidateId: string } }) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

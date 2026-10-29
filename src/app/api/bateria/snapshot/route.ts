@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,10 @@ const MAX_BYTES = 400 * 1024;
  * El bucket es privado: las imágenes solo se ven con URL firmada desde el informe.
  */
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   try {
     const { token, image, block, item_code } = await req.json();
     if (!token || !image) return NextResponse.json({ error: 'Parámetros faltantes' }, { status: 400 });

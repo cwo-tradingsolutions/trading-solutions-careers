@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { isPreviewReadonlyBlocked, PREVIEW_READONLY_ERROR } from '@/lib/preview-readonly';
 
 /**
  * Middleware combinado:
@@ -43,6 +44,19 @@ async function isValidSession(token: string | undefined, secret: string | undefi
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Preview of this branch uses the production database. Refuse writes,
+  // Gmail drafts, invites, and cron mail before any route code runs.
+  // Login only sets a cookie. Reads stay open. Production is unchanged.
+  if (
+    isPreviewReadonlyBlocked({
+      vercelEnv: process.env.VERCEL_ENV,
+      method: request.method,
+      pathname,
+    })
+  ) {
+    return NextResponse.json({ error: PREVIEW_READONLY_ERROR }, { status: 403 });
+  }
 
   // ---------- 1) Protección de /hr-admin ----------
   if (pathname.startsWith('/hr-admin')) {

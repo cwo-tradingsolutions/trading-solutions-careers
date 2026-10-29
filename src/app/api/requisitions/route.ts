@@ -11,6 +11,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
 import { requireWxm, correoDelLider } from "@/lib/wxm-auth";
 import { RequisitionStatus, RequisitionType, diasEnEstado } from "@/lib/requisitions";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 export const runtime = "nodejs";
 
@@ -36,6 +37,10 @@ async function registrarEvento(
 }
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   // La requisición la crea el líder desde WXM (token de servicio) o
   // Wellness/HR directamente desde el ATS (cookie de sesión de HR-admin).
   // Basta con una de las dos.

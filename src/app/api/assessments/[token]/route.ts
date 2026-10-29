@@ -5,6 +5,7 @@
  */
 import { neon } from "@neondatabase/serverless";
 import { NextRequest, NextResponse } from "next/server";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -63,6 +64,10 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { token: string } }
 ) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   try {
     const body = (await req.json()) as PatchBody;
     const sql = neon(process.env.DATABASE_URL!);

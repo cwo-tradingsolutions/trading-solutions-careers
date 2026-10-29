@@ -4,8 +4,13 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { scoreCandidate } from '@/lib/headhunting/scoring-agent';
 import { calculateMatchPercentage, compareToBenchmark, detectRedFlags } from '@/lib/headhunting/match-calculator';
 import type { HtScenario, HtResponse, IdealProfile } from '@/lib/headhunting/types';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

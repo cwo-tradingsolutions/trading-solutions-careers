@@ -17,6 +17,7 @@ import { createDraftViaGmail, isGmailConnected } from '@/lib/gmail';
 import { asuntoRecordatorio, htmlRecordatorio, textoRecordatorio, FIRMA_RECORDATORIO,
   asuntoRecordatorioEn, htmlRecordatorioEn, EN_REMINDER_SIGNATURE } from '@/lib/recordatorio-prefiltro';
 import { resolveCandidateLang } from '@/lib/candidate-lang';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,6 +35,10 @@ function formatoFecha(iso: string, lang: 'es' | 'en' = 'es'): string {
 }
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

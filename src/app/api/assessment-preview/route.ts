@@ -20,6 +20,7 @@ import { neon } from "@neondatabase/serverless";
 import { NextRequest, NextResponse } from "next/server";
 import { TS_SCENARIOS } from "@/lib/headhunting/scenarios-ts";
 import { TS_BENCHMARK_STATS, TS_DNA_PATTERNS } from "@/lib/headhunting/calibration-data";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 export const runtime = "nodejs";
 
@@ -69,6 +70,10 @@ async function ensureTables() {
 
 // ─── POST: guardar respuesta o completar run ─────────────────────────
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   try {
     const sql = neon(process.env.DATABASE_URL!);
     await ensureTables();

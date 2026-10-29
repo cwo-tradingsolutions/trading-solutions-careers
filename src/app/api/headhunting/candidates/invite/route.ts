@@ -5,6 +5,7 @@ import { Resend } from 'resend';
 import { createDraftViaGmail, isGmailConnected } from '@/lib/gmail';
 import crypto from 'crypto';
 import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 function getResend(): Resend | null {
   const key = process.env.RESEND_API_KEY;
@@ -23,6 +24,10 @@ function getResend(): Resend | null {
 type InviteMode = 'auto' | 'draft' | 'send' | 'token-only';
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

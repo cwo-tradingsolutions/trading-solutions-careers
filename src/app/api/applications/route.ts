@@ -10,6 +10,7 @@ import { recordStageEvent } from "@/lib/stage-events";
 // /api/admin/sync-applications-to-funnel · no duplicarla acá.
 import { resolverVacante } from "@/lib/vacancy-map";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -23,6 +24,10 @@ async function ensureDB() {
 }
 
 export async function POST(request: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   try {
     await ensureDB();
 

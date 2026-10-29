@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 /**
  * Crea el esquema de Neon y resiembra las vacantes.
@@ -303,6 +304,10 @@ const VACANCIES: VacancySeed[] = [
 ];
 
 export async function POST(request: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(request);
   if (authError) return authError;
 

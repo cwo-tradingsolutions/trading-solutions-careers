@@ -4,6 +4,7 @@ import { sql, initDB } from "@/lib/db";
 import { generatePortalToken } from "@/lib/portal-token";
 import { getResend, EMAIL_FROM } from "@/lib/resend";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 let dbInitialized = false;
 
@@ -121,6 +122,10 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   // Escritura solo para HR Admin. Antes esta ruta aceptaba cambios de
   // cualquiera en internet.
   const authError = requireAdmin(request);

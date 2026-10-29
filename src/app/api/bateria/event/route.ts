@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +10,10 @@ const ALLOWED = new Set([
 ]);
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   try {
     const { token, kind, detail, item_code } = await req.json();
     if (!token || !ALLOWED.has(kind)) return NextResponse.json({ error: 'Parámetros inválidos' }, { status: 400 });

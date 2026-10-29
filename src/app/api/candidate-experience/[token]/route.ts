@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 export async function GET(
   _req: NextRequest,
@@ -51,6 +52,10 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { token: string } }
 ) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   try {
     const { token } = params;
     const body = await req.json();

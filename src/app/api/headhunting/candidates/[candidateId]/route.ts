@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { requireAdmin } from '@/lib/admin-auth';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 /**
  * GET /api/headhunting/candidates/[candidateId]
@@ -59,6 +60,10 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ candidateId: string }> },
 ) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 
@@ -122,6 +127,10 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ candidateId: string }> },
 ) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

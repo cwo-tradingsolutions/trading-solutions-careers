@@ -17,6 +17,7 @@ import {
   guardarResultado,
   type EstadoPrueba,
 } from "@/lib/pruebas-externas";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +42,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const noAutorizado = requireAdmin(req);
   if (noAutorizado) return noAutorizado;
 

@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { getAnthropic } from "@/lib/anthropic";
 import { CEO_MANDATES } from "@/lib/ceo-mandates";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // 5 min · transcripts largos + claude sonnet pueden tomar 60-90s
@@ -114,6 +115,10 @@ Ejemplos:
 }`;
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

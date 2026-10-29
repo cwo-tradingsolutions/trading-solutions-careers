@@ -10,6 +10,7 @@ import { createDraftViaGmail, isGmailConnected } from '@/lib/gmail';
 import { getResend, EMAIL_FROM } from '@/lib/resend';
 import { recordStageEvent } from '@/lib/stage-events';
 import { normalizeStage, STAGE_RANK } from '@/lib/stage-labels';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -137,6 +138,10 @@ async function sesionDe(c: Cand, perfil: string | null, origin: string) {
 }
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   if (!isAdminRequest(req)) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
   try {

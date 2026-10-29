@@ -14,10 +14,15 @@
  */
 import { NextResponse } from "next/server";
 import { verifyRSCSignature, type LinkedInApplication } from "@/lib/linkedin";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const bodyText = await request.text();
   const signature = request.headers.get("x-li-signature") ?? "";
   const clientSecret = process.env.LINKEDIN_CLIENT_SECRET ?? "";

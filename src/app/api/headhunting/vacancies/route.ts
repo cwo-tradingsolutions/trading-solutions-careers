@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 // GET /api/headhunting/vacancies?client_id=xxx
 export async function GET(req: NextRequest) {
@@ -35,6 +36,10 @@ export async function GET(req: NextRequest) {
 
 // POST /api/headhunting/vacancies — create a new vacancy
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

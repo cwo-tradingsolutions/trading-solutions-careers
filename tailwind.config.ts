@@ -17,9 +17,15 @@ const config: Config = {
         ts: {
           canvas: "var(--ts-canvas)",
           surface: "var(--ts-surface)",
+          "surface-2": "var(--ts-surface-2)",
           ink: "var(--ts-ink)",
           secondary: "var(--ts-ink-secondary)",
+          "ink-soft": "var(--ts-ink-soft)",
+          "ink-mute": "var(--ts-ink-mute)",
           accent: "var(--ts-accent)",
+          "accent-deep": "var(--ts-accent-deep)",
+          "accent-soft": "var(--ts-accent-soft)",
+          hairline: "var(--ts-hairline)",
           highlight: "var(--ts-highlight)",
           muted: "var(--ts-muted)",
           /* Legacy keys, same variables. */
@@ -37,6 +43,8 @@ const config: Config = {
         "ts-md": "var(--ts-radius-md)",
         "ts-lg": "var(--ts-radius-lg)",
         "ts-xl": "var(--ts-radius-xl)",
+        "ts-pill": "var(--ts-radius-pill)",
+        "ts-panel": "var(--ts-panel)",
       },
       maxWidth: {
         ts: "var(--ts-content-max)",

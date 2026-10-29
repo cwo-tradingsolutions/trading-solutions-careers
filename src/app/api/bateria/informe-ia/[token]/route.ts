@@ -7,6 +7,7 @@ import { perfilDe, perfilPorTitulo } from '@/lib/bateria/perfiles-cargo';
 import { FACTORS, MOTIVADORES, INTEGRIDAD_LABEL, RAZONAMIENTO_LABEL, DISC_PATRONES, ARQUETIPOS } from '@/lib/bateria/interpretacion';
 import { pruebasExternasParaAgente } from '@/lib/pruebas-externas';
 import { entrevistaParaAgente } from '@/lib/informe-candidato';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -192,6 +193,10 @@ async function redactar(sistema: string, insumo: unknown, maxTokens: number): Pr
 }
 
 export async function POST(req: NextRequest, { params }: { params: { token: string } }) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   if (!isAdminRequest(req)) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   const t0 = Date.now();
 

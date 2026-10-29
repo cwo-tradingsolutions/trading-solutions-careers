@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import { supabaseAdmin } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
+import { isPreviewMutationBlocked } from "@/lib/preview-readonly";
 
 // IDs de Supabase verificados via /api/headhunting/vacancies el 2026-04-30
 // Si Supabase cambia, re-correr ese endpoint para revalidar.
@@ -69,6 +70,10 @@ function detectVacancySlug(c: NeonCandidate): string | null {
 }
 
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   const authError = requireAdmin(req);
   if (authError) return authError;
 

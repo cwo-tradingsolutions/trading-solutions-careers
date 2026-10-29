@@ -3,11 +3,16 @@ import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase';
 import { isAdminRequest } from '@/lib/bateria/auth';
 import { BATTERY_VERSION } from '@/lib/bateria/items';
+import { isPreviewMutationBlocked } from '@/lib/preview-readonly';
 
 export const dynamic = 'force-dynamic';
 
 /** Crea una sesión de la batería y devuelve el enlace del candidato. */
 export async function POST(req: NextRequest) {
+  if (isPreviewMutationBlocked()) {
+    return NextResponse.json({ error: "preview read-only" }, { status: 403 });
+  }
+
   if (!isAdminRequest(req)) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
