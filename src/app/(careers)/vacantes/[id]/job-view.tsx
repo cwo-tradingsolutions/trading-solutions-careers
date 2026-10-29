@@ -59,7 +59,7 @@ export default function JobView({ id, previewTestMode = false }: { id: string; p
   const deptName = (d: string) => (t.deptNames as Record<string, string>)[d] || d;
   const modeName = (m: string) => (t.modeNames as Record<string, string>)[m] || m;
   const others = job ? jobs.filter((j) => j.id !== job.id) : [];
-  const englishOnly = !!job && locale !== "en" && postingReadsEnglish(job);
+  const englishOnly = !!job && locale !== "en" && postingReadsEnglish(job, locale);
 
   return (
     <Frame>

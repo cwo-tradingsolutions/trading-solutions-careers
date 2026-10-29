@@ -182,18 +182,29 @@ function sectionReadsEnglish(esText: string, enText: string): boolean {
 }
 
 /**
- * The Spanish UI is showing an English job narrative, so the page should say so.
- * A mixed posting (English intro, Spanish bullets) is shown as stored and is not labeled English-only.
+ * The locale on screen is showing an English job narrative, so the page should say so.
+ * ES reads the Spanish fields when they exist; PT and 中文 read the English fields.
+ * A mixed posting (English intro, Spanish bullets) stays unlabeled.
  */
-export function postingReadsEnglish(job: Pick<Job, "description" | "responsibilities" | "requirements">): boolean {
-  const sections: Array<[string, string]> = [
-    [job.description.es, job.description.en],
-    [job.responsibilities.es.join(" "), job.responsibilities.en.join(" ")],
-    [job.requirements.es.join(" "), job.requirements.en.join(" ")],
+export function postingReadsEnglish(
+  job: Pick<Job, "description" | "responsibilities" | "requirements">,
+  locale: Locale = "es",
+): boolean {
+  const shown: Array<[string, string]> = [
+    [jobString(job.description, locale), job.description.en],
+    [jobStrings(job.responsibilities, locale).join(" "), job.responsibilities.en.join(" ")],
+    [jobStrings(job.requirements, locale).join(" "), job.requirements.en.join(" ")],
   ];
-  const present = sections.filter(([es, en]) => es.trim() || en.trim());
+  const present = shown.filter(([text, en]) => text.trim() || en.trim());
   if (!present.length) return false;
-  return present.every(([es, en]) => sectionReadsEnglish(es, en));
+  return present.every(([text, en]) => {
+    const visible = text.trim();
+    const english = en.trim();
+    if (!visible) return true;
+    // The English source is on screen, including place names such as Panamá.
+    if (english && visible === english) return true;
+    return sectionReadsEnglish(visible, english);
+  });
 }
 
 export function linkedInShareHref(jobUrl: string): string {
