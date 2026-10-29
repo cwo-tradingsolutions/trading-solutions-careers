@@ -1,5 +1,13 @@
 @import "../styles/universe-tokens.css";
 
+/* Inter latin is self-hosted so `next build` does not download Google Fonts.
+   next/font's parser rejects the current Google CSS for Inter. */
+@font-face{font-family:"Inter";src:url("/fonts/inter-latin.woff2") format("woff2");font-weight:300 700;font-style:normal;font-display:swap}
+:root{--font-inter:"Inter"}
+@font-face{font-family:"Open Sauce Two";src:url("/fonts/OpenSauceTwo-300.woff2") format("woff2");font-weight:300;font-style:normal;font-display:swap}
+@font-face{font-family:"Open Sauce Two";src:url("/fonts/OpenSauceTwo-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"Open Sauce Two";src:url("/fonts/OpenSauceTwo-500.woff2") format("woff2");font-weight:500;font-style:normal;font-display:swap}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

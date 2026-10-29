@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
-const TS_BLACK = "#0A0A0A";
-const TS_BLUE = "#2C64ED";
-const TS_GRAY = "#6B7280";
-const TS_BORDER = "#E5E7EB";
+const TS_BLACK = "#111111";
+const TS_BLUE = "#0988FC";
+const TS_GRAY = "#6F6F6A";
+const TS_BORDER = "#E6E6E1";
+const TS_FONT = '"Open Sauce Two", Inter, "Helvetica Neue", Arial, sans-serif';
 
 type Phase = "loading" | "habeas" | "form" | "submitting" | "done" | "error";
 
@@ -547,7 +548,7 @@ export default function PrefiltroForm() {
 
   if (phase === "loading") {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa", fontFamily: "Inter, -apple-system, sans-serif" }}>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F7F7F5", fontFamily: TS_FONT }}>
         <p style={{ color: TS_GRAY }}>Cargando…</p>
       </div>
     );
@@ -555,7 +556,7 @@ export default function PrefiltroForm() {
 
   if (phase === "error") {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa", padding: 24, fontFamily: "Inter, -apple-system, sans-serif" }}>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F7F7F5", padding: 24, fontFamily: TS_FONT }}>
         <div style={{ maxWidth: 480, textAlign: "center" }}>
           <h2 style={{ color: TS_BLACK }}>No pudimos abrir tu cuestionario</h2>
           <p style={{ color: TS_GRAY }}>{errorMsg}</p>
@@ -566,7 +567,7 @@ export default function PrefiltroForm() {
 
   if (phase === "done") {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa", padding: 24, fontFamily: "Inter, -apple-system, sans-serif" }}>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F7F7F5", padding: 24, fontFamily: TS_FONT }}>
         <div style={{ maxWidth: 480, textAlign: "center", background: "white", padding: 48, borderRadius: 16, border: `1px solid ${TS_BORDER}` }}>
           <div style={{ width: 64, height: 64, borderRadius: 32, background: "#DCFCE7", margin: "0 auto 24px", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#166534" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
@@ -582,7 +583,7 @@ export default function PrefiltroForm() {
   // ─── China · PIPL consent phase (English) ─────────────────────────
   if (phase === "habeas" && isChina) {
     return (
-      <div style={{ minHeight: "100vh", background: "#fafafa", padding: "32px 16px", fontFamily: "Inter, -apple-system, sans-serif", color: TS_BLACK }}>
+      <div style={{ minHeight: "100vh", background: "#F7F7F5", padding: "32px 16px", fontFamily: TS_FONT, color: TS_BLACK }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           <div style={{ marginBottom: 32 }}>
             <p style={{ color: TS_GRAY, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 8 }}>
@@ -614,7 +615,7 @@ export default function PrefiltroForm() {
               <li>You may access, update, correct or request deletion of your data at any time.</li>
               <li>To exercise your rights, write to <strong>jointheteam@tradingsolutions.com</strong>.</li>
             </ul>
-            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 16, border: `2px solid ${habeasAccepted ? TS_BLACK : TS_BORDER}`, borderRadius: 12, cursor: "pointer", background: habeasAccepted ? "#F9FAFB" : "white" }}>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 16, border: `2px solid ${habeasAccepted ? TS_BLACK : TS_BORDER}`, borderRadius: 12, cursor: "pointer", background: habeasAccepted ? "#EFEFEC" : "white" }}>
               <input
                 type="checkbox"
                 checked={habeasAccepted}
@@ -653,7 +654,7 @@ export default function PrefiltroForm() {
   // ─── Panama Ops · EN privacy consent (not PIPL, not CO habeas) ────
   if (phase === "habeas" && isPanamaOps) {
     return (
-      <div style={{ minHeight: "100vh", background: "#fafafa", padding: "32px 16px", fontFamily: "Inter, -apple-system, sans-serif", color: TS_BLACK }}>
+      <div style={{ minHeight: "100vh", background: "#F7F7F5", padding: "32px 16px", fontFamily: TS_FONT, color: TS_BLACK }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           <div style={{ marginBottom: 32 }}>
             <p style={{ color: TS_GRAY, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 8 }}>
@@ -685,7 +686,7 @@ export default function PrefiltroForm() {
               <li>You may access, update, correct or request deletion of your data at any time.</li>
               <li>To exercise your rights, write to <strong>jointheteam@tradingsolutions.com</strong>.</li>
             </ul>
-            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 16, border: `2px solid ${habeasAccepted ? TS_BLACK : TS_BORDER}`, borderRadius: 12, cursor: "pointer", background: habeasAccepted ? "#F9FAFB" : "white" }}>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 16, border: `2px solid ${habeasAccepted ? TS_BLACK : TS_BORDER}`, borderRadius: 12, cursor: "pointer", background: habeasAccepted ? "#EFEFEC" : "white" }}>
               <input
                 type="checkbox"
                 checked={habeasAccepted}
@@ -724,7 +725,7 @@ export default function PrefiltroForm() {
   // ─── Habeas Data phase ────────────────────────────────────────────
   if (phase === "habeas") {
     return (
-      <div style={{ minHeight: "100vh", background: "#fafafa", padding: "32px 16px", fontFamily: "Inter, -apple-system, sans-serif", color: TS_BLACK }}>
+      <div style={{ minHeight: "100vh", background: "#F7F7F5", padding: "32px 16px", fontFamily: TS_FONT, color: TS_BLACK }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           {/* Hero cálido */}
           <div style={{ marginBottom: 32 }}>
@@ -758,7 +759,7 @@ export default function PrefiltroForm() {
               <li>Tienes derecho a conocer, actualizar, rectificar y solicitar la supresión de tus datos en cualquier momento.</li>
               <li>Para ejercer tus derechos puedes escribirnos a <strong>jointheteam@tradingsolutions.com</strong>.</li>
             </ul>
-            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 16, border: `2px solid ${habeasAccepted ? TS_BLACK : TS_BORDER}`, borderRadius: 12, cursor: "pointer", background: habeasAccepted ? "#F9FAFB" : "white" }}>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 16, border: `2px solid ${habeasAccepted ? TS_BLACK : TS_BORDER}`, borderRadius: 12, cursor: "pointer", background: habeasAccepted ? "#EFEFEC" : "white" }}>
               <input
                 type="checkbox"
                 checked={habeasAccepted}
@@ -798,7 +799,7 @@ export default function PrefiltroForm() {
   if (isChina) {
     const YESNO_EN = [{ label: "Yes", value: "yes" }, { label: "No", value: "no" }];
     return (
-      <div style={{ minHeight: "100vh", background: "#fafafa", padding: "32px 16px", fontFamily: "Inter, -apple-system, sans-serif", color: TS_BLACK }}>
+      <div style={{ minHeight: "100vh", background: "#F7F7F5", padding: "32px 16px", fontFamily: TS_FONT, color: TS_BLACK }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           <div style={{ marginBottom: 32 }}>
             <p style={{ color: TS_GRAY, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 8 }}>
@@ -901,7 +902,7 @@ export default function PrefiltroForm() {
   if (isPanamaOps) {
     const YESNO_EN = [{ label: "Yes", value: "yes" }, { label: "No", value: "no" }];
     return (
-      <div style={{ minHeight: "100vh", background: "#fafafa", padding: "32px 16px", fontFamily: "Inter, -apple-system, sans-serif", color: TS_BLACK }}>
+      <div style={{ minHeight: "100vh", background: "#F7F7F5", padding: "32px 16px", fontFamily: TS_FONT, color: TS_BLACK }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           <div style={{ marginBottom: 32 }}>
             <p style={{ color: TS_GRAY, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 8 }}>
@@ -1003,7 +1004,7 @@ export default function PrefiltroForm() {
 
   // ─── Form phase ───────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: "100vh", background: "#fafafa", padding: "32px 16px", fontFamily: "Inter, -apple-system, sans-serif", color: TS_BLACK }}>
+    <div style={{ minHeight: "100vh", background: "#F7F7F5", padding: "32px 16px", fontFamily: TS_FONT, color: TS_BLACK }}>
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
         <div style={{ marginBottom: 32 }}>
           <p style={{ color: TS_GRAY, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 8 }}>
