@@ -13,6 +13,7 @@
  */
 import { neon } from "@/lib/sql";
 import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { assertPreviewReadOnly, previewLibraryBlocked } from "@/lib/preview-readonly";
 
 export { ATS_FROM_NAME, ATS_FROM_NAME_EN } from "@/lib/ats-from";
 
@@ -52,6 +53,8 @@ export type GoogleTokens = {
 };
 
 async function ensureTable() {
+  // El preview no crea ni altera google_oauth_tokens. Si la tabla ya existe, el SELECT de abajo sigue.
+  if (previewLibraryBlocked()) return;
   const sql = neon(process.env.DATABASE_URL!);
   await sql`
     CREATE TABLE IF NOT EXISTS google_oauth_tokens (
@@ -88,6 +91,7 @@ export async function saveTokens(tokens: {
   expires_in: number; // seconds
   scope?: string;
 }) {
+  assertPreviewReadOnly("gmail tokens");
   await ensureTable();
   const sql = neon(process.env.DATABASE_URL!);
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
@@ -105,6 +109,7 @@ export async function saveTokens(tokens: {
 }
 
 export async function clearTokens() {
+  assertPreviewReadOnly("gmail tokens");
   await ensureTable();
   const sql = neon(process.env.DATABASE_URL!);
   await sql`DELETE FROM google_oauth_tokens WHERE id = 1`;
@@ -200,6 +205,7 @@ export async function createDraftViaGmail(opts: {
   bcc?: string;
   fromName?: string;
 }): Promise<{ ok: true; draft_id: string; gmail_email: string } | { ok: false; error: string }> {
+  assertPreviewReadOnly("gmail draft");
   const valid = await getValidAccessToken();
   if (!valid) {
     return { ok: false, error: "Gmail no conectado. Pide a Kelly que vaya a Settings → Conectar Gmail." };
@@ -239,6 +245,7 @@ export async function sendViaGmail(opts: {
   bcc?: string;
   fromName?: string; // Display name (defaults to ATS_FROM_NAME)
 }): Promise<{ ok: true; gmail_id: string } | { ok: false; error: string }> {
+  assertPreviewReadOnly("gmail send");
   const valid = await getValidAccessToken();
   if (!valid) {
     return { ok: false, error: "Gmail no conectado. Pide a Kelly que vaya a Settings → Conectar Gmail." };
@@ -467,6 +474,7 @@ export async function createDraftWithAttachmentsViaGmail(opts: {
   replyTo?: string;
   attachments: { filename: string; mimeType: string; data: Buffer }[];
 }): Promise<{ ok: true; draft_id: string; message_id: string; gmail_email: string } | { ok: false; error: string }> {
+  assertPreviewReadOnly("gmail draft");
   const valid = await getValidAccessToken();
   if (!valid) return { ok: false, error: "Gmail no está conectado o el permiso expiró." };
 

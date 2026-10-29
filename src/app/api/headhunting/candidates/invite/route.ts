@@ -5,6 +5,7 @@ import { Resend } from 'resend';
 import { createDraftViaGmail, isGmailConnected } from '@/lib/gmail';
 import crypto from 'crypto';
 import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { assertPreviewReadOnly } from "@/lib/preview-readonly";
 
 function getResend(): Resend | null {
   const key = process.env.RESEND_API_KEY;
@@ -162,6 +163,7 @@ export async function POST(req: NextRequest) {
         note: 'Sin Gmail conectado y sin RESEND_API_KEY — token generado, copialo manualmente. Conecta Gmail en Settings para auto-drafts.',
       });
     }
+    assertPreviewReadOnly("resend");
     const { error: emailError } = await resend.emails.send({
       from: `${ATS_FROM_NAME} <${senderEmail}>`,
       to: candidate.email,

@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { isPreviewAuthWrite, isSideEffectGet } from '@/lib/preview-readonly';
 
 /**
  * Middleware combinado:
+ *  0) preview solo lectura -> 403 {error:'Preview solo lectura'} salvo GET/HEAD/OPTIONS
+ *     y POST/DELETE /api/hr-admin/login. También 403 en GET con efectos (cron, Gmail, sync).
  *  1) /api/*        -> CORS preflight + headers
  *  2) /hr-admin/*   -> requiere cookie de sesión HMAC válida, si no → /hr-admin/login
  */
@@ -41,7 +44,33 @@ async function isValidSession(token: string | undefined, secret: string | undefi
   }
 }
 
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+function previewBlocked(request: NextRequest): NextResponse | null {
+  const { pathname } = request.nextUrl;
+  const method = request.method.toUpperCase();
+
+  // Server Actions llegan como POST con este header. También un GET no debería traerlo.
+  if (request.headers.has('next-action')) {
+    return NextResponse.json({ error: 'Preview solo lectura' }, { status: 403 });
+  }
+
+  if (!SAFE_METHODS.has(method)) {
+    if (isPreviewAuthWrite(method, pathname)) return null;
+    return NextResponse.json({ error: 'Preview solo lectura' }, { status: 403 });
+  }
+
+  if ((method === 'GET' || method === 'HEAD') && isSideEffectGet(pathname, request.nextUrl.searchParams)) {
+    return NextResponse.json({ error: 'Preview solo lectura' }, { status: 403 });
+  }
+
+  return null;
+}
+
 export async function middleware(request: NextRequest) {
+  const blocked = previewBlocked(request);
+  if (blocked) return blocked;
+
   const { pathname } = request.nextUrl;
 
   // ---------- 1) Protección de /hr-admin ----------
@@ -86,5 +115,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/:path*', '/hr-admin/:path*'],
+  // Cubre /api/*, /hr-admin/* (sesión), server actions y cron.
+  // Deja fuera estáticos de Next para no interceptar assets.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
 };

@@ -86,11 +86,12 @@ export default function HistorialContactos({ candidateId }: { candidateId: strin
   const [panel, setPanel] = useState<null | "anotar" | "whatsapp">(null);
 
   const cargar = useCallback(
-    async (sync = true) => {
+    async () => {
       setCargando(true);
       setError("");
       try {
-        const r = await fetch(`/api/admin/candidates/${candidateId}/contactos${sync ? "" : "?sync=0"}`, {
+        // sync=0: el preview bloquea el GET que llama a Gmail y escribe.
+        const r = await fetch(`/api/admin/candidates/${candidateId}/contactos?sync=0`, {
           cache: "no-store",
         });
         const j = await r.json();
@@ -108,7 +109,7 @@ export default function HistorialContactos({ candidateId }: { candidateId: strin
   );
 
   useEffect(() => {
-    void cargar(true);
+    void cargar();
   }, [cargar]);
 
   const visibles = useMemo(
@@ -139,7 +140,7 @@ export default function HistorialContactos({ candidateId }: { candidateId: strin
           {confirmados.filter((c) => c.channel === "whatsapp").length} WhatsApp
         </span>
         {gmailRevisado && <span>Gmail revisado {fecha(gmailRevisado)}</span>}
-        <button onClick={() => void cargar(true)} className="underline hover:text-gray-900" disabled={cargando}>
+        <button onClick={() => void cargar()} className="underline hover:text-gray-900" disabled={cargando}>
           {cargando ? "Revisando…" : "Actualizar"}
         </button>
       </div>
@@ -173,7 +174,7 @@ export default function HistorialContactos({ candidateId }: { candidateId: strin
           candidateId={candidateId}
           onListo={() => {
             setPanel(null);
-            void cargar(false);
+            void cargar();
           }}
         />
       )}
@@ -182,7 +183,7 @@ export default function HistorialContactos({ candidateId }: { candidateId: strin
           candidateId={candidateId}
           onListo={() => {
             setPanel(null);
-            void cargar(false);
+            void cargar();
           }}
         />
       )}

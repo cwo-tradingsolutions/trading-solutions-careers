@@ -1,10 +1,13 @@
 import { neon } from "@/lib/sql";
+import { previewLibraryBlocked } from "@/lib/preview-readonly";
 
 const sql = neon(process.env.DATABASE_URL!);
 
 export { sql };
 
 export async function initDB() {
+  // GET /api/applications llama esto antes de leer. En el preview no hay DDL.
+  if (previewLibraryBlocked()) return;
   await sql`
     CREATE TABLE IF NOT EXISTS applications (
       id SERIAL PRIMARY KEY,

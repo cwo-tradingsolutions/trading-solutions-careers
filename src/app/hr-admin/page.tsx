@@ -246,7 +246,7 @@ export default function HRAdminPage() {
   return (
     // data-ui="universe" vive en el layout de /hr-admin (globals.css).
     <div className="min-h-screen">
-      <header className="sticky top-0 z-50 text-white" style={{ background: "var(--ts-ink)" }}>
+      <header className="sticky top-10 z-50 text-white" style={{ background: "var(--ts-ink)" }}>
         <div className="max-w-ts mx-auto px-5 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <img
@@ -374,7 +374,7 @@ export default function HRAdminPage() {
 
       {/* Secciones · control segmentado en vez de pestañas subrayadas:
           ocupa menos alto y deja claro que son excluyentes. */}
-      <nav className="sticky top-14 z-40 bg-ts-surface border-b border-[color:var(--ts-line)]">
+      <nav className="sticky top-24 z-40 bg-ts-surface border-b border-[color:var(--ts-line)]">
         <div className="max-w-ts mx-auto px-3 py-1.5">
           <div className="ts-seg flex overflow-x-auto">
             {TABS.map(({ id, label, icon: Icon }) => (

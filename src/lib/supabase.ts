@@ -1,5 +1,45 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { claveServicioFirmada } from './clave-servicio';
+import { assertPreviewReadOnly, previewLibraryBlocked } from './preview-readonly';
+
+const WRITE_OPS = new Set(['insert', 'update', 'upsert', 'delete']);
+
+/** insert/update/upsert/delete/rpc tiran en el preview. select y filtros siguen. */
+function guardQueryBuilder<T extends object>(builder: T): T {
+  if (!previewLibraryBlocked()) return builder;
+  return new Proxy(builder, {
+    get(target, prop, receiver) {
+      if (typeof prop === 'string' && WRITE_OPS.has(prop)) {
+        const original = Reflect.get(target, prop, receiver);
+        return (...args: unknown[]) => {
+          assertPreviewReadOnly(prop);
+          return typeof original === 'function' ? original.apply(target, args) : original;
+        };
+      }
+      const value = Reflect.get(target, prop, receiver);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+}
+
+function guardClient(client: SupabaseClient): SupabaseClient {
+  return new Proxy(client, {
+    get(target, prop, receiver) {
+      if (prop === 'from') {
+        return (table: string) => guardQueryBuilder(target.from(table));
+      }
+      if (prop === 'rpc') {
+        return (...args: unknown[]) => {
+          assertPreviewReadOnly('rpc');
+          const rpc = target.rpc as (...a: unknown[]) => unknown;
+          return rpc(...args);
+        };
+      }
+      const value = Reflect.get(target, prop, receiver);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  }) as SupabaseClient;
+}
 
 // ─── Lazy init para que el build de Next.js no requiera las env vars ─
 // Se crean los clients al primer uso (request time), no al importar el módulo.
@@ -76,17 +116,17 @@ function getAnonClient(): SupabaseClient {
 // Se mantiene la API antigua (supabaseAdmin.from(...), supabase.from(...))
 // pero se resuelve el cliente real al primer acceso en runtime.
 export const supabaseAdmin: SupabaseClient = new Proxy({} as SupabaseClient, {
-  get(_t, prop) {
-    const c = getAdminClient() as unknown as Record<PropertyKey, unknown>;
-    const v = c[prop];
-    return typeof v === 'function' ? (v as (...args: unknown[]) => unknown).bind(c) : v;
+  get(_t, prop, receiver) {
+    const guarded = guardClient(getAdminClient());
+    const value = Reflect.get(guarded, prop, receiver);
+    return typeof value === 'function' ? value.bind(guarded) : value;
   },
 });
 
 export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
-  get(_t, prop) {
-    const c = getAnonClient() as unknown as Record<PropertyKey, unknown>;
-    const v = c[prop];
-    return typeof v === 'function' ? (v as (...args: unknown[]) => unknown).bind(c) : v;
+  get(_t, prop, receiver) {
+    const guarded = guardClient(getAnonClient());
+    const value = Reflect.get(guarded, prop, receiver);
+    return typeof value === 'function' ? value.bind(guarded) : value;
   },
 });

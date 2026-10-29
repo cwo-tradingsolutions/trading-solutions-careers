@@ -7,6 +7,7 @@
  *   - createMeetEvent(...) · crea evento en Calendar con Google Meet auto-generado
  */
 import { getValidAccessToken } from "@/lib/gmail";
+import { assertPreviewReadOnly } from "@/lib/preview-readonly";
 
 const FREEBUSY_URL = "https://www.googleapis.com/calendar/v3/freeBusy";
 const EVENTS_URL = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
@@ -174,6 +175,7 @@ export async function createMeetEvent(opts: {
   attendees: string[];  // emails
   timezone?: string;
 }): Promise<{ ok: true; event_id: string; meet_url: string; html_link: string } | { ok: false; error: string }> {
+  assertPreviewReadOnly("calendar event");
   const valid = await getValidAccessToken();
   if (!valid) {
     return { ok: false, error: "Google OAuth no conectado" };
