@@ -8,19 +8,18 @@
  *   - gmail.compose: crear drafts (incluye gmail.send implícito) — para que HR
  *     pueda revisar el correo antes de enviar
  *   - email: identificar su correo (jointheteam@tradingsolutions.com)
+ *   - calendar + calendar.events: crear el evento con Google Meet
+ *     (calendar.events se sumó para la invitación a entrevista; el token
+ *     viejo no lo trae hasta que jointheteam@ vuelva a pasar por aquí)
  *
  * Después del consent, Google redirige a /api/google/callback?code=...
  */
 import { NextResponse } from "next/server";
+import { GOOGLE_OAUTH_SCOPES } from "@/lib/google-scopes";
 
 export const runtime = "nodejs";
 
-const SCOPES = [
-  "https://www.googleapis.com/auth/gmail.compose",  // crear drafts + send
-  "https://www.googleapis.com/auth/gmail.readonly",  // leer inbox para audit (Round 3 #3)
-  "https://www.googleapis.com/auth/userinfo.email",
-  "https://www.googleapis.com/auth/calendar",       // leer/crear eventos · Joint Scheduling
-];
+const SCOPES = GOOGLE_OAUTH_SCOPES;
 
 export async function GET() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
