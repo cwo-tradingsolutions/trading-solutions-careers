@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { ATS_FROM_EMAIL, ATS_FROM_NAME } from '@/lib/ats-from';
 
 let _client: Resend | null = null;
 
