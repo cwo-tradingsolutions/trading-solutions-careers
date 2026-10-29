@@ -19,6 +19,7 @@ import crypto from "crypto";
 // No declarar listas de etapas acá.
 import { VALID_STAGES } from "@/lib/stage-labels";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
 
 const TS_LINKEDIN_URL = "https://www.linkedin.com/company/trading-sol/";
 
@@ -53,7 +54,7 @@ function buildRejectionHtml(name: string, vacancyTitle: string): string {
     <p>Gracias por tomarte el tiempo de aplicar a la posición de <strong>${vacancyTitle}</strong> en Trading Solutions. Después de revisar tu aplicación, hemos decidido avanzar con otros candidatos cuyo perfil se ajusta más a la posición en este momento. Sin embargo, Trading Solutions sigue creciendo y nos encantaría mantenernos en contacto.</p>
     <p>Tu información queda en nuestra base de datos para futuras oportunidades. También te invitamos a seguirnos en LinkedIn para enterarte de nuevas vacantes: <a href="${TS_LINKEDIN_URL}">${TS_LINKEDIN_URL}</a></p>
     <p>Apreciamos tu interés en Trading Solutions y te deseamos mucho éxito en tus próximos pasos.</p>
-    <p>Un abrazo,<br><strong>Kelly Castañeda</strong><br>Talent Acquisition and Development Lead<br>Trading Solutions</p>
+    <p>Un abrazo,<br><strong>${ATS_FROM_NAME}</strong><br>Trading Solutions</p>
   </div>
 </body></html>`;
 }
@@ -190,7 +191,7 @@ export async function POST(
             html: rejLang === "en"
               ? buildRejectionHtmlEn(candidate.name as string, vacancyTitle)
               : buildRejectionHtml(candidate.name as string, vacancyTitle),
-            fromName: rejLang === "en" ? "Trading Solutions Talent Team" : "Kelly Castañeda",
+            fromName: ATS_FROM_NAME,
           });
           if (draftRes.ok) {
             draftId = draftRes.draft_id;

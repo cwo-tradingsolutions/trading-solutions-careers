@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createMeetEvent } from "@/lib/google-calendar";
+import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -32,6 +33,13 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     if (session.status === "scheduled") return NextResponse.json({ error: "already_scheduled" }, { status: 409 });
     if (session.expires_at && new Date(session.expires_at) < new Date()) {
       return NextResponse.json({ error: "expired" }, { status: 410 });
+    }
+
+    if (isPreviewTestMode()) {
+      return previewTestJson("POST /api/joint-schedulings/[token]/book", {
+        slot_start: slotStart,
+        slot_end: slotEnd,
+      });
     }
 
     const interviewerNames: string[] = session.interviewer_names || [];

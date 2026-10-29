@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { isPreviewTestMode, previewTestJson } from '@/lib/preview-mode';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,10 @@ export async function POST(req: NextRequest) {
       .eq('token', token)
       .single();
     if (!session) return NextResponse.json({ error: 'Enlace no válido' }, { status: 404 });
+
+    if (isPreviewTestMode()) {
+      return previewTestJson('POST /api/bateria/event');
+    }
 
     await supabaseAdmin.from('ts_bat_events').insert({
       session_id: session.id,
