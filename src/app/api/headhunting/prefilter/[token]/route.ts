@@ -18,6 +18,7 @@ import { recordStageEvent } from "@/lib/stage-events";
 import { enviarBateriaAuto } from "@/lib/bateria/invitar";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { TEMPLATE_ENGLISH_MIN_RANK, TEMPLATE_SALARY_CAP, type TemplateKey } from "@/lib/prefilter-templates";
+import { flagSalarioSobreTope } from "@/lib/prefilter-salary";
 
 // Techos por vacancy_id (en COP mensuales)
 const SALARY_CAPS: Record<string, number> = {
@@ -241,14 +242,6 @@ const PANAMA_OPS_ENGLISH_RANK: Record<string, number> = {
 const PANAMA_OPS_ENGLISH_MIN_RANK = 3; // B1
 const PANAMA_OPS_YEARS_MIN = 4;
 
-/** "USD 2,500/month gross" → 2500. Devuelve null si no hay número legible. */
-function parseSalaryUsd(raw: unknown): number | null {
-  const digits = String(raw ?? "").replace(/[^0-9.]/g, "");
-  if (!digits) return null;
-  const n = Number(digits);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
-
 const TS_LINKEDIN_URL = "https://www.linkedin.com/company/trading-sol/";
 
 // Auto-detección sencilla ES/EN basada en frecuencia de palabras-función.
@@ -419,19 +412,21 @@ export async function POST(
     }
     decision = bloqueos.length ? "review" : "pass";
 
-    // Presupuesto · sobre el tope no se rechaza, se manda a revisión.
-    const salaryUsd = parseSalaryUsd(body.salary_usd);
-    const salaryOverBudget = salaryUsd !== null && salaryUsd > CHINA_SALARY_CAP_USD;
-    if (salaryOverBudget && decision === "pass") {
-      decision = "review";
+    // Presupuesto · el mínimo del rango contra el tope. Sobre el tope no se
+    // rechaza: queda un bloqueo blando y la decisión baja a revisión.
+    const topeChina = flagSalarioSobreTope(body.salary_usd, CHINA_SALARY_CAP_USD);
+    if (topeChina.bloqueo) {
+      bloqueos.push(topeChina.bloqueo);
+      if (decision === "pass") decision = "review";
     }
 
     meta = {
       china: true,
       salary_usd_expectation: body.salary_usd ?? null, // dato · no descarta
-      salary_usd_parsed: salaryUsd,
+      salary_usd_parsed: topeChina.range?.min ?? null,
+      salary_usd_max: topeChina.range?.max ?? null,
       salary_cap_usd: CHINA_SALARY_CAP_USD,
-      salary_over_budget: salaryOverBudget,
+      salary_over_budget: topeChina.salaryOverBudget,
       english_min_required_rank: CHINA_ENGLISH_MIN_RANK,
       english_candidate_rank: englishRank,
       english_fails: englishFails,
@@ -496,18 +491,19 @@ export async function POST(
 
     decision = bloqueos.length ? "review" : "pass";
 
-    const salaryUsd = parseSalaryUsd(body.salary_usd);
-    const salaryOverBudget = salaryUsd !== null && salaryUsd > PANAMA_OPS_SALARY_CAP_USD;
-    if (salaryOverBudget && decision === "pass") {
-      decision = "review";
+    const topePanama = flagSalarioSobreTope(body.salary_usd, PANAMA_OPS_SALARY_CAP_USD);
+    if (topePanama.bloqueo) {
+      bloqueos.push(topePanama.bloqueo);
+      if (decision === "pass") decision = "review";
     }
 
     meta = {
       panama_ops: true,
       salary_usd_expectation: body.salary_usd ?? null,
-      salary_usd_parsed: salaryUsd,
+      salary_usd_parsed: topePanama.range?.min ?? null,
+      salary_usd_max: topePanama.range?.max ?? null,
       salary_cap_usd: PANAMA_OPS_SALARY_CAP_USD,
-      salary_over_budget: salaryOverBudget,
+      salary_over_budget: topePanama.salaryOverBudget,
       english_min_required_rank: PANAMA_OPS_ENGLISH_MIN_RANK,
       english_candidate_rank: englishRank,
       english_fails: englishFails,
