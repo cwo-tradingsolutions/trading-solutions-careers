@@ -5,7 +5,6 @@ import {
   Inbox, ClipboardList, ClipboardCheck, AlertTriangle, Mail, Hourglass, Target,
   Video, ListChecks, MessageSquare, UserCheck, Building2, Trophy, Send,
   CheckCircle2, XCircle, ArrowRight,
-  User, Users,
 } from "lucide-react";
 import RejectionModal from "./RejectionModal";
 import RecruiterAssessmentCard from "./RecruiterAssessmentCard";
@@ -66,6 +65,9 @@ type Cand = {
   rejection_note_public?: string | null;
   rejection_sent_at?: string | null;
   rejection_draft_id?: string | null;
+  /** El listado trae `select *`. Sirven para el aging del journey; no son un stage nuevo. */
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 type PrefilterData = {
@@ -107,25 +109,43 @@ type PrefilterData = {
   years_leading_sig?: number;
   cert_audit_cycles?: number;
   case_answer?: string;
-  // China · plantilla china. El _meta del prefiltro trae los knock-outs y el
-  // salario; sin esto la ficha no mostraba nada de lo que el candidato
-  // respondió y había que ir a la base a mirarlo.
+  // China / Panama Ops · plantillas EN. El _meta del prefiltro trae los
+  // knock-outs y el salario; sin esto la ficha no mostraba nada de lo que
+  // el candidato respondió y había que ir a la base a mirarlo.
   current_city?: string;
   work_authorized?: boolean;
   onsite_available?: boolean;
+  work_authorized_panama?: boolean;
+  onsite_panama_city?: boolean;
+  years_freight_panama?: number;
+  ocean_fcl_lcl?: boolean;
+  air_freight?: boolean;
+  bl_awb_docs?: boolean;
+  warehouse_ftz?: boolean;
   salary_usd?: string;
   years_experience?: number;
   pipl_consent?: boolean;
+  privacy_consent?: boolean;
   _meta?: {
     china?: boolean;
+    panama_ops?: boolean;
     salary_usd_expectation?: string | null;
     salary_usd_parsed?: number | null;
     salary_cap_usd?: number;
     salary_over_budget?: boolean;
     english_candidate_rank?: number;
     english_min_required_rank?: number;
+    english_fails?: boolean;
     work_authorized?: boolean;
     onsite_available?: boolean;
+    work_authorized_panama?: boolean;
+    onsite_panama_city?: boolean;
+    years_freight_panama?: number;
+    years_freight_short?: boolean;
+    ocean_fcl_lcl?: boolean;
+    air_freight?: boolean;
+    bl_awb_docs?: boolean;
+    warehouse_ftz?: boolean;
   };
 };
 
@@ -148,6 +168,8 @@ type Vacancy = {
   owner_recruiter_id?: string | null;
   /** Quien puede operarla igual sin aparecer frente al candidato. */
   support_recruiter_id?: string | null;
+  /** Hiring Lead del área. No es el dueño del proceso (owner_recruiter_id). */
+  hiring_lead_email?: string | null;
 };
 
 /** El equipo de Talent, para saber de quién es cada vacante. */
@@ -231,8 +253,12 @@ import {
   normalizeStage,
   stageOrder,
   siguienteEtapa,
+  stageLabel,
+  stageSla,
+  slaStatus,
   KELLY_GATES,
   kellyGateFromStage,
+  type KellyGate,
 } from "@/lib/stage-labels";
 
 type StageCategory = "screening" | "assessment" | "interview" | "decision" | "terminal-positive" | "terminal-negative";
@@ -271,22 +297,23 @@ const STAGES: Array<{ id: string; label: string; category: StageCategory; owner:
   }));
 
 /**
- * Columnas del tablero = gates de Kelly (27-oct), en su orden. Onboarding
- * (gate 12 · contratado) sigue abajo en el pie, junto a los rechazados.
- * Psicométricas y Entrevista HM solo se llenan con codes históricos: no
- * tienen code v4 propio hasta que Kelly lo nombre.
+ * El tablero es el journey de los 12 gates de Kelly, en este orden
+ * (Docs después de Oferta, Onboarding incluido). No hay columnas.
+ * Psicométricas y Entrevista HM solo se llenan con codes históricos:
+ * no tienen code v4 propio hasta que Kelly lo nombre.
  */
 const OWNER_BY_GATE: Record<string, StageOwner> = {
   psicometricas: "candidate",
   entrevista_hm: "recruiter",
 };
-const GATE_COLUMNS: Array<{ id: string; n: number; label: string; owner: StageOwner }> =
-  KELLY_GATES.filter((g) => g.id !== "onboarding").map((g) => ({
-    id: g.id,
-    n: g.n,
-    label: g.label,
-    owner: OWNER_BY_GATE[g.id] ?? OWNER_BY_STAGE[g.stages[0]] ?? "recruiter",
-  }));
+function ownerDeGate(g: KellyGate): StageOwner {
+  return OWNER_BY_GATE[g.id] ?? OWNER_BY_STAGE[g.stages[0]] ?? "recruiter";
+}
+
+/** Nota de producto del gate. Assessment es Case global ± On-call. */
+const GATE_NOTA: Partial<Record<string, string>> = {
+  assessment: "Case global ± On-call",
+};
 
 const REJECTED_STAGE = { id: "rechazado", label: "Rechazado", category: "terminal-negative" as StageCategory, owner: "terminal" as StageOwner };
 
@@ -369,6 +396,8 @@ export default function PipelineFunnel({
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; ok: number; fail: number } | null>(null);
   /** Estado de la bateria por candidato · ht_candidate_id -> estado. */
   const [bateria, setBateria] = useState<Record<string, BatEstado>>({});
+  /** Gate encendido del journey. Null = el primero que tenga gente. */
+  const [litGateId, setLitGateId] = useState<string | null>(null);
 
   useEffect(() => { void load(); }, []);
 
@@ -573,7 +602,7 @@ export default function PipelineFunnel({
 
   const byGate = useMemo(() => {
     const m: Record<string, Cand[]> = {};
-    GATE_COLUMNS.forEach(g => { m[g.id] = []; });
+    KELLY_GATES.forEach(g => { m[g.id] = []; });
     filtered.forEach(c => {
       const gate = kellyGateFromStage(c.stage);
       if (gate && m[gate.id]) m[gate.id].push(c);
@@ -582,10 +611,24 @@ export default function PipelineFunnel({
     return m;
   }, [filtered, ordenarPorBateria]);
 
-  const totals = filtered.length;
+  const leadPorVacante = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const v of vacancies) {
+      const email = (v.hiring_lead_email ?? "").trim();
+      if (email) m[v.id] = email;
+    }
+    return m;
+  }, [vacancies]);
 
-  // Columnas a renderizar: gates 1..11 (Onboarding y rechazados van en el pie)
-  const visibleStages = GATE_COLUMNS;
+  const litGate = useMemo(() => {
+    if (litGateId) {
+      const elegido = KELLY_GATES.find((g) => g.id === litGateId);
+      if (elegido) return elegido;
+    }
+    return KELLY_GATES.find((g) => (byGate[g.id] || []).length > 0) ?? KELLY_GATES[0];
+  }, [litGateId, byGate]);
+
+  const totals = filtered.length;
   const hiredCount = (byStage['contratado'] || []).length;
   const rejectedCount = (byStage['rechazado'] || []).length;
   const activeCount = totals - hiredCount - rejectedCount;
@@ -783,6 +826,15 @@ export default function PipelineFunnel({
                 </div>
               );
             })()}
+            {vacFilter !== "all" && (() => {
+              const email = (vacancies.find((x) => x.id === vacFilter)?.hiring_lead_email ?? "").trim();
+              if (!email) return null;
+              return (
+                <div className="text-[11px] text-[var(--ts-gray-60)]">
+                  Hiring Lead: <span className="font-bold text-[var(--ts-black)]">{email}</span>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -804,130 +856,27 @@ export default function PipelineFunnel({
         <div className="text-center py-16 ts-eyebrow text-[var(--ts-gray-40)]">Cargando pipeline…</div>
       ) : (
         <>
-          {/* ════════════════ LEYENDA DE OWNERS ════════════════ */}
-          <div className="flex items-center gap-5 mb-3 pb-3 border-b border-[var(--ts-gray-10)]">
-            <div className="ts-eyebrow text-[10px]">¿De quién depende?</div>
-            <LegendItem icon={User} label="Candidato" color={OWNER_STYLE.candidate.barColor} />
-            <LegendItem icon={UserCheck} label="Reclutador" color={OWNER_STYLE.recruiter.barColor} />
-            <LegendItem icon={Users} label="Compartido" color={OWNER_STYLE.shared.barColor} />
-            <div className="text-[11px] text-[var(--ts-gray-40)] ml-auto italic">
-              La barra superior de cada columna indica quién mueve la pelota.
-            </div>
-          </div>
+          {/* Journey de 12 gates. Onboarding es el paso 12; rechazados quedan aparte. */}
+          <JourneyBoard
+            byGate={byGate}
+            lit={litGate}
+            onLit={setLitGateId}
+            selectedIds={selectedIds}
+            onToggle={toggleSelect}
+            onSelectAll={(id) => {
+              const cands = byGate[id] || [];
+              const todos = cands.length > 0 && cands.every((c) => selectedIds.has(c.id));
+              if (todos) cands.forEach((c) => toggleSelect(c.id));
+              else selectAllInStage(id);
+            }}
+            onOpen={setSelectedCand}
+            bateria={bateria}
+            esperandoIds={esperandoIds}
+            leadPorVacante={leadPorVacante}
+          />
 
-          {/* ════════════════ KANBAN FUNNEL ════════════════ */}
-          <div className="overflow-x-auto pb-4 -mx-6 px-6">
-            <div className="flex gap-2 min-w-max">
-              {visibleStages.map((stage) => {
-                const cands = byGate[stage.id] || [];
-                const stageSelected = cands.filter(c => selectedIds.has(c.id)).length;
-                const ownerStyle = OWNER_STYLE[stage.owner];
-                const OwnerIcon = stage.owner === 'candidate' ? User : stage.owner === 'recruiter' ? UserCheck : stage.owner === 'shared' ? Users : null;
-                return (
-                  <div key={stage.id} className="w-[260px] flex-shrink-0">
-                    {/* Cabecera de etapa · opción C
-                        El contraste sale del peso de la letra y de un fondo
-                        apenas marcado, no de una barra negra: cinco barras
-                        negras seguidas se comen el tablero y compiten con los
-                        nombres de los candidatos, que es lo que hay que leer.
-                        De quién depende la etapa se dice con un punto de color
-                        y con el texto, no pintando la columna entera. */}
-                    <div className="ts-etapa rounded-t-xl px-3.5 pt-3 pb-2.5">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-[7px] h-[7px] rounded-full flex-shrink-0"
-                          style={{ background: ownerStyle.barColor }}
-                          title={`Depende de: ${ownerStyle.label}`}
-                        />
-                        <span className="ts-etapa-nombre flex-1 min-w-0"><span className="ts-tabular text-[var(--texto-3)] mr-1">{stage.n}</span>{stage.label}</span>
-                        {cands.length > 0 && (
-                          <button
-                            onClick={() => stageSelected === cands.length ? cands.forEach(c => toggleSelect(c.id)) : selectAllInStage(stage.id)}
-                            className="text-[13px] text-[var(--texto-3)] hover:text-[var(--texto)] transition-colors leading-none"
-                            title={stageSelected === cands.length ? "Deseleccionar todos" : "Seleccionar todos"}
-                          >
-                            {stageSelected === cands.length ? "−" : "+"}
-                          </button>
-                        )}
-                        <span className="ts-etapa-conteo inline-flex items-center justify-center">
-                          {cands.length}
-                        </span>
-                      </div>
-                      <div className="ts-etapa-duenio mt-1 pl-[15px]">{ownerStyle.label}</div>
-                    </div>
-                    {/* Column body */}
-                    <div
-                      className="border border-t-0 border-gray-200 rounded-b-xl p-2 min-h-[120px] max-h-[600px] overflow-y-auto bg-white"
-                    >
-                      {cands.length === 0 ? (
-                        <div className="text-[13px] text-[var(--texto-3)] text-center py-7">
-                          Nadie en esta etapa
-                        </div>
-                      ) : cands.map(c => {
-                        const isSelected = selectedIds.has(c.id);
-                        return (
-                          <div
-                            key={c.id}
-                            className={`relative bg-white border p-3 mb-2 transition-all ${
-                              isSelected
-                                ? "border-[var(--ts-black)] shadow-sm"
-                                : "border-[var(--ts-gray-10)] hover:border-[var(--ts-gray-60)]"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={(e) => { e.stopPropagation(); toggleSelect(c.id); }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="absolute top-2.5 right-2.5 w-3.5 h-3.5 cursor-pointer accent-[var(--ts-black)]"
-                              title="Seleccionar para acción masiva"
-                            />
-                            <button onClick={() => setSelectedCand(c)} className="w-full text-left pr-5">
-                              <div className="text-[14px] font-bold leading-tight text-[var(--ts-black)]" style={{ letterSpacing: '-0.01em' }}>
-                                {c.name}
-                              </div>
-                              <div className="text-[11px] text-[var(--ts-gray-60)] truncate mt-1 ts-tabular">
-                                {c.email}
-                              </div>
-                              {esperandoIds.has(c.id) && (
-                                <div
-                                  className="mt-1.5 inline-block text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5"
-                                  title="El último mensaje es del candidato y no le hemos respondido"
-                                >
-                                  ✉ Espera respuesta
-                                </div>
-                              )}
-                              <div className="mt-2 inline-block ts-eyebrow text-[9px] tracking-[1.5px] text-[var(--ts-gray-90)] border border-[var(--ts-gray-20)] px-1.5 py-0.5">
-                                {c.ht_vacancies?.title || "—"}
-                              </div>
-                              {c.source === "cv_proceso_anterior" && (
-                                <div
-                                  className="mt-1.5 inline-block ts-eyebrow text-[9px] tracking-[1.5px] text-[var(--ts-gray-60)] bg-[var(--ts-gray-10)] px-1.5 py-0.5"
-                                  title="Hoja de vida cargada de un proceso anterior · no aplicó por la web"
-                                >
-                                  CV proceso anterior
-                                </div>
-                              )}
-                            </button>
-                            <ChipBateria est={bateria[c.id]} />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* ════════════════ TERMINAL FOOTER · contratados + rechazados ════════════════ */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-[var(--ts-gray-20)] mt-6 border border-[var(--ts-gray-20)]">
-            <ContractedColumn
-              cands={byStage['contratado'] || []}
-              selectedIds={selectedIds}
-              onToggle={toggleSelect}
-              onSelect={setSelectedCand}
-            />
+          {/* Rechazados aparte del journey. Contratados viven en el gate 12. */}
+          <div className="mt-6 border border-[var(--ts-gray-20)]">
             <RejectedColumn
               cands={byStage['rechazado'] || []}
               selectedIds={selectedIds}
@@ -961,7 +910,333 @@ export default function PipelineFunnel({
       )}
 
       {/* Side panel con detalles del candidato */}
-      {selectedCand && <CandDetailPanel cand={selectedCand} onClose={() => setSelectedCand(null)} onChanged={() => { void load(); }} />}
+      {selectedCand && (
+        <CandDetailPanel
+          cand={selectedCand}
+          hiringLeadEmail={leadPorVacante[selectedCand.vacancy_id] ?? null}
+          onClose={() => setSelectedCand(null)}
+          onChanged={() => { void load(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Journey horizontal de los 12 gates. Un solo paso encendido; el panel
+ * de abajo son las fichas de ese paso. Los colores son los de Clara
+ * (canvas, ink, mute). El azul solo marca el paso encendido y el eyebrow.
+ */
+function JourneyBoard({
+  byGate, lit, onLit, selectedIds, onToggle, onSelectAll, onOpen, bateria, esperandoIds, leadPorVacante,
+}: {
+  byGate: Record<string, Cand[]>;
+  lit: KellyGate;
+  onLit: (id: string) => void;
+  selectedIds: Set<string>;
+  onToggle: (id: string) => void;
+  onSelectAll: (gateId: string) => void;
+  onOpen: (c: Cand) => void;
+  bateria: Record<string, BatEstado>;
+  esperandoIds: Set<string>;
+  leadPorVacante: Record<string, string>;
+}) {
+  const cands = byGate[lit.id] || [];
+  const todos = cands.length > 0 && cands.every((c) => selectedIds.has(c.id));
+  const owner = OWNER_STYLE[ownerDeGate(lit)].label;
+  const nota = GATE_NOTA[lit.id];
+
+  return (
+    <div style={{ background: "#F3F4F6", borderRadius: 16, padding: 16 }}>
+      <div
+        role="tablist"
+        aria-label="Journey de selección"
+        style={{ display: "flex", alignItems: "stretch", overflowX: "auto", gap: 0, paddingBottom: 4 }}
+      >
+        {KELLY_GATES.map((g, i) => {
+          const n = (byGate[g.id] || []).length;
+          const estado = g.n < lit.n ? "done" : g.id === lit.id ? "lit" : "upcoming";
+          const ink = estado === "upcoming" ? "#9ca3af" : "#1d1d1f";
+          return (
+            <div key={g.id} style={{ display: "flex", alignItems: "center", flex: "1 0 auto", minWidth: 0 }}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={g.id === lit.id}
+                onClick={() => onLit(g.id)}
+                title={`${g.n}. ${g.label} · ${n}`}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 6,
+                  minWidth: 84,
+                  padding: "6px 4px",
+                  background: "transparent",
+                  border: 0,
+                  cursor: "pointer",
+                  color: ink,
+                  fontFamily: "Inter, system-ui, sans-serif",
+                }}
+              >
+                <span
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 999,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    fontVariantNumeric: "tabular-nums",
+                    background: estado === "done" ? "#1d1d1f" : "#ffffff",
+                    color: estado === "done" ? "#ffffff" : ink,
+                    border: estado === "lit"
+                      ? "2px solid #1d1d1f"
+                      : "1px solid rgba(0,0,0,.06)",
+                    boxShadow: estado === "lit" ? "0 0 0 3px #1747D9" : "none",
+                  }}
+                >
+                  {g.n}
+                </span>
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: estado === "lit" ? 700 : 500,
+                  lineHeight: 1.2,
+                  textAlign: "center",
+                  maxWidth: 96,
+                }}>
+                  {g.label}
+                </span>
+                <span style={{
+                  fontSize: 11,
+                  fontVariantNumeric: "tabular-nums",
+                  color: "#6e6e73",
+                  background: "#ffffff",
+                  borderRadius: 999,
+                  padding: "1px 7px",
+                  border: "1px solid rgba(0,0,0,.06)",
+                }}>
+                  {n}
+                </span>
+              </button>
+              {i < KELLY_GATES.length - 1 && (
+                <span
+                  aria-hidden
+                  style={{
+                    width: 18,
+                    height: 1,
+                    flex: "0 0 18px",
+                    background: g.n < lit.n ? "#1d1d1f" : "rgba(0,0,0,.12)",
+                    marginBottom: 28,
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <section
+        aria-label={`Candidatos en ${lit.label}`}
+        style={{
+          marginTop: 8,
+          background: "#ffffff",
+          borderRadius: 16,
+          border: "1px solid rgba(0,0,0,.06)",
+          padding: 16,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <div style={{
+              color: "#1747D9",
+              fontSize: 11,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              fontWeight: 700,
+              fontFamily: "Inter, system-ui, sans-serif",
+            }}>
+              Talent Acquisition
+            </div>
+            <h2 style={{ margin: "4px 0 0", fontSize: 22, lineHeight: 1.2, color: "#1d1d1f", fontWeight: 700 }}>
+              {lit.n}. {lit.label}
+            </h2>
+            {nota && (
+              <p style={{ margin: "4px 0 0", color: "#6e6e73", fontSize: 13 }}>{nota}</p>
+            )}
+            <p style={{ margin: "2px 0 0", color: "#6e6e73", fontSize: 12 }}>
+              Depende de: {owner}
+            </p>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ color: "#6e6e73", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+              {cands.length}
+            </span>
+            {cands.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onSelectAll(lit.id)}
+                style={{
+                  background: "#1d1d1f",
+                  color: "#ffffff",
+                  border: 0,
+                  borderRadius: 999,
+                  padding: "8px 14px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {todos ? "Quitar selección" : "Seleccionar"}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {cands.length === 0 ? (
+          <p style={{ margin: "20px 0 4px", textAlign: "center", color: "#6e6e73", fontSize: 13 }}>
+            Nadie en esta etapa
+          </p>
+        ) : (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+            gap: 12,
+            marginTop: 16,
+          }}>
+            {cands.map((c) => (
+              <JourneyCard
+                key={c.id}
+                cand={c}
+                gate={lit}
+                selected={selectedIds.has(c.id)}
+                esperando={esperandoIds.has(c.id)}
+                bateria={bateria[c.id]}
+                hiringLead={leadPorVacante[c.vacancy_id] ?? null}
+                onToggle={() => onToggle(c.id)}
+                onOpen={() => onOpen(c)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function diasEnEtapa(c: Cand): number | null {
+  const iso = c.updated_at || c.created_at;
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000));
+}
+
+/** Semáforo en gris: el dato sigue, el color no pinta la tarjeta. */
+function semaforoDe(c: Cand, bat?: BatEstado): string | null {
+  if (c.prefilter_decision === "pass") return "Prefiltro ok";
+  if (c.prefilter_decision === "review") return "Prefiltro revisión";
+  if (c.prefilter_decision === "reject") return "Prefiltro no";
+  if (bat?.status === "completed" && bat.match != null) return `Match ${Math.round(bat.match)}`;
+  return null;
+}
+
+function JourneyCard({
+  cand, gate, selected, esperando, bateria, hiringLead, onToggle, onOpen,
+}: {
+  cand: Cand;
+  gate: KellyGate;
+  selected: boolean;
+  esperando: boolean;
+  bateria?: BatEstado;
+  hiringLead?: string | null;
+  onToggle: () => void;
+  onOpen: () => void;
+}) {
+  const sub = stageLabel(cand.stage);
+  const mostrarSub = gate.stages.length !== 1 || (cand.stage && cand.stage !== gate.stages[0]);
+  const dias = diasEnEtapa(cand);
+  const sla = dias == null ? null : slaStatus(cand.stage, dias);
+  const aging = dias == null
+    ? null
+    : sla === "serious" || sla === "critical"
+      ? `${dias} d · fuera de plazo`
+      : `${dias} d`;
+  const sem = semaforoDe(cand, bateria);
+  const pill: React.CSSProperties = {
+    display: "inline-block",
+    borderRadius: 999,
+    padding: "2px 8px",
+    fontSize: 11,
+    lineHeight: 1.4,
+    color: "#1d1d1f",
+    background: "#F3F4F6",
+    border: "1px solid rgba(0,0,0,.06)",
+  };
+
+  return (
+    <div style={{
+      position: "relative",
+      background: "#ffffff",
+      borderRadius: 16,
+      border: selected ? "1px solid #1d1d1f" : "1px solid rgba(0,0,0,.06)",
+      padding: 14,
+    }}>
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={(e) => { e.stopPropagation(); onToggle(); }}
+        onClick={(e) => e.stopPropagation()}
+        aria-label={`Seleccionar ${cand.name}`}
+        style={{ position: "absolute", top: 12, right: 12, width: 14, height: 14, accentColor: "#1d1d1f", cursor: "pointer" }}
+      />
+      <button type="button" onClick={onOpen} style={{
+        display: "block",
+        width: "100%",
+        textAlign: "left",
+        background: "transparent",
+        border: 0,
+        padding: 0,
+        paddingRight: 22,
+        cursor: "pointer",
+        fontFamily: "Inter, system-ui, sans-serif",
+        color: "#1d1d1f",
+      }}>
+        <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.25 }}>{cand.name}</div>
+        <div style={{ fontSize: 12, color: "#6e6e73", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {cand.email}
+        </div>
+        {hiringLead && (
+          <div style={{ fontSize: 12, color: "#6e6e73", marginTop: 4 }}>
+            Hiring Lead: {hiringLead}
+          </div>
+        )}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+          <span style={pill}>{cand.ht_vacancies?.title || "—"}</span>
+          {mostrarSub && sub !== gate.label && (
+            <span style={{ ...pill, background: "#EEF2FF" }}>{sub}</span>
+          )}
+          {cand.source === "cv_proceso_anterior" && (
+            <span style={{ ...pill, background: "#F5F3FF" }} title="Hoja de vida cargada de un proceso anterior">
+              CV proceso anterior
+            </span>
+          )}
+          {esperando && (
+            <span style={{ ...pill, background: "#F4F4F5" }} title="El último mensaje es del candidato y no le hemos respondido">
+              Espera respuesta
+            </span>
+          )}
+          {sem && <span style={{ ...pill, color: "#6e6e73" }}>{sem}</span>}
+          {aging && (
+            <span style={{ ...pill, color: "#6e6e73" }} title={stageSla(cand.stage) ? `Plazo de la etapa: ${stageSla(cand.stage)} días` : undefined}>
+              {aging}
+            </span>
+          )}
+        </div>
+      </button>
+      <ChipBateria est={bateria} />
     </div>
   );
 }
@@ -1148,16 +1423,14 @@ function ChipBateria({ est }: { est?: BatEstado }) {
   if (!est) return null;
 
   if (est.status === "completed" && est.match != null) {
-    const color = est.match >= 75 ? "text-emerald-700 border-emerald-300 bg-emerald-50"
-      : est.match >= 55 ? "text-blue-700 border-blue-300 bg-blue-50"
-      : "text-amber-700 border-amber-300 bg-amber-50";
     return (
       <a href={`/hr-admin/bateria/informe/${est.token}`} target="_blank" rel="noreferrer"
         onClick={(e) => e.stopPropagation()}
-        className={`mt-2 flex items-center justify-between gap-1 border px-1.5 py-1 text-[10px] font-bold ${color}`}
+        className="mt-2 flex items-center justify-between gap-1 px-2 py-1 text-[10px] font-semibold"
+        style={{ borderRadius: 999, background: "#F3F4F6", color: "#6e6e73", border: "1px solid rgba(0,0,0,.06)" }}
         title="Abrir el informe · match con el perfil del cargo">
         <span>Batería completa · {est.match}%</span>
-        <span className="opacity-70 font-normal">{est.conInforme ? "informe ↗" : "sin IA ↗"}</span>
+        <span className="font-normal">{est.conInforme ? "informe ↗" : "sin IA ↗"}</span>
       </a>
     );
   }
@@ -1169,7 +1442,11 @@ function ChipBateria({ est }: { est?: BatEstado }) {
     : "Batería con enlace · sin enviar";
 
   return (
-    <div className="mt-2 border border-[var(--ts-gray-20)] px-1.5 py-1 text-[10px] text-[var(--ts-gray-60)]" title={txt}>
+    <div
+      className="mt-2 px-2 py-1 text-[10px]"
+      style={{ borderRadius: 999, background: "#F3F4F6", color: "#6e6e73", border: "1px solid rgba(0,0,0,.06)" }}
+      title={txt}
+    >
       {txt}
     </div>
   );
@@ -1540,7 +1817,8 @@ function BulkActionBar({
           </select>
           <button
             onClick={() => runBulk("advance")}
-            className="text-xs font-bold px-3 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700"
+            className="text-xs font-bold px-3 py-1.5 rounded-full hover:opacity-90"
+            style={{ background: "#1d1d1f", color: "#ffffff" }}
             title="Avanzar cada uno a su siguiente etapa"
           >
             → Avanzar etapa
@@ -1564,61 +1842,7 @@ function BulkActionBar({
   );
 }
 
-// ─── Terminal footer columns · contratados + rechazados ──────────
-function ContractedColumn({
-  cands,
-  selectedIds,
-  onToggle,
-  onSelect,
-}: {
-  cands: Cand[];
-  selectedIds: Set<string>;
-  onToggle: (id: string) => void;
-  onSelect: (c: Cand) => void;
-}) {
-  return (
-    <div className="bg-white p-5">
-      <div className="flex items-baseline justify-between mb-4 pb-3 border-b border-[var(--ts-gray-10)]">
-        <div className="flex items-baseline gap-3">
-          <CheckCircle2 className="w-4 h-4 text-[var(--ts-green)] flex-shrink-0 self-center" />
-          <div className="ts-eyebrow text-[var(--ts-green)]">Contratados</div>
-        </div>
-        <div className="text-[28px] font-extrabold ts-tabular text-[var(--ts-green)]" style={{ letterSpacing: '-0.04em' }}>
-          {cands.length}
-        </div>
-      </div>
-      {cands.length === 0 ? (
-        <div className="ts-eyebrow text-[10px] text-[var(--ts-gray-40)] py-4">Sin contrataciones aún</div>
-      ) : (
-        <div className="space-y-2">
-          {cands.map(c => {
-            const isSelected = selectedIds.has(c.id);
-            return (
-              <div
-                key={c.id}
-                className={`relative bg-white border p-3 transition-all ${isSelected ? 'border-[var(--ts-black)]' : 'border-[var(--ts-green-border)] hover:border-[var(--ts-green)]'}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => onToggle(c.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="absolute top-2.5 right-2.5 w-3.5 h-3.5 cursor-pointer accent-[var(--ts-black)]"
-                />
-                <button onClick={() => onSelect(c)} className="w-full text-left pr-5">
-                  <div className="text-[14px] font-bold text-[var(--ts-black)] leading-tight" style={{ letterSpacing: '-0.01em' }}>
-                    {c.name}
-                  </div>
-                  <div className="text-[11px] text-[var(--ts-gray-60)] mt-1">{c.ht_vacancies?.title || '—'}</div>
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
+// Contratados van en el gate 12 (Onboarding) del journey, no en una columna.
 
 // Etiquetas cortas por category_key para badges en cards
 const REJECTION_CATEGORY_SHORT: Record<string, string> = {
@@ -1890,7 +2114,7 @@ function RejectedColumn({
 }
 
 // ─── Side panel con detalle + respuestas del prefiltro ──────────────
-function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: () => void; onChanged?: () => void }) {
+function CandDetailPanel({ cand, onClose, onChanged, hiringLeadEmail }: { cand: Cand; onClose: () => void; onChanged?: () => void; hiringLeadEmail?: string | null }) {
   const pf = cand.prefilter_data;
   const decision = cand.prefilter_decision;
   const decisionBadge = decision === "pass" ? { label: "✅ PASS", color: "#10B981" }
@@ -1952,6 +2176,9 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
           <div>
             <h2 className="text-xl font-bold">{cand.name}</h2>
             <p className="text-xs text-gray-500 mt-0.5">{cand.ht_vacancies?.title || "—"}</p>
+            {hiringLeadEmail && (
+              <p className="text-xs text-gray-500 mt-0.5">Hiring Lead: {hiringLeadEmail}</p>
+            )}
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-black text-2xl leading-none w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100">×</button>
         </div>
@@ -2298,6 +2525,79 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
                     <Row k="Presencial" v={pf._meta.onsite_available ? "Sí" : "No"} />
                   )}
                   {typeof pf.years_experience === "number" && <Row k="Años de experiencia" v={`${pf.years_experience}`} />}
+                  {(pf._meta.salary_usd_expectation || pf.salary_usd) && (
+                    <Row
+                      k="Expectativa (USD/mes)"
+                      v={
+                        <span className={pf._meta.salary_over_budget ? "text-red-700 font-bold" : "font-bold"}>
+                          {pf._meta.salary_usd_expectation || pf.salary_usd}
+                          {pf._meta.salary_over_budget && pf._meta.salary_cap_usd
+                            ? ` · sobre el tope de USD ${pf._meta.salary_cap_usd}`
+                            : ""}
+                        </span>
+                      }
+                    />
+                  )}
+                </Section>
+              )}
+
+              {pf._meta?.panama_ops && (
+                <Section title="🇵🇦 Prefiltro Panama Ops">
+                  {pf.current_city && <Row k="Ciudad" v={pf.current_city} />}
+                  {typeof pf._meta.work_authorized_panama === "boolean" && (
+                    <Row
+                      k="Autorizado para trabajar (PA)"
+                      v={
+                        <strong className={pf._meta.work_authorized_panama ? "text-emerald-700" : "text-red-700"}>
+                          {pf._meta.work_authorized_panama ? "Sí" : "No"}
+                        </strong>
+                      }
+                    />
+                  )}
+                  {typeof pf._meta.onsite_panama_city === "boolean" && (
+                    <Row
+                      k="Presencial Panamá City"
+                      v={
+                        <strong className={pf._meta.onsite_panama_city ? "text-emerald-700" : "text-red-700"}>
+                          {pf._meta.onsite_panama_city ? "Sí" : "No"}
+                        </strong>
+                      }
+                    />
+                  )}
+                  {typeof (pf._meta.years_freight_panama ?? pf.years_freight_panama) === "number" && (
+                    <Row
+                      k="Años freight Panamá"
+                      v={
+                        <span className={pf._meta.years_freight_short ? "text-amber-700 font-bold" : undefined}>
+                          {pf._meta.years_freight_panama ?? pf.years_freight_panama}
+                          {pf._meta.years_freight_short ? " · bajo el mínimo (4)" : ""}
+                        </span>
+                      }
+                    />
+                  )}
+                  {typeof pf._meta.ocean_fcl_lcl === "boolean" && (
+                    <Row k="Ocean FCL/LCL" v={pf._meta.ocean_fcl_lcl ? "Sí" : "No"} />
+                  )}
+                  {typeof pf._meta.air_freight === "boolean" && (
+                    <Row k="Air freight" v={pf._meta.air_freight ? "Sí" : "No"} />
+                  )}
+                  {typeof pf._meta.bl_awb_docs === "boolean" && (
+                    <Row k="B/L · AWB docs" v={pf._meta.bl_awb_docs ? "Sí" : "No"} />
+                  )}
+                  {typeof pf._meta.warehouse_ftz === "boolean" && (
+                    <Row k="Warehouse / FTZ" v={pf._meta.warehouse_ftz ? "Sí" : "No"} />
+                  )}
+                  {pf.english_level && (
+                    <Row
+                      k="Inglés"
+                      v={
+                        <span className={pf._meta.english_fails ? "text-amber-700 font-bold" : undefined}>
+                          {pf.english_level}
+                          {pf._meta.english_fails ? " · bajo B1" : ""}
+                        </span>
+                      }
+                    />
+                  )}
                   {(pf._meta.salary_usd_expectation || pf.salary_usd) && (
                     <Row
                       k="Expectativa (USD/mes)"
@@ -3194,14 +3494,4 @@ function RobustAudioPlayer({
 }
 
 
-// ─── Legend item · usado en la barra superior del Funnel ──────────
-function LegendItem({ icon: Icon, label, color }: { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; label: string; color: string }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="w-3 h-[3px]" style={{ background: color }} />
-      <Icon className="w-3 h-3" style={{ color }} />
-      <span className="text-[11px] font-semibold text-[var(--ts-gray-90)]">{label}</span>
-    </div>
-  );
-}
 

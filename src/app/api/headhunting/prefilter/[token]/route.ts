@@ -106,6 +106,7 @@ const SEVERIDAD_POR_REGLA: Record<string, Severidad> = {
   licencia_vencida: "duro",
   sin_curso_50_horas: "duro",
   sin_autorizacion_trabajo_china: "duro",
+  sin_autorizacion_trabajo_panama: "duro",
   sin_tarjeta_profesional: "duro",
   ingles_a1_a2: "blando",
   ingles_b1: "blando",
@@ -115,6 +116,7 @@ const SEVERIDAD_POR_REGLA: Record<string, Severidad> = {
   sin_disponibilidad_presencial: "blando",
   sin_experiencia_rol: "blando",
   anos_industria: "blando",
+  anos_freight_panama: "blando",
   // Customer Documentation · todo lo que declara el candidato de si mismo
   sin_experiencia_doc_comex: "blando",
   sin_conciliacion_facturas: "blando",
@@ -220,6 +222,24 @@ function checkEnglishLevel(englishLevel: string | undefined, vacancyId: string, 
  * gaste una entrevista sin que nadie lo haya visto.
  */
 const CHINA_SALARY_CAP_USD = 1500;
+
+/**
+ * Tope mensual USD (bruto) para Panama Operations Specialist.
+ * Igual que China: sobre el tope = flag/review, NUNCA auto-reject.
+ */
+const PANAMA_OPS_SALARY_CAP_USD = 1500;
+
+/** Inglés corto EN (A1–C2). Mínimo soft B1 para panama_ops. */
+const PANAMA_OPS_ENGLISH_RANK: Record<string, number> = {
+  A1: 1,
+  A2: 2,
+  B1: 3,
+  B2: 4,
+  C1: 5,
+  C2: 6,
+};
+const PANAMA_OPS_ENGLISH_MIN_RANK = 3; // B1
+const PANAMA_OPS_YEARS_MIN = 4;
 
 /** "USD 2,500/month gross" → 2500. Devuelve null si no hay número legible. */
 function parseSalaryUsd(raw: unknown): number | null {
@@ -418,6 +438,88 @@ export async function POST(
       work_authorized: workAuthorized,
       onsite_available: onsiteAvailable,
       pipl_consent: true,
+    };
+  } else if (templateKey === "panama_ops") {
+    // ─── Rama PANAMA OPS · freight knock-outs (EN) ──────────────────
+    //   - Consentimiento privacy EN obligatorio (no PIPL, no habeas CO).
+    //   - Salario (salary_usd) es SOLO DATO · nunca descarta.
+    //   - Knock-outs → review flags: work_authorized_panama, onsite_panama_city.
+    //   - Soft mark: years_freight_panama < 4, english below B1.
+    if (!isYes(body.privacy_consent)) {
+      return NextResponse.json({ error: "privacy_consent_required" }, { status: 400 });
+    }
+
+    const englishKey = String(body.english_level || "").trim().toUpperCase();
+    const englishRank = PANAMA_OPS_ENGLISH_RANK[englishKey] ?? 0;
+    const englishFails = englishRank > 0 && englishRank < PANAMA_OPS_ENGLISH_MIN_RANK;
+    const workAuthorized = isYes(body.work_authorized_panama);
+    const onsitePanama = isYes(body.onsite_panama_city);
+    const yearsFreight = Number(body.years_freight_panama ?? 0);
+    const yearsShort = Number.isFinite(yearsFreight) && yearsFreight < PANAMA_OPS_YEARS_MIN;
+
+    if (!workAuthorized) {
+      bloqueos.push({
+        regla: "autorizacion_trabajo",
+        severidad: "duro",
+        categoria: "requisito_excluyente",
+        sub_detail: "sin_autorizacion_trabajo_panama",
+        valor: String(body.work_authorized_panama ?? ""),
+      });
+    }
+    if (!onsitePanama) {
+      bloqueos.push({
+        regla: "disponibilidad_presencial",
+        severidad: "duro",
+        categoria: "requisito_excluyente",
+        sub_detail: "sin_disponibilidad_presencial",
+        valor: String(body.onsite_panama_city ?? ""),
+      });
+    }
+    if (englishFails) {
+      bloqueos.push({
+        regla: "ingles_minimo",
+        severidad: "blando",
+        categoria: "idioma_insuficiente",
+        sub_detail: englishRank <= 2 ? "ingles_a1_a2" : "ingles_b1",
+        valor: String(body.english_level ?? ""),
+      });
+    }
+    if (yearsShort) {
+      bloqueos.push({
+        regla: "anos_freight_panama",
+        severidad: "blando",
+        categoria: "experiencia_insuficiente",
+        sub_detail: "anos_freight_panama",
+        valor: String(body.years_freight_panama ?? ""),
+      });
+    }
+
+    decision = bloqueos.length ? "review" : "pass";
+
+    const salaryUsd = parseSalaryUsd(body.salary_usd);
+    const salaryOverBudget = salaryUsd !== null && salaryUsd > PANAMA_OPS_SALARY_CAP_USD;
+    if (salaryOverBudget && decision === "pass") {
+      decision = "review";
+    }
+
+    meta = {
+      panama_ops: true,
+      salary_usd_expectation: body.salary_usd ?? null,
+      salary_usd_parsed: salaryUsd,
+      salary_cap_usd: PANAMA_OPS_SALARY_CAP_USD,
+      salary_over_budget: salaryOverBudget,
+      english_min_required_rank: PANAMA_OPS_ENGLISH_MIN_RANK,
+      english_candidate_rank: englishRank,
+      english_fails: englishFails,
+      work_authorized_panama: workAuthorized,
+      onsite_panama_city: onsitePanama,
+      years_freight_panama: yearsFreight,
+      years_freight_short: yearsShort,
+      ocean_fcl_lcl: isYes(body.ocean_fcl_lcl),
+      air_freight: isYes(body.air_freight),
+      bl_awb_docs: isYes(body.bl_awb_docs),
+      warehouse_ftz: isYes(body.warehouse_ftz),
+      privacy_consent: true,
     };
   } else if (templateKey === "sig_sst") {
     // ─── Rama SIG-SST · credenciales de ley + salario + inglés ──────

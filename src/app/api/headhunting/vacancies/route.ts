@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
     // el filtro se ignoraba en silencio.
     const clientId = req.nextUrl.searchParams.get('client_id') ?? req.nextUrl.searchParams.get('clientId');
 
+    // `*` incluye hiring_lead_email (el Hiring Lead del área) junto a
+    // owner_recruiter_id. Son personas distintas; el Funnel muestra las dos.
     let query = supabaseAdmin
       .from('ht_vacancies')
       .select(`

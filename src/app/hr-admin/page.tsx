@@ -5463,14 +5463,14 @@ function ImportCSVModal({
                 onClick={doImport}
                 disabled={!text.trim() || saving}
               >
-                {saving ? "Importando…" : "Importar al CV Bank"}
+                {saving ? "Importando…" : "Importar al banco (Funnel)"}
               </button>
             </div>
           </>
         ) : (
           <div className="space-y-3">
             <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-900">
-              <b>{result.imported}</b> candidatos importados al CV Bank ·{" "}
+              <b>{result.imported}</b> candidatos importados al banco (Funnel) ·{" "}
               {result.skipped > 0 && <span>{result.skipped} omitidos</span>}
             </div>
             {result.errors.length > 0 && (
@@ -5978,7 +5978,7 @@ function ReferralDetail({ referral, onBack, onAction }: { referral: Referral; on
               onClick={() => onAction('imported_to_cvbank')}
               className="text-xs font-semibold px-4 py-2 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 inline-flex items-center gap-1.5"
             >
-              <UserCheck className="w-3.5 h-3.5" /> Importar al CV Bank
+              <UserCheck className="w-3.5 h-3.5" /> Guardar para rediscovery
             </button>
           </>
         )}

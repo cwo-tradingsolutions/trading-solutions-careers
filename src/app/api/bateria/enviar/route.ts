@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { isAdminRequest } from '@/lib/bateria/auth';
-import { asuntoBateria, htmlBateria, textoBateria, FIRMA } from '@/lib/bateria/correo';
-import { asuntoBateriaEn, htmlBateriaEn, textoBateriaEn, FIRMA_EN } from '@/lib/bateria/correo';
+import { asuntoBateria, htmlBateria, textoBateria } from '@/lib/bateria/correo';
+import { asuntoBateriaEn, htmlBateriaEn, textoBateriaEn } from '@/lib/bateria/correo';
+import { ATS_FROM_NAME } from '@/lib/ats-from';
 import { resolveCandidateLang, type CandidateLang } from '@/lib/candidate-lang';
 import { createDraftViaGmail, isGmailConnected } from '@/lib/gmail';
 import { getResend, EMAIL_FROM } from '@/lib/resend';
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
       let fallo: string | null = null;
 
       if (modo === 'borrador') {
-        const r = await createDraftViaGmail({ to: c.email, subject: asunto, html, fromName: `${lang === 'en' ? FIRMA_EN : FIRMA} · Trading Solutions` });
+        const r = await createDraftViaGmail({ to: c.email, subject: asunto, html, fromName: ATS_FROM_NAME });
         canal = 'gmail-borrador';
         if (!r.ok) fallo = r.error ?? 'Gmail rechazó el borrador';
       } else {

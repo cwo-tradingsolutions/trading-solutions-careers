@@ -11,7 +11,7 @@
 import crypto from "crypto";
 
 function getSecret(): string {
-  const s = process.env.ADMIN_SECRET;
+  const s = (process.env.ADMIN_SECRET ?? "").trim();
   if (!s || s.length < 8) {
     throw new Error("ADMIN_SECRET no configurado o muy corto");
   }
