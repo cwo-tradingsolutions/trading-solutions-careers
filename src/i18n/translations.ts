@@ -1,260 +1,342 @@
-/**
- * Textos del portal público de empleo.
- *
- * El portal público va en un solo idioma: inglés, 1:1 con el copy pack de
- * Bernabé (CAREERS-COPY-PACK-Bernabe-2026-10-27, v1.0). Antes convivían ES y
- * EN con un selector y la página mezclaba `lang=es` con texto en inglés.
- *
- * Cifras (pack rev K, Kelly GO): las de tradingsolutions.com — +150 países,
- * +300 clientes, +52k TEUs, +500 t aire y tierra. El "+10 markets" del copy
- * pack sale de Universe (oficinas) y no se usa en Careers para no
- * contradecir el sitio corporativo.
- *
- * Los tres puntos que el pack deja por confirmar (presupuesto de formación,
- * programas de bienestar, caso en todos los roles) van con su texto de
- * respaldo hasta que Kelly/HR los confirme. Antes de agregar texto nuevo,
- * pasar la lista "Voice QA" del pack (§5): ni programas internos, ni cifras
- * de la web corporativa, ni promesas de ascenso o asignaciones.
- */
-export type Locale = "en";
+import { ptBR } from "./pt";
+import { zhCN } from "./zh";
+
+export type { Locale } from "./locales";
 
 export const translations = {
-  en: {
-    meta: {
-      title: "Careers at Trading Solutions | Boutique Freight Forwarder, Miami",
-      description:
-        "Join a boutique freight forwarder moving cargo by sea, land and air to +150 countries. Open roles in Operations, Corporate and Commercial.",
-      ogTitle: "Every shipment has a name behind it. It could be yours.",
-      ogDescription:
-        "Careers at Trading Solutions — +150 countries, one team. See open roles in Operations, Corporate and Commercial.",
-    },
-    logoAlt: "Trading Solutions logo",
-    nav: {
-      why: "Why us",
-      roles: "Open roles",
-      hire: "How we hire",
-      life: "Life here",
-      cta: "See open roles",
-      menu: "Menu",
-    },
-    // Shell Universe × Careers (preview AJUSTE de Clara, pack rev J). Las
-    // pills del preview (Inicio · Cultura · Gente · Crecer · Vacantes · Únete)
-    // van en inglés: el portal público es un solo idioma.
-    shell: {
-      workspace: "Workspace",
-      company: "Company",
-      workspaceTip: "Workspace is for the Trading Solutions team",
-      searchPlaceholder: "Search open roles…",
-      searchLabel: "Search open roles",
-      announcements: "New roles are posted here first",
-      sections: "Careers sections",
-      home: "Home",
-      culture: "Culture",
-      people: "People",
-      grow: "Grow",
-      roles: "Open roles",
-      join: "Join us",
-      photoPlaceholder: "placeholder until TS photo bank",
-    },
-    // Búsqueda junto al hero (patrón SLB).
-    heroSearch: {
-      label: "Search open roles",
-      keyword: "Keyword or role",
-      allTeams: "All teams",
-      anyLocation: "Any location",
-      submit: "Search",
-      cardKicker: "Trading Solutions Careers",
-    },
-    // Historias de gente: hasta que Bernabé entregue historias reales (con
-    // nombre y foto del banco TS) las tarjetas llevan las tres ideas del
-    // bloque Why, sin citas ni nombres inventados.
-    people: {
-      storyPending: "Team story · coming soon",
-    },
-    // Talent pool "Join us" (Kelly P0). Texto nuestro, pendiente de pasada de
-    // Bernabé: no promete puesto ni llamada, igual que el resto del pack.
-    pool: {
-      eyebrow: "Join us",
-      title: "No role that fits today? Leave your CV.",
-      body: "Send it once and it stays on file with our team. When a role opens that matches your profile, the CVs on file are part of the search.",
-      points: [
-        "One submission. Your CV stays with our team.",
-        "Pick the team where you'd like to contribute.",
-        "If there's a fit, we'll reach out.",
-      ],
-      area: "Team of interest",
-      areaPlaceholder: "Choose a team",
-      areaOther: "Other / open",
-      message: "Message (optional)",
-      messagePlaceholder: "Tell us what you're looking for.",
-      cvFormats: "PDF, DOC or DOCX (max. 5 MB)",
-      cvTooBig: "That file is over 5 MB. Please upload a smaller PDF or Word file.",
-      submit: "Send my CV",
-      successTitle: "CV received. Thank you.",
-      successBody: "It's on file with our team. If a role opens that fits your profile, we'll reach out.",
-      again: "Send another",
-      cta: "Leave your CV",
-    },
+  es: {
+    nav: { culture: "Cultura", areas: "Áreas", experience: "Experiencia", viewJobs: "Ver vacantes" },
     hero: {
-      eyebrow: "Careers at Trading Solutions",
-      title: "Every shipment has a name behind it. It could be yours.",
-      body: "We're a boutique freight forwarder headquartered in Miami, moving cargo by sea, land and air to +150 countries. We look for curious, committed people who like owning the details — and answering the phone when it rings.",
-      ctaPrimary: "See open roles",
-      ctaSecondary: "How we hire",
-      imageAlt: "A Trading Solutions container vessel arriving at the Port of Miami",
+      tag: "Carreras en Trading Solutions",
+      title: "Tu próximo capítulo\nempieza aquí.",
+      subtitle: "Somos un freight forwarder boutique con operación en más de 150 países. Buscamos personas curiosas, comprometidas y con ganas de crecer junto a nosotros.",
+      cta: "Explorar oportunidades",
+      ctaSecondary: "Conoce nuestra cultura"
     },
-    stats: [
-      { value: "+150", label: "Countries of operation" },
-      { value: "+300", label: "Clients" },
-      { value: "+52k", label: "Maritime TEUs" },
-      { value: "+500", label: "Tons by air & land" },
-    ],
-    why: {
-      eyebrow: "Why Trading Solutions",
-      title: "+150 countries. One team. A seat that matters.",
-      lead: "We're not a giant with a call center. We're a team that knows every client by name and every shipment by its route. Here, your work doesn't disappear into a process — it shows up at a port, a border or a warehouse, on time.",
-      pillars: [
-        {
-          title: "Learn the whole route",
-          body: "Freight is a chain: booking, origin, transit, customs, delivery. You'll work close to every link, side by side with people who've done it for years and are glad to show you how.",
-        },
-        {
-          title: "Real cargo, real markets",
-          body: "Maritime, ground, air and customs to +150 countries. Every day brings a real problem with a real client on the other end — and a team that solves it together.",
-        },
-        {
-          title: "Small enough to be heard",
-          body: "In a boutique team, a good idea doesn't wait in a queue. If you see a better way to quote, track or communicate, you'll have people who listen — and the chance to make it happen.",
-        },
+    stats: {
+      countries: { value: "+150", label: "Países en operación" },
+      clients: { value: "+300", label: "Clientes activos" },
+      teus: { value: "+52k", label: "TEUs marítimos" },
+      tons: { value: "+500", label: "Toneladas aéreo y terrestre" }
+    },
+    culture: {
+      tag: "Mentalidad de crecimiento",
+      title: "Aquí no vienes a ocupar un puesto.\nVienes a construir tu futuro.",
+      subtitle: "En Trading Solutions creemos que el talento excepcional florece cuando se le da espacio para crecer, libertad para proponer y un entorno donde cada persona puede desafiar el status quo.",
+      cards: [
+        { title: "Crecimiento acelerado", desc: "Tu carrera se acelera con exposición internacional, proyectos de alto impacto y líderes que invierten en tu desarrollo. Aquí el techo lo pones tú." },
+        { title: "Alcance internacional", desc: "Operamos en más de 150 países con servicios marítimos, terrestres, aéreos y aduaneros. Cada día es una oportunidad de resolver desafíos logísticos reales." },
+        { title: "Cultura de expansión", desc: "Cada idea tiene espacio. Cada voz importa. Construimos un entorno donde la curiosidad se premia, la innovación se celebra y los límites se desafían." }
       ],
-      closeTitle: "Every shipment has a name behind it, and a phone that gets answered.",
-      closeBody:
-        "That's the promise we make to our clients. It only works because of the people who keep it. If you like being the person others can count on — at 9 a.m. or when a container is stuck at 6 p.m. — you'll feel at home here.",
-      tags: ["Maritime", "Ground", "Air", "Customs"],
-      miniStats: [
-        { value: "+150", label: "Countries of operation" },
-        { value: "+52k", label: "Maritime TEUs moved" },
-        { value: "+500", label: "Tons by air & land" },
-      ],
-      imageAlt: "Trading Solutions ground fleet at sunrise",
+      blackBlock: {
+        title: "Creemos en las personas que quieren más.",
+        desc: "Más impacto. Más aprendizaje. Más libertad. Si buscas un lugar donde tu energía se convierte en resultados reales y tu crecimiento profesional no tiene techo — este es tu lugar.",
+        maritime: "Maritime",
+        maritimeSub: "Ground, Air & Customs",
+        countriesLabel: "Países en operación",
+        teusLabel: "TEUs marítimos gestionados",
+        tonsLabel: "Tons Air & Land"
+      }
     },
-    areas: {
-      eyebrow: "Open roles",
-      title: "Find your place on the route.",
-      lead: "Three teams, one goal: getting every shipment where it needs to go — and every client the answer they need.",
-      operations: {
-        title: "Operations",
-        desc: "Coordinate cargo from origin to destination. Bookings, tracking, documents, carriers — the heartbeat of every shipment.",
-        imageAlt: "Container terminal seen from above",
-      },
-      corporate: {
-        title: "Corporate",
-        desc: "Finance, people, systems and administration. The team that keeps the whole operation steady and growing.",
-        imageAlt: "Stacked containers under a port crane",
-      },
-      commercial: {
-        title: "Commercial",
-        desc: "Understand what clients need to move and design the right solution. Relationships built one conversation at a time.",
-        imageAlt: "A team member on a call with a client",
-      },
-      cardCta: "View roles",
-      countOne: "1 open position",
-      countMany: "{n} open positions",
-      countZero: "No open roles right now",
+    departments: {
+      tag: "Áreas",
+      title: "Encuentra tu espacio.",
+      ops: { name: "Operaciones", count: "4 posiciones abiertas" },
+      corporate: { name: "Corporate", count: "3 posiciones abiertas" },
+      commercial: { name: "Comercial", count: "2 posiciones abiertas" }
     },
-    process: {
-      eyebrow: "How we hire",
-      title: "Four steps. Real people on both sides.",
-      lead: "No black boxes. Here's what to expect from the moment you apply — and what we expect from ourselves.",
+    experience: {
+      tag: "La experiencia",
+      title: "Contratamos talento excepcional. Así se siente ser parte del proceso.",
       steps: [
-        {
-          label: "01 — Apply",
-          title: "Tell us who you are.",
-          body: "Pick a role that fits and send your application. A real person on our team reads it — not just a filter.",
-        },
-        {
-          label: "02 — Conversation",
-          title: "A conversation, not an interrogation.",
-          body: "We'll talk about your experience, how you think and what you're looking for. Ask us anything — about the team, the work, the day-to-day. It has to be a fit for both of us.",
-        },
-        {
-          label: "03 — Case",
-          title: "Show us how you'd handle it.",
-          body: "For some roles, we'll share a short practical case based on real freight situations. We care about how you reason, prioritize and communicate.",
-        },
-        {
-          label: "04 — Welcome",
-          title: "Your first shipment won't be a solo trip.",
-          body: "You'll start with a team that walks you through our clients, our routes and our tools. Ask early, ask often — that's how everyone here learned.",
-        },
+        { num: "01", label: "Descubrimiento", title: "Nos encuentras. Te intrigamos.", desc: "Exploras nuestras oportunidades y algo conecta. No es solo un trabajo — es la posibilidad de hacer algo que importa en una escala internacional." },
+        { num: "02", label: "Conversación", title: "No es una entrevista. Es un diálogo.", desc: "Queremos conocer quién eres de verdad — tu curiosidad, tus ideas, tu forma de pensar. Tú también nos conoces a nosotros. Es un match de dos vías." },
+        { num: "03", label: "Inmersión", title: "Muéstranos cómo piensas.", desc: "Un reto real del negocio. Sin respuestas correctas. Queremos ver tu proceso, tu creatividad y cómo abordas lo desconocido." },
+        { num: "04", label: "Bienvenida", title: "Empieza algo extraordinario.", desc: "Desde el día uno, tienes mentor, equipo y acceso a un programa de onboarding diseñado para que despegues rápido y con confianza." }
       ],
+      cta: "Explorar vacantes abiertas"
     },
     benefits: {
-      eyebrow: "Life at Trading Solutions",
-      title: "What you can count on.",
+      tag: "Lo que te espera",
+      title: "Diseñado para que crezcas.",
       items: [
-        {
-          title: "Keep learning",
-          body: "Learn from people who know the business inside out, with support for the training that helps you grow in your role.",
-        },
-        {
-          title: "International exposure",
-          body: "Work every day with partners, clients and colleagues in +150 countries. Your network grows with every shipment.",
-        },
-        {
-          title: "Well-being that's real",
-          body: "Flexibility where the work allows it, and a team that understands life happens outside of work, too.",
-        },
-        {
-          title: "Work that's seen",
-          body: "In a boutique team, your impact doesn't get lost. Competitive pay and people who notice what you bring.",
-        },
-      ],
+        { title: "Aprendizaje continuo", desc: "Presupuesto anual para formación, certificaciones y conferencias" },
+        { title: "Experiencia internacional", desc: "Proyectos cross-country y oportunidad de asignaciones internacionales" },
+        { title: "Bienestar integral", desc: "Programas de wellness, salud mental, flexibilidad y balance real" },
+        { title: "Reconocimiento", desc: "Tu impacto se ve. Compensación competitiva y crecimiento acelerado" }
+      ]
     },
     cta: {
-      title: "Ready to move something real?",
-      body: "Somewhere, a client is waiting on a shipment. Help us get it there — with your name behind it.",
-      primary: "See open roles",
-      secondary: "Get to know Trading Solutions",
-      secondaryUrl: "https://tradingsolutions.com",
+      title: "¿Listo para lo que viene?",
+      subtitle: "Las mejores historias profesionales empiezan con una decisión valiente. Esta podría ser la tuya.",
+      button: "Ver todas las vacantes"
     },
     footer: {
-      tagline: "Boutique freight forwarding. One team.",
-      hq: "Headquartered in Miami, FL",
-      careers: "Careers",
-      services: "Services",
-      company: "Company",
-      about: "About",
-      contact: "Contact",
+      tagline: "Boutique freight forwarder. Movemos lo que importa, con precisión y propósito.",
+      services: "Servicios",
+      company: "Compañía",
+      companyAbout: "Nosotros",
+      companyCareers: "Carreras",
+      companyContact: "Contacto",
+      followUs: "Síguenos",
       legal: "Legal",
-      rights: "© 2026 Trading Solutions. All rights reserved.",
+      privacy: "Privacidad",
+      rights: "Todos los derechos reservados."
     },
     jobs: {
-      pageEyebrow: "Open roles",
-      pageTitle: "Find your place on the route.",
-      pageSubtitle: "Every role here moves something real. Search, filter and find the one that fits.",
-      searchPlaceholder: "Search by title, team or skill",
-      searchLabel: "Search open roles",
-      areaLabel: "Team",
-      modeLabel: "Work mode",
+      pageTitle: "Vacantes abiertas",
+      pageSubtitle: "Encuentra el rol que conecta con tu ambición.",
+      backHome: "Volver al inicio",
+      searchPlaceholder: "Buscar por título, área o habilidad...",
+      deptLabel: "Departamento:",
+      modeLabel: "Modalidad:",
+      all: "Todos",
+      allFem: "Todas",
+      resultsSingular: "posición encontrada",
+      resultsPlural: "posiciones encontradas",
+      clearFilters: "Limpiar filtros",
+      noResults: "No encontramos vacantes con esos filtros.",
+      backToJobs: "Todas las vacantes",
+      notFound: "Vacante no encontrada",
+      viewAll: "Ver todas las vacantes",
+      whatYouDo: "Lo que harás",
+      whatWeSeek: "Lo que buscamos",
+      applyBtn: "Postularme a esta vacante",
+      applyTo: "Postularme a",
+      fullName: "Nombre completo",
+      fullNamePlaceholder: "Tu nombre",
+      email: "Correo electrónico",
+      emailPlaceholder: "tu@correo.com",
+      phone: "Teléfono",
+      phonePlaceholder: "+1 (555) 000-0000",
+      linkedin: "LinkedIn",
+      linkedinPlaceholder: "linkedin.com/in/tu-perfil",
+      cvLabel: "Hoja de vida",
+      cvDrag: "Arrastra tu CV o",
+      cvSelect: "selecciona un archivo",
+      cvFormats: "PDF, DOC o DOCX (máx. 10 MB)",
+      whyTs: "¿Por qué Trading Solutions?",
+      whyTsPlaceholder: "Cuéntanos qué te motiva y qué te haría excepcional en este rol...",
+      submit: "Enviar postulación",
+      cancel: "Cancelar",
+      successTitle: "Postulación enviada",
+      successMsg: "Gracias por tu interés en Trading Solutions. Nuestro equipo revisará tu perfil y te contactaremos pronto.",
+      backToJobsBtn: "Volver a vacantes"
+    },
+    deptNames: {
+      Operaciones: "Operaciones",
+      Corporate: "Corporate",
+      Comercial: "Comercial",
+      People: "People",
+      Talento: "Talento",
+      Finanzas: "Finanzas",
+      "Tecnología": "Tecnología",
+      Operations: "Operaciones",
+      Administration: "Administración",
+      Technology: "Tecnología",
+      Commercial: "Comercial",
+      Wellness: "Bienestar",
+      Pricing: "Pricing"
+    },
+    modeNames: {
+      Presencial: "Presencial",
+      "Híbrido": "Híbrido",
+      Remoto: "Remoto",
+      "On-site": "Presencial",
+      Remote: "Remoto",
+      Hybrid: "Híbrido"
+    },
+    ui: {
+      menu: "Menú",
+      mainSite: "tradingsolutions.com",
+      mainSiteNote: "Sitio principal",
+      prev: "Anterior",
+      next: "Siguiente",
+      cultureHeadline: "Espacio para crecer. Libertad para proponer.",
+      about: "Sobre Trading Solutions",
+      viewRoles: "Ver cargos",
+      openNone: "Sin vacantes por ahora",
+      openOne: "1 vacante abierta",
+      openMany: "{n} vacantes abiertas",
+      talentPool: "Únete a nuestra base de talento",
+      leaveCv: "Deja tu hoja de vida",
+      sendCv: "Enviar mi hoja de vida",
+      areaWord: "Área",
+      followLinkedIn: "Síguenos en LinkedIn",
+      dontSeeTitle: "¿Aún no ves tu cargo?",
+      dontSeeBody: "Guardamos tu perfil para una vacante futura y publicamos cada apertura aquí y en LinkedIn.",
+      poolTitle: "Base de talento",
+      poolIntro: "Deja tu hoja de vida aunque hoy no veas el cargo.",
+      poolGap: "La base de talento todavía no recibe postulaciones por aquí: el sitio solo envía aplicaciones cuando hay una vacante publicada. Postúlate a un cargo abierto o síguenos en LinkedIn.",
+      areaInterest: "Área de interés",
+      areaUnset: "Elige un área",
+      areaGeneral: "Aún no lo sé",
+      areaRequired: "Elige un área de interés.",
+      positionClosed: "Esta vacante está cerrada",
+      positionClosedBody: "Este enlace ya no tiene una vacante abierta. Mira las vacantes actuales o deja tu hoja de vida en la base de talento.",
+      englishPosting: "Vacante publicada en inglés",
+      language: "Idioma",
+      previewTestBanner: "Modo prueba: no se guarda ni se envía",
+      previewTestSuccess: "Envío de prueba enviado (no se guardó)",
+      poolSuccessTitle: "Hoja de vida recibida",
+      loading: "Cargando...",
+      loadingJobs: "Cargando vacantes...",
+      salaryCompetitiveUsd: "Competitiva (USD)",
+      salaryCompetitive: "Competitiva",
+      salaryNegotiable: "A convenir",
+      opsAlt: "Especialista de operaciones junto a contenedores en una terminal",
+      techAlt: "Equipo revisando un trabajo juntos en un computador",
+      adminAlt: "Compañeros trabajando en sus escritorios en la oficina",
+      location: "Ubicación",
+      level: "Nivel",
+      levelMid: "Nivel medio",
+      cityPanama: "Ciudad de Panamá",
+      countryPanama: "Panamá",
+      compensation: "Compensación",
+      privacyAgree: "Acepto el tratamiento de mis datos personales según la",
+      privacyPolicy: "Política de privacidad",
+      privacyAfter: "",
+      knowSomeone: "¿Conoces a alguien para este cargo?",
+      shareLinkedIn: "Compartir en LinkedIn",
+      keepExploring: "Sigue explorando",
+      otherOpenings: "Otras vacantes.",
+      required: "obligatorio",
+      chooseFile: "Elegir archivo",
+      noFile: "Ningún archivo seleccionado",
+      cvHint: "PDF o Word, hasta 5 MB",
+      cvTooBig: "El archivo supera 5 MB. Sube un PDF o Word más liviano.",
+      cvType: "Sube un PDF o un Word.",
+      emailInvalid: "Escribe un correo electrónico válido.",
+      nameRequired: "Escribe tu nombre completo.",
+      consentRequired: "Acepta el tratamiento de datos para enviar.",
+      linkedinInvalid: "Usa un enlace de LinkedIn, por ejemplo linkedin.com/in/tu-perfil.",
+      sending: "Enviando...",
+      sendError: "No pudimos enviarla. Intenta de nuevo en unos minutos.",
+      listHeading: "Lista de vacantes abiertas",
+      openPositions: "Vacantes",
+      careersCrumb: "Trabaja con nosotros",
+      careersCol: "Trabaja con nosotros",
+      solutions: "Soluciones",
+      maritime: "Marítimo",
+      ground: "Terrestre",
+      air: "Aéreo",
+      customs: "Aduanas",
+      deptFilter: "Área",
+      modeFilter: "Modalidad",
+      heroAlt: "Dos profesionales de logística revisando una operación en un computador en una terminal portuaria",
+      nextAlt: "Un equipo con equipo de protección planificando el siguiente paso",
+      teamAlt: "Un equipo trabajando junto en una oficina abierta"
+    },
+    meta: {
+      homeTitle: "Carreras — Trading Solutions",
+      homeDescription: "Tu próximo capítulo empieza aquí. Únete a un freight forwarder boutique con operación en más de 150 países.",
+      jobsTitle: "Vacantes — Trading Solutions",
+      jobsDescription: "Encuentra el rol que conecta con tu ambición. Vacantes abiertas en Trading Solutions.",
+      poolTitle: "Deja tu hoja de vida — Trading Solutions",
+      poolDescription: "Deja tu hoja de vida aunque hoy no veas el cargo. Trading Solutions guarda tu perfil para una vacante futura.",
+      closedTitle: "Esta vacante está cerrada — Trading Solutions",
+      closedDescription: "Este enlace ya no tiene una vacante abierta. Mira las vacantes actuales o deja tu hoja de vida.",
+      jobTitle: "{title} — Trading Solutions"
+    }
+  },
+  en: {
+    nav: { culture: "Culture", areas: "Areas", experience: "Experience", viewJobs: "View openings" },
+    hero: {
+      tag: "Trading Solutions Careers",
+      title: "Your next chapter\nstarts here.",
+      subtitle: "We are a boutique freight forwarder with operations in more than 150 countries. We look for curious, committed people eager to grow with us.",
+      cta: "Explore opportunities",
+      ctaSecondary: "Learn about our culture"
+    },
+    stats: {
+      countries: { value: "+150", label: "Countries of operation" },
+      clients: { value: "+300", label: "Active clients" },
+      teus: { value: "+52k", label: "Maritime TEUs" },
+      tons: { value: "+500", label: "Tons Air & Land" }
+    },
+    culture: {
+      tag: "Growth mindset",
+      title: "You're not here to fill a role.\nYou're here to build your future.",
+      subtitle: "At Trading Solutions we believe exceptional talent thrives when given room to grow, freedom to propose, and an environment where everyone can challenge the status quo.",
+      cards: [
+        { title: "Accelerated growth", desc: "Your career takes off with international exposure, high-impact projects, and leaders who invest in your development. Here, you set your own ceiling." },
+        { title: "Global reach", desc: "We operate in more than 150 countries with maritime, ground, air, and customs services. Every day is an opportunity to solve real logistics challenges." },
+        { title: "Culture of expansion", desc: "Every idea has space. Every voice matters. We build an environment where curiosity is rewarded, innovation is celebrated, and limits are challenged." }
+      ],
+      blackBlock: {
+        title: "We believe in people who want more.",
+        desc: "More impact. More learning. More freedom. If you're looking for a place where your energy turns into real results and your professional growth knows no ceiling — this is your place.",
+        maritime: "Maritime",
+        maritimeSub: "Ground, Air & Customs",
+        countriesLabel: "Countries of operation",
+        teusLabel: "Maritime TEUs handled",
+        tonsLabel: "Tons Air & Land"
+      }
+    },
+    departments: {
+      tag: "Areas",
+      title: "Find your space.",
+      ops: { name: "Operations", count: "4 open positions" },
+      corporate: { name: "Corporate", count: "3 open positions" },
+      commercial: { name: "Commercial", count: "2 open positions" }
+    },
+    experience: {
+      tag: "The experience",
+      title: "We hire exceptional talent. This is what being part of the process feels like.",
+      steps: [
+        { num: "01", label: "Discovery", title: "You find us. We intrigue you.", desc: "You explore our opportunities and something clicks. It's not just a job — it's the chance to do something that matters on an international scale." },
+        { num: "02", label: "Conversation", title: "It's not an interview. It's a dialogue.", desc: "We want to meet the real you — your curiosity, your ideas, your way of thinking. You also get to know us. It's a two-way match." },
+        { num: "03", label: "Immersion", title: "Show us how you think.", desc: "A real business challenge. No right answers. We want to see your process, your creativity, and how you approach the unknown." },
+        { num: "04", label: "Welcome", title: "Start something extraordinary.", desc: "From day one, you have a mentor, a team, and access to an onboarding program designed to help you take off quickly and confidently." }
+      ],
+      cta: "Explore open positions"
+    },
+    benefits: {
+      tag: "What awaits you",
+      title: "Designed for your growth.",
+      items: [
+        { title: "Continuous learning", desc: "Annual budget for training, certifications, and conferences" },
+        { title: "International experience", desc: "Cross-country projects and international assignment opportunities" },
+        { title: "Holistic well-being", desc: "Wellness programs, mental health support, flexibility, and real balance" },
+        { title: "Recognition", desc: "Your impact is visible. Competitive compensation and accelerated growth" }
+      ]
+    },
+    cta: {
+      title: "Ready for what's next?",
+      subtitle: "The best professional stories begin with a bold decision. This could be yours.",
+      button: "View all openings"
+    },
+    footer: {
+      tagline: "Boutique freight forwarder. We move what matters, with precision and purpose.",
+      services: "Services",
+      company: "Company",
+      companyAbout: "About",
+      companyCareers: "Careers",
+      companyContact: "Contact",
+      followUs: "Follow us",
+      legal: "Legal",
+      privacy: "Privacy",
+      rights: "All rights reserved."
+    },
+    jobs: {
+      pageTitle: "Open positions",
+      pageSubtitle: "Find the role that matches your ambition.",
+      backHome: "Back to home",
+      searchPlaceholder: "Search by title, area, or skill...",
+      deptLabel: "Department:",
+      modeLabel: "Work mode:",
       all: "All",
-      loading: "Loading open roles…",
-      resultsOne: "1 open role",
-      resultsMany: "{n} open roles",
+      allFem: "All",
+      resultsSingular: "position found",
+      resultsPlural: "positions found",
       clearFilters: "Clear filters",
-      noResults: "No open roles match those filters.",
-      areaEmptyTitle: "No open roles in {Area} right now.",
-      areaEmptyBody: "Our team grows with our clients, so this can change. Check back soon or explore the other teams.",
-      areaEmptyCta: "See all open roles",
-      allEmptyTitle: "No open roles at the moment.",
-      allEmptyBody: "We're not hiring for any position right now. New roles are posted here first — check back soon.",
-      cardCta: "View role",
-      backToJobs: "All open roles",
-      notFound: "This role is no longer open.",
-      viewAll: "See all open roles",
+      noResults: "No openings match those filters.",
+      backToJobs: "All openings",
+      notFound: "Position not found",
+      viewAll: "View all openings",
       whatYouDo: "What you'll do",
       whatWeSeek: "What we're looking for",
-      applyBtn: "Apply for this role",
+      applyBtn: "Apply for this position",
       applyTo: "Apply for",
       fullName: "Full name",
       fullNamePlaceholder: "Your name",
@@ -265,20 +347,16 @@ export const translations = {
       linkedin: "LinkedIn",
       linkedinPlaceholder: "linkedin.com/in/your-profile",
       cvLabel: "CV / Résumé",
-      cvDrag: "Drop your CV here or",
-      cvSelect: "choose a file",
-      cvFormats: "PDF, DOC or DOCX (max. 10 MB)",
+      cvDrag: "Drag your CV or",
+      cvSelect: "select a file",
+      cvFormats: "PDF, DOC, or DOCX (max. 10 MB)",
       whyTs: "Why Trading Solutions?",
-      whyTsPlaceholder: "Tell us what draws you to this role and to freight.",
-      submit: "Send application",
-      submitting: "Sending…",
+      whyTsPlaceholder: "Tell us what motivates you and what would make you exceptional in this role...",
+      submit: "Submit application",
       cancel: "Cancel",
-      close: "Close",
-      successTitle: "Application received. Thank you.",
-      successBody:
-        "A member of our team will review it. If your profile fits the role, we'll reach out to set up a conversation.",
-      errorGeneric: "Something went wrong sending your application. Please try again in a moment.",
-      backToJobsBtn: "All open roles",
+      successTitle: "Application submitted",
+      successMsg: "Thank you for your interest in Trading Solutions. Our team will review your profile and contact you soon.",
+      backToJobsBtn: "Back to openings"
     },
     deptNames: {
       Operaciones: "Operations",
@@ -288,15 +366,122 @@ export const translations = {
       Talento: "Talent",
       Finanzas: "Finance",
       "Tecnología": "Technology",
-      Pricing: "Pricing",
+      Operations: "Operations",
+      Administration: "Administration",
+      Technology: "Technology",
+      Commercial: "Commercial",
+      Wellness: "Wellness",
+      Pricing: "Pricing"
     },
     modeNames: {
       Presencial: "On-site",
       "Híbrido": "Hybrid",
       Remoto: "Remote",
+      "On-site": "On-site",
+      Remote: "Remote",
+      Hybrid: "Hybrid"
     },
+    ui: {
+      menu: "Menu",
+      mainSite: "tradingsolutions.com",
+      mainSiteNote: "Main site",
+      prev: "Previous",
+      next: "Next",
+      cultureHeadline: "Room to grow. Freedom to propose.",
+      about: "About Trading Solutions",
+      viewRoles: "View roles",
+      openNone: "No openings right now",
+      openOne: "1 open position",
+      openMany: "{n} open positions",
+      talentPool: "Join our talent pool",
+      leaveCv: "Leave your CV",
+      sendCv: "Send my CV",
+      areaWord: "Area",
+      followLinkedIn: "Follow us on LinkedIn",
+      dontSeeTitle: "Don't see your role yet?",
+      dontSeeBody: "We keep your profile for a future opening and publish every role here and on LinkedIn.",
+      poolTitle: "Talent pool",
+      poolIntro: "Leave your CV even if you don't see the role today.",
+      poolGap: "Talent pool applications aren't connected yet. The site only sends an application when it is tied to a published role. Apply to an open position, or follow us on LinkedIn.",
+      areaInterest: "Area of interest",
+      areaUnset: "Choose an area",
+      areaGeneral: "Not sure yet",
+      areaRequired: "Choose an area of interest.",
+      positionClosed: "This position is closed",
+      positionClosedBody: "This link no longer has an open role. See current openings or leave your CV with the talent pool.",
+      englishPosting: "Published in English",
+      language: "Language",
+      previewTestBanner: "Test mode — submissions are not saved or sent",
+      previewTestSuccess: "Test submission sent (not saved)",
+      poolSuccessTitle: "CV received",
+      loading: "Loading...",
+      loadingJobs: "Loading positions...",
+      salaryCompetitiveUsd: "Competitive (USD)",
+      salaryCompetitive: "Competitive",
+      salaryNegotiable: "Negotiable",
+      opsAlt: "Operations specialist beside containers at a terminal",
+      techAlt: "Team reviewing work together on a laptop",
+      adminAlt: "Colleagues working at their desks in the office",
+      location: "Location",
+      level: "Level",
+      levelMid: "Mid-Level",
+      cityPanama: "Panama City",
+      countryPanama: "Panama",
+      compensation: "Compensation",
+      privacyAgree: "I agree to the processing of my personal data under the",
+      privacyPolicy: "Privacy Policy",
+      privacyAfter: "",
+      knowSomeone: "Know someone for this role?",
+      shareLinkedIn: "Share on LinkedIn",
+      keepExploring: "Keep exploring",
+      otherOpenings: "Other openings.",
+      required: "required",
+      chooseFile: "Choose file",
+      noFile: "No file chosen",
+      cvHint: "PDF or Word, up to 5 MB",
+      cvTooBig: "That file is over 5 MB. Upload a smaller PDF or Word file.",
+      cvType: "Upload a PDF or Word file.",
+      emailInvalid: "Enter a valid email address.",
+      nameRequired: "Enter your full name.",
+      consentRequired: "Agree to the processing of your data to send this.",
+      linkedinInvalid: "Use a LinkedIn link, for example linkedin.com/in/your-profile.",
+      sending: "Sending...",
+      sendError: "We could not send it. Please try again in a few minutes.",
+      listHeading: "Open positions list",
+      openPositions: "Open positions",
+      careersCrumb: "Careers",
+      careersCol: "Careers",
+      solutions: "Solutions",
+      maritime: "Maritime",
+      ground: "Ground",
+      air: "Air",
+      customs: "Customs",
+      deptFilter: "Department",
+      modeFilter: "Work mode",
+      heroAlt: "Two logistics professionals reviewing an operation on a laptop at a port terminal",
+      nextAlt: "A team in safety gear planning the next step together",
+      teamAlt: "A team working together in an open office"
+    },
+    meta: {
+      homeTitle: "Careers — Trading Solutions",
+      homeDescription: "Your next chapter starts here. Join the boutique freight forwarder operating in more than 150 countries.",
+      jobsTitle: "Open positions — Trading Solutions Careers",
+      jobsDescription: "Find the role that matches your ambition. Open positions at Trading Solutions.",
+      poolTitle: "Leave your CV — Trading Solutions Careers",
+      poolDescription: "Leave your CV even if you don't see the role today. Trading Solutions keeps your profile for a future opening.",
+      closedTitle: "This position is closed — Trading Solutions Careers",
+      closedDescription: "This link no longer has an open role. See current openings or leave your CV.",
+      jobTitle: "{title} — Trading Solutions Careers"
+    }
   },
+  "zh-CN": zhCN,
+  "pt-BR": ptBR
 };
+
+const _zhMatchesEnglish: (typeof translations)["en"] = translations["zh-CN"];
+const _ptMatchesEnglish: (typeof translations)["en"] = translations["pt-BR"];
+void _zhMatchesEnglish;
+void _ptMatchesEnglish;
 
 // Deep writable type that converts readonly string literals to string
 type DeepWritable<T> = {
@@ -309,9 +494,4 @@ type DeepWritable<T> = {
     : T[K];
 };
 
-export type Translations = DeepWritable<typeof translations.en>;
-
-/** "{n} open positions" → "4 open positions". */
-export function fill(template: string, vars: Record<string, string | number>): string {
-  return template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? `{${k}}`));
-}
+export type Translations = DeepWritable<typeof translations.es>;
