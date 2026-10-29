@@ -49,3 +49,28 @@ export function flagSalarioSobreTope(raw: unknown, capUsd: number): SalaryCapFla
     },
   };
 }
+
+export type EtiquetaAviso = { label: string; emoji: string; enRojo: boolean };
+
+/**
+ * Etiqueta del aviso a Kelly. Sale de `decision`, no de «hay algún bloqueo».
+ * Salario como único tema, o ningún bloqueo (salario desconocido), es revisión
+ * amarilla. Rojo solo cuando hay un bloqueo distinto del tope.
+ */
+export function etiquetaAvisoPrefiltro(
+  decision: string,
+  bloqueos: { regla: string }[],
+): EtiquetaAviso {
+  if (decision === "pass") return { label: "PASA", emoji: "✅", enRojo: false };
+  const soloSalario = bloqueos.length > 0 && bloqueos.every((b) => b.regla === "salario_sobre_tope");
+  if (soloSalario || bloqueos.length === 0) {
+    return { label: "REVISIÓN", emoji: "🟡", enRojo: false };
+  }
+  return { label: "EN ROJO · decide tú", emoji: "🔴", enRojo: true };
+}
+
+/** El aviso lee salary o salary_usd. Vacío no se muestra como un guion. */
+export function textoSalarioAviso(body: { salary?: unknown; salary_usd?: unknown }): string {
+  const salarioRaw = body.salary || body.salary_usd;
+  return salarioRaw ? String(salarioRaw) : "Salario no informado";
+}

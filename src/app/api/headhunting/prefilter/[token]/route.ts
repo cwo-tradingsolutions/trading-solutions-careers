@@ -26,6 +26,7 @@ import { recordStageEvent } from "@/lib/stage-events";
 import { enviarBateriaAuto } from "@/lib/bateria/invitar";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { TEMPLATE_ENGLISH_MIN_RANK, TEMPLATE_SALARY_CAP, type TemplateKey } from "@/lib/prefilter-templates";
+import { etiquetaAvisoPrefiltro, textoSalarioAviso } from "@/lib/prefilter-salary";
 
 // Techos por vacancy_id (en COP mensuales)
 const SALARY_CAPS: Record<string, number> = {
@@ -866,15 +867,9 @@ export async function POST(
         });
         return NextResponse.json({ success: true });
       }
-      const salarioRaw = body.salary || body.salary_usd;
-      const salarioTxt = salarioRaw ? String(salarioRaw) : "Salario no informado";
-      // Salario desconocido no pinta la ficha de rojo. Revisión amarilla si
-      // el único bloqueo es el tope, o si no hay bloqueos y aun así no pasó.
-      const soloSalario = bloqueos.length > 0 && bloqueos.every((b) => b.regla === "salario_sobre_tope");
-      const decisionLabel = decision === "pass" ? "PASA"
-        : soloSalario || bloqueos.length === 0 ? "REVISIÓN" : "EN ROJO · decide tú";
-      const decisionEmoji = decision === "pass" ? "✅"
-        : soloSalario || bloqueos.length === 0 ? "🟡" : "🔴";
+      const aviso = etiquetaAvisoPrefiltro(decision, bloqueos);
+      const { label: decisionLabel, emoji: decisionEmoji, enRojo } = aviso;
+      const salarioTxt = textoSalarioAviso(body);
       const listaBloqueos = bloqueos
         .map((b) => `<li>${b.sub_detail.replace(/_/g, " ")} — dato ${b.severidad}${b.valor ? ` (marcó: ${b.valor})` : ""}${b.contradiccion ? ` · <strong>${b.contradiccion}</strong>` : ""}</li>`)
         .join("");
@@ -893,7 +888,7 @@ export async function POST(
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Ciudad:</td><td>${body.city || "—"}</td></tr>
             ${bateriaAuto ? `<tr><td style="padding: 4px 12px 4px 0; color: #666;">Batería TS:</td><td>${bateriaAuto.enviado ? `enviada automáticamente (${bateriaAuto.canal})` : `<strong>no salió</strong> · ${bateriaAuto.motivo}`}</td></tr>` : ""}
           </table>
-          ${bloqueos.length > 0 ? `<div style="background: ${soloSalario ? "#FFFBEB" : "#FEF2F2"}; padding: 10px 14px; border-radius: 6px; color: ${soloSalario ? "#92400E" : "#991B1B"}; font-size: 13px;"><strong>No se rechazó a nadie.</strong> ${soloSalario ? "Quedó en revisión por el salario:" : "Quedó en rojo esperando tu decisión:"}<ul style="margin: 8px 0 0; padding-left: 18px;">${listaBloqueos}</ul></div>` : ""}
+          ${enRojo ? `<div style="background: #FEF2F2; padding: 10px 14px; border-radius: 6px; color: #991B1B; font-size: 13px;"><strong>No se rechazó a nadie.</strong> Quedó en rojo esperando tu decisión:<ul style="margin: 8px 0 0; padding-left: 18px;">${listaBloqueos}</ul></div>` : bloqueos.length ? `<div style="background: #FFFBEB; padding: 10px 14px; border-radius: 6px; color: #92400E; font-size: 13px;"><strong>Revisión.</strong> El salario quedó sobre el tope. No se rechazó a nadie:<ul style="margin: 8px 0 0; padding-left: 18px;">${listaBloqueos}</ul></div>` : ""}
           <p><a href="${baseUrl}/hr-admin?tab=prefiltros" style="color: #2C64ED;">Ver en HR Admin →</a></p>
         </body></html>`,
         fromName: "Trading Solutions ATS",

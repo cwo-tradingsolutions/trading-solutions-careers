@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { parseSalaryRangeUsd } from "./prefilter-salary.ts";
+import { etiquetaAvisoPrefiltro, parseSalaryRangeUsd, textoSalarioAviso } from "./prefilter-salary.ts";
 
 describe("parseSalaryRangeUsd", () => {
   it("lee miles con punto, coma o prefijo USD", () => {
@@ -26,5 +26,41 @@ describe("parseSalaryRangeUsd", () => {
     assert.equal(parseSalaryRangeUsd("a convenir"), null);
     assert.equal(parseSalaryRangeUsd(""), null);
     assert.equal(parseSalaryRangeUsd(null), null);
+  });
+});
+
+describe("etiqueta del aviso", () => {
+  it("PASA cuando la decisión es pass", () => {
+    const e = etiquetaAvisoPrefiltro("pass", []);
+    assert.equal(e.label, "PASA");
+    assert.equal(e.emoji, "✅");
+    assert.equal(e.enRojo, false);
+  });
+
+  it("REVISIÓN amarilla si el único bloqueo es el salario", () => {
+    const e = etiquetaAvisoPrefiltro("review", [{ regla: "salario_sobre_tope" }]);
+    assert.equal(e.label, "REVISIÓN");
+    assert.equal(e.emoji, "🟡");
+    assert.equal(e.enRojo, false);
+  });
+
+  it("no pone ROJO cuando el salario no vino informado", () => {
+    const e = etiquetaAvisoPrefiltro("review", []);
+    assert.equal(e.label, "REVISIÓN");
+    assert.equal(e.emoji, "🟡");
+    assert.equal(e.enRojo, false);
+    assert.equal(textoSalarioAviso({}), "Salario no informado");
+    assert.equal(textoSalarioAviso({ salary: "" }), "Salario no informado");
+    assert.equal(textoSalarioAviso({ salary_usd: "1800-2000" }), "1800-2000");
+  });
+
+  it("EN ROJO solo con un bloqueo que no es el tope", () => {
+    const e = etiquetaAvisoPrefiltro("review", [
+      { regla: "salario_sobre_tope" },
+      { regla: "autorizacion_trabajo" },
+    ]);
+    assert.equal(e.label, "EN ROJO · decide tú");
+    assert.equal(e.emoji, "🔴");
+    assert.equal(e.enRojo, true);
   });
 });
