@@ -9,7 +9,7 @@ import { recordStageEvent } from "@/lib/stage-events";
 // La resolución job_id → vacancy_id es compartida con
 // /api/admin/sync-applications-to-funnel · no duplicarla acá.
 import { resolverVacante } from "@/lib/vacancy-map";
-import { resolveCandidateLang } from "@/lib/candidate-lang";
+import { isEnglishTemplate, resolveCandidateLang } from "@/lib/candidate-lang";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
     // Cada nueva aplicación entra directo al funnel en stage 'aplico'
     // sin necesidad de correr sync manual. Idempotente · si ya existe el email
     // solo actualiza el updated_at.
+    let vacTemplate: string | null = null;
     try {
       const resuelta = await resolverVacante(job_id, job_title);
       const vacancyId = resuelta?.id ?? null;
@@ -90,6 +91,12 @@ export async function POST(request: NextRequest) {
         console.warn(`[applications] aplicación ${newId} de ${emailLower}: ${resuelta.aviso}`);
       }
       if (vacancyId) {
+        const { data: vacanteAts } = await supabaseAdmin
+          .from("ht_vacancies")
+          .select("form_template_key")
+          .eq("id", vacancyId)
+          .maybeSingle();
+        vacTemplate = (vacanteAts?.form_template_key as string) ?? null;
         const emailNormalized = emailLower;
         // El duplicado se mide por correo Y VACANTE. Con la llave solo en el
         // correo, quien ya estaba en el ATS por otro cargo volvía a aplicar y
@@ -119,6 +126,7 @@ export async function POST(request: NextRequest) {
               phone: phone || null,
               stage: "aplico",
               source: isInternal ? "public_form_internal" : "public_form",
+              preferred_language: isEnglishTemplate(vacTemplate) ? "en" : "es",
               notes: why_ts ? `[Public form] ${why_ts}` : `[Public form] · application_id=${newId}`,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
@@ -184,7 +192,12 @@ export async function POST(request: NextRequest) {
           const locRows = await sql`SELECT location FROM vacancies WHERE id = ${job_id} LIMIT 1`;
           if (locRows.length > 0) jobLocation = (locRows[0].location as string) ?? null;
         } catch { /* si no se puede leer, quedan el id y el título */ }
-        const lang = resolveCandidateLang({ jobId: job_id, jobTitle: job_title, country: jobLocation });
+        const lang = resolveCandidateLang({
+          formTemplateKey: vacTemplate,
+          jobId: job_id,
+          jobTitle: job_title,
+          country: jobLocation,
+        });
         const subject = lang === "en"
           ? `Trading Solutions · We received your application for ${job_title}`
           : `Trading Solutions · Recibimos tu aplicación a ${job_title}`;
