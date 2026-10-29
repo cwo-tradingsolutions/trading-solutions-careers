@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { hasMaskedCredentialConfig } from './lib/credential-config';
+import { previewReadOnlyBlock } from '@/lib/preview-readonly';
 
 /**
  * Middleware combinado:
@@ -57,6 +58,12 @@ export async function middleware(request: NextRequest) {
       { error: 'Servicio temporalmente no disponible.' },
       { status: 503, headers: { 'Cache-Control': 'no-store' } },
     );
+  }
+
+  // Preview de Vercel puede apuntar a la base de producción. Ahí no se escribe.
+  const blocked = previewReadOnlyBlock(process.env.VERCEL_ENV, request.method, pathname);
+  if (blocked) {
+    return NextResponse.json(blocked, { status: 403 });
   }
 
   // ---------- 1) Protección de /hr-admin ----------
