@@ -10,7 +10,7 @@ import { useOpenJobs } from "@/components/careers/useOpenJobs";
 import { departmentsFrom, displaySalary, jobString, jobStrings, linkedInShareHref, postingReadsEnglish, siteLinks } from "@/components/careers/shared";
 import { useLanguage } from "@/i18n/context";
 
-export default function JobView({ id }: { id: string }) {
+export default function JobView({ id, previewTestMode = false }: { id: string; previewTestMode?: boolean }) {
   const searchParams = useSearchParams();
   const refCode = searchParams.get("ref");
   const { t, locale } = useLanguage();
@@ -108,7 +108,7 @@ export default function JobView({ id }: { id: string }) {
               </p>
             </div>
             <aside className="cr-apply" id="apply">
-              <ApplyForm mode="pool" areas={departmentsFrom(jobs)} />
+              <ApplyForm mode="pool" areas={departmentsFrom(jobs)} previewTestMode={previewTestMode} />
             </aside>
           </section>
         </>
@@ -181,7 +181,7 @@ export default function JobView({ id }: { id: string }) {
               ) : null}
             </div>
             <aside className="cr-apply" id="apply">
-              <ApplyForm mode="job" job={job} areas={departmentsFrom(jobs)} refCode={refCode} />
+              <ApplyForm mode="job" job={job} areas={departmentsFrom(jobs)} refCode={refCode} previewTestMode={previewTestMode} />
               <div className="cr-share">
                 <span>{t.ui.knowSomeone}</span>
                 <a href={shareHref || linkedInShareHref(`https://careers.tradingsolutions.com/vacantes/${job.id}`)} target="_blank" rel="noopener">

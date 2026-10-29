@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { isPreviewTestMode, previewTestJson } from '@/lib/preview-mode';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,10 @@ export async function POST(req: NextRequest) {
     const binary = Buffer.from(match[2], 'base64');
     if (binary.length > MAX_BYTES) {
       return NextResponse.json({ error: 'Captura demasiado grande' }, { status: 413 });
+    }
+
+    if (isPreviewTestMode()) {
+      return previewTestJson('POST /api/bateria/snapshot', { saved: true });
     }
 
     const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';

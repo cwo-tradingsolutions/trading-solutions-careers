@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected, sendViaGmail } from "@/lib/gmail";
+import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 import { recordStageEvent } from "@/lib/stage-events";
 import { resolveCandidateLang, EN_SIGNATURE_NAME } from "@/lib/candidate-lang";
 import { TEMPLATE_ENGLISH_MIN_RANK, TEMPLATE_SALARY_CAP, type TemplateKey } from "@/lib/prefilter-templates";
@@ -320,7 +321,7 @@ export async function GET(
   if (candidate.prefilter_token_expires_at) {
     const expires = new Date(candidate.prefilter_token_expires_at as string);
     const now = new Date();
-    if (expires < now || (expires.getTime() - now.getTime()) < 3 * 24 * 60 * 60 * 1000) {
+    if (!isPreviewTestMode() && (expires < now || (expires.getTime() - now.getTime()) < 3 * 24 * 60 * 60 * 1000)) {
       const fresh = new Date();
       fresh.setDate(fresh.getDate() + 7);
       await supabaseAdmin
@@ -819,6 +820,10 @@ export async function POST(
   // Actualizar stage según decisión
   if (decision === "pass") updates.stage = "prefiltro_pasado";
   else if (decision === "review") updates.stage = "prefiltro_revision";
+
+  if (isPreviewTestMode()) {
+    return previewTestJson("POST /api/headhunting/prefilter/[token]", { decision });
+  }
 
   const { error: updateErr } = await supabaseAdmin
     .from("ht_candidates")

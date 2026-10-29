@@ -15,11 +15,14 @@ export default function ApplyForm({
   job,
   areas,
   refCode,
+  previewTestMode = false,
 }: {
   mode: Mode;
   job?: Job;
   areas: string[];
   refCode?: string | null;
+  /** Server-passed. True only when VERCEL_ENV === "preview". */
+  previewTestMode?: boolean;
 }) {
   const { t, locale } = useLanguage();
   const [fullName, setFullName] = useState("");
@@ -68,7 +71,8 @@ export default function ApplyForm({
     if (honeypot) return;
     if (!validate()) return;
 
-    if (mode === "pool" || !job) {
+    const poolPreview = mode === "pool" && previewTestMode;
+    if ((mode === "pool" || !job) && !poolPreview) {
       setStatus({ gap: true, text: t.ui.poolGap });
       return;
     }
@@ -86,21 +90,34 @@ export default function ApplyForm({
           reader.readAsDataURL(file);
         });
       }
+      const payload = poolPreview
+        ? {
+            talent_pool: true,
+            full_name: fullName.trim(),
+            email: email.trim(),
+            phone,
+            linkedin: normalizarLinkedin(linkedin),
+            why_ts: why,
+            area,
+            cv_filename,
+            cv_data,
+          }
+        : {
+            job_id: job!.id,
+            job_title: jobString(job!.title, locale),
+            full_name: fullName.trim(),
+            email: email.trim(),
+            phone,
+            linkedin: normalizarLinkedin(linkedin),
+            why_ts: why,
+            cv_filename,
+            cv_data,
+            ref: refCode || null,
+          };
       const res = await fetch("/api/applications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          job_id: job.id,
-          job_title: jobString(job.title, locale),
-          full_name: fullName.trim(),
-          email: email.trim(),
-          phone,
-          linkedin: normalizarLinkedin(linkedin),
-          why_ts: why,
-          cv_filename,
-          cv_data,
-          ref: refCode || null,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("submit");
       setSent(true);

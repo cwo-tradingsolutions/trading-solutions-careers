@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { isPreviewTestMode, previewTestJson } from '@/lib/preview-mode';
 
 /**
  * Uploads a single proctoring snapshot (base64 JPEG) to Supabase Storage.
@@ -34,6 +35,10 @@ export async function POST(req: NextRequest) {
     const mime = match[1];
     const ext = mime === 'image/png' ? 'png' : 'jpg';
     const binary = Buffer.from(match[2], 'base64');
+
+    if (isPreviewTestMode()) {
+      return previewTestJson('POST /api/headhunting/assessment/snapshot', { saved: true });
+    }
 
     const ts = Date.now();
     const filename = `${candidate.id}/${scenario_index ?? 0}_${ts}.${ext}`;

@@ -5,6 +5,8 @@ import { jobs } from "@/data/jobs";
 import { ogLocale } from "@/i18n/locales";
 import { localeFromRequest } from "@/i18n/server-locale";
 import { translations } from "@/i18n/translations";
+import { isPreviewTestMode } from "@/lib/preview-mode";
+import { PreviewTestShell } from "@/components/careers/PreviewTestShell";
 import JobView from "./job-view";
 
 function localizedMeta(title: string, description: string): Metadata {
@@ -72,9 +74,12 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 }
 
 export default function VacantePage({ params }: { params: { id: string } }) {
+  const previewTestMode = isPreviewTestMode();
   return (
-    <Suspense fallback={<div className="ts-x" style={{ minHeight: "100vh" }} />}>
-      <JobView id={params.id} />
-    </Suspense>
+    <PreviewTestShell>
+      <Suspense fallback={<div className="ts-x" style={{ minHeight: "100vh" }} />}>
+        <JobView id={params.id} previewTestMode={previewTestMode} />
+      </Suspense>
+    </PreviewTestShell>
   );
 }

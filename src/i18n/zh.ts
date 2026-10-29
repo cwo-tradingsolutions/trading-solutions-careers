@@ -171,6 +171,7 @@ export const zhCN = {
     positionClosedBody: "这个链接已经没有在招的职位。请查看当前职位，或把简历留给人才库。",
     englishPosting: "此职位以英文发布",
     language: "语言",
+    previewTestBanner: "测试模式 — 提交内容不会被保存或发送",
     loading: "加载中...",
     loadingJobs: "正在加载职位...",
     salaryCompetitiveUsd: "具有竞争力（美元）",

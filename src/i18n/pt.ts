@@ -171,6 +171,7 @@ export const ptBR = {
     positionClosedBody: "Este link não tem mais uma vaga aberta. Veja as vagas atuais ou deixe seu currículo no banco de talentos.",
     englishPosting: "Vaga publicada em inglês",
     language: "Idioma",
+    previewTestBanner: "Modo de teste — os envios não são salvos nem enviados",
     loading: "Carregando...",
     loadingJobs: "Carregando vagas...",
     salaryCompetitiveUsd: "Competitivo (USD)",
