@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useLanguage } from "@/i18n/context";
 import type { Job } from "@/lib/vacancies-adapter";
-import { normalizarLinkedin, siteLinks } from "./shared";
+import { jobString, normalizarLinkedin, siteLinks } from "./shared";
 
 const MAX_CV = 5 * 1024 * 1024;
 
@@ -37,7 +37,7 @@ export default function ApplyForm({
   const [sent, setSent] = useState(false);
 
   const deptName = (d: string) => (t.deptNames as Record<string, string>)[d] || d;
-  const title = mode === "pool" ? t.ui.poolTitle : job?.title[locale] || "";
+  const title = mode === "pool" ? t.ui.poolTitle : job ? jobString(job.title, locale) : "";
 
   const validate = () => {
     const next: Record<string, string> = {};
@@ -91,7 +91,7 @@ export default function ApplyForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           job_id: job.id,
-          job_title: job.title[locale],
+          job_title: jobString(job.title, locale),
           full_name: fullName.trim(),
           email: email.trim(),
           phone,

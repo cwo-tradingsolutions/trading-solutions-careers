@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
-import { translations, type Locale, type Translations } from "./translations";
+import { translations, type Translations } from "./translations";
+import { htmlLang, isLocale, LANG_COOKIE, LANG_STORAGE_KEY, LOCALES, type Locale } from "./locales";
 
 interface LanguageContextType {
   locale: Locale;
@@ -12,34 +13,58 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | null>(null);
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("en");
+function readStoredLocale(): Locale | null {
+  try {
+    const saved = window.localStorage.getItem(LANG_STORAGE_KEY);
+    if (isLocale(saved)) return saved;
+  } catch {
+    /* private mode */
+  }
+  const match = document.cookie.match(/(?:^|; )ts-lang=([^;]+)/);
+  if (!match) return null;
+  try {
+    const value = decodeURIComponent(match[1]);
+    return isLocale(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistLocale(locale: Locale) {
+  try {
+    window.localStorage.setItem(LANG_STORAGE_KEY, locale);
+  } catch {
+    /* private mode */
+  }
+  document.cookie = `${LANG_COOKIE}=${encodeURIComponent(locale)}; Path=/; Max-Age=31536000; SameSite=Lax`;
+  document.documentElement.lang = htmlLang(locale);
+}
+
+export function LanguageProvider({
+  children,
+  initialLocale = "en",
+}: {
+  children: ReactNode;
+  initialLocale?: Locale;
+}) {
+  const [locale, setLocaleState] = useState<Locale>(isLocale(initialLocale) ? initialLocale : "en");
 
   useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem("ts-lang");
-      if (saved === "es" || saved === "en") setLocaleState(saved);
-    } catch {
-      /* private mode */
-    }
+    const saved = readStoredLocale();
+    if (!saved) return;
+    setLocaleState((current) => (current === saved ? current : saved));
+    persistLocale(saved);
   }, []);
 
-  const setLocale = useCallback((l: Locale) => {
-    setLocaleState(l);
-    try {
-      window.localStorage.setItem("ts-lang", l);
-    } catch {
-      /* private mode */
-    }
+  const setLocale = useCallback((next: Locale) => {
+    setLocaleState(next);
+    persistLocale(next);
   }, []);
+
   const toggleLocale = useCallback(() => {
     setLocaleState((prev) => {
-      const next = prev === "es" ? "en" : "es";
-      try {
-        window.localStorage.setItem("ts-lang", next);
-      } catch {
-        /* private mode */
-      }
+      const next = LOCALES[(LOCALES.indexOf(prev) + 1) % LOCALES.length];
+      persistLocale(next);
       return next;
     });
   }, []);

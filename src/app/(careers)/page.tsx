@@ -10,7 +10,7 @@ import { useLanguage } from "@/i18n/context";
 import { GoArrow } from "@/components/careers/shared";
 
 export default function HomePage() {
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
   const { jobs, loading } = useOpenJobs();
   const trackRef = useRef<HTMLDivElement>(null);
   const depts = departmentsFrom(jobs);
@@ -36,7 +36,7 @@ export default function HomePage() {
             widths={[800, 1600, 2400]}
             sizes="100vw"
             priority
-            alt={locale === "es" ? t.ui.heroAlt : t.ui.heroAlt}
+            alt={t.ui.heroAlt}
           />
         </div>
         <div className="v3-hero-in">
@@ -137,7 +137,7 @@ export default function HomePage() {
             const href = n > 0 ? `/vacantes?dept=${encodeURIComponent(dept)}` : "/vacantes/pool";
             return (
               <Link className="cr-area" href={href} key={dept}>
-                <CareerPicture base={visual.base} widths={visual.widths} alt={visual.alt[locale]} sizes="(max-width:560px) 84vw, 560px" />
+                <CareerPicture base={visual.base} widths={visual.widths} alt={t.ui[visual.altKey]} sizes="(max-width:560px) 84vw, 560px" />
                 <div className="top">
                   <span>
                     {t.ui.areaWord} {String(i + 1).padStart(2, "0")}
@@ -227,7 +227,7 @@ export default function HomePage() {
             base="careers-next"
             widths={[800, 1600, 2400]}
             sizes="100vw"
-            alt={locale === "es" ? t.ui.nextAlt : t.ui.nextAlt}
+            alt={t.ui.nextAlt}
           />
         </div>
         <div className="wrap v3-chapter-in rv">

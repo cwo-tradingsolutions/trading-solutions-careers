@@ -1,4 +1,7 @@
-export type Locale = "es" | "en";
+import { ptBR } from "./pt";
+import { zhCN } from "./zh";
+
+export type { Locale } from "./locales";
 
 export const translations = {
   es: {
@@ -172,6 +175,15 @@ export const translations = {
       positionClosed: "Esta vacante está cerrada",
       positionClosedBody: "Este enlace ya no tiene una vacante abierta. Mira las vacantes actuales o deja tu hoja de vida en la base de talento.",
       englishPosting: "Vacante publicada en inglés",
+      language: "Idioma",
+      loading: "Cargando...",
+      loadingJobs: "Cargando vacantes...",
+      salaryCompetitiveUsd: "Competitiva (USD)",
+      salaryCompetitive: "Competitiva",
+      salaryNegotiable: "A convenir",
+      opsAlt: "Especialista de operaciones junto a contenedores en una terminal",
+      techAlt: "Equipo revisando un trabajo juntos en un computador",
+      adminAlt: "Compañeros trabajando en sus escritorios en la oficina",
       location: "Ubicación",
       level: "Nivel",
       compensation: "Compensación",
@@ -207,6 +219,17 @@ export const translations = {
       heroAlt: "Dos profesionales de logística revisando una operación en un computador en una terminal portuaria",
       nextAlt: "Un equipo con equipo de protección planificando el siguiente paso",
       teamAlt: "Un equipo trabajando junto en una oficina abierta"
+    },
+    meta: {
+      homeTitle: "Carreras — Trading Solutions",
+      homeDescription: "Tu próximo capítulo empieza aquí. Únete al boutique freight forwarder con operación en más de 150 países.",
+      jobsTitle: "Vacantes — Trading Solutions",
+      jobsDescription: "Encuentra el rol que conecta con tu ambición. Vacantes abiertas en Trading Solutions.",
+      poolTitle: "Deja tu hoja de vida — Trading Solutions",
+      poolDescription: "Deja tu hoja de vida aunque hoy no veas el cargo. Trading Solutions guarda tu perfil para una vacante futura.",
+      closedTitle: "Esta vacante está cerrada — Trading Solutions",
+      closedDescription: "Este enlace ya no tiene una vacante abierta. Mira las vacantes actuales o deja tu hoja de vida.",
+      jobTitle: "{title} — Trading Solutions"
     }
   },
   en: {
@@ -379,7 +402,16 @@ export const translations = {
       areaRequired: "Choose an area of interest.",
       positionClosed: "This position is closed",
       positionClosedBody: "This link no longer has an open role. See current openings or leave your CV with the talent pool.",
-      englishPosting: "Role published in English",
+      englishPosting: "Published in English",
+      language: "Language",
+      loading: "Loading...",
+      loadingJobs: "Loading positions...",
+      salaryCompetitiveUsd: "Competitive (USD)",
+      salaryCompetitive: "Competitive",
+      salaryNegotiable: "Negotiable",
+      opsAlt: "Operations specialist beside containers at a terminal",
+      techAlt: "Team reviewing work together on a laptop",
+      adminAlt: "Colleagues working at their desks in the office",
       location: "Location",
       level: "Level",
       compensation: "Compensation",
@@ -415,9 +447,27 @@ export const translations = {
       heroAlt: "Two logistics professionals reviewing an operation on a laptop at a port terminal",
       nextAlt: "A team in safety gear planning the next step together",
       teamAlt: "A team working together in an open office"
+    },
+    meta: {
+      homeTitle: "Careers — Trading Solutions",
+      homeDescription: "Your next chapter starts here. Join the boutique freight forwarder operating in more than 150 countries.",
+      jobsTitle: "Open positions — Trading Solutions Careers",
+      jobsDescription: "Find the role that matches your ambition. Open positions at Trading Solutions.",
+      poolTitle: "Leave your CV — Trading Solutions Careers",
+      poolDescription: "Leave your CV even if you don't see the role today. Trading Solutions keeps your profile for a future opening.",
+      closedTitle: "This position is closed — Trading Solutions Careers",
+      closedDescription: "This link no longer has an open role. See current openings or leave your CV.",
+      jobTitle: "{title} — Trading Solutions Careers"
     }
-  }
+  },
+  "zh-CN": zhCN,
+  "pt-BR": ptBR
 };
+
+const _zhMatchesEnglish: (typeof translations)["en"] = translations["zh-CN"];
+const _ptMatchesEnglish: (typeof translations)["en"] = translations["pt-BR"];
+void _zhMatchesEnglish;
+void _ptMatchesEnglish;
 
 // Deep writable type that converts readonly string literals to string
 type DeepWritable<T> = {

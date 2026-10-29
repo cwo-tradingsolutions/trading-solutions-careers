@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import Frame from "@/components/careers/Frame";
 import JobRow from "@/components/careers/JobRow";
 import { useOpenJobs } from "@/components/careers/useOpenJobs";
-import { CareerPicture, departmentsFrom, deptMatches, siteLinks } from "@/components/careers/shared";
+import { CareerPicture, departmentsFrom, deptMatches, jobString, siteLinks } from "@/components/careers/shared";
 import { deriveModes } from "@/lib/vacancies-adapter";
 import { useLanguage } from "@/i18n/context";
 
@@ -36,7 +36,7 @@ function VacantesContent() {
       if (modeFilter !== "all" && j.mode !== modeFilter) return false;
       if (search) {
         const s = search.toLowerCase();
-        const searchable = `${j.title[locale]} ${j.dept} ${deptName(j.dept)} ${j.location} ${j.tags.join(" ")} ${j.description[locale]}`.toLowerCase();
+        const searchable = `${jobString(j.title, locale)} ${j.dept} ${deptName(j.dept)} ${j.location} ${j.tags.join(" ")} ${jobString(j.description, locale)}`.toLowerCase();
         if (!searchable.includes(s)) return false;
       }
       return true;
@@ -93,9 +93,7 @@ function VacantesContent() {
           </div>
           <span className="cr-count" aria-live="polite">
             {loading
-              ? locale === "es"
-                ? "Cargando vacantes..."
-                : "Loading positions..."
+              ? t.ui.loadingJobs
               : `${filtered.length} ${filtered.length === 1 ? t.jobs.resultsSingular : t.jobs.resultsPlural}`}
           </span>
         </div>

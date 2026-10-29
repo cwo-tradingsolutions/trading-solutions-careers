@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useLanguage } from "@/i18n/context";
 import type { Job } from "@/lib/vacancies-adapter";
-import { GoArrow } from "./shared";
+import { GoArrow, jobString } from "./shared";
 
 export default function JobRow({ job }: { job: Job }) {
   const { t, locale } = useLanguage();
@@ -11,7 +11,7 @@ export default function JobRow({ job }: { job: Job }) {
   const mode = (t.modeNames as Record<string, string>)[job.mode] || job.mode;
   return (
     <Link className="cr-job rv" href={`/vacantes/${job.id}`}>
-      <h3>{job.title[locale]}</h3>
+      <h3>{jobString(job.title, locale)}</h3>
       <div className="meta">
         <b>{dept}</b>
         {job.level}

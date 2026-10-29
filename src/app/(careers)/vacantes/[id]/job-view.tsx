@@ -7,7 +7,7 @@ import Frame from "@/components/careers/Frame";
 import JobRow from "@/components/careers/JobRow";
 import ApplyForm from "@/components/careers/ApplyForm";
 import { useOpenJobs } from "@/components/careers/useOpenJobs";
-import { departmentsFrom, displaySalary, linkedInShareHref, postingReadsEnglish, siteLinks } from "@/components/careers/shared";
+import { departmentsFrom, displaySalary, jobString, jobStrings, linkedInShareHref, postingReadsEnglish, siteLinks } from "@/components/careers/shared";
 import { useLanguage } from "@/i18n/context";
 
 export default function JobView({ id }: { id: string }) {
@@ -23,15 +23,15 @@ export default function JobView({ id }: { id: string }) {
 
   useEffect(() => {
     if (isPool) {
-      document.title = locale === "es" ? "Deja tu hoja de vida — Trading Solutions" : "Leave your CV — Trading Solutions Careers";
+      document.title = t.meta.poolTitle;
       return;
     }
     if (job) {
-      document.title = `${job.title[locale]} — Trading Solutions Careers`;
+      document.title = t.meta.jobTitle.replace("{title}", jobString(job.title, locale));
       return;
     }
     if (missing) {
-      document.title = locale === "es" ? "Esta vacante está cerrada — Trading Solutions" : "This position is closed — Trading Solutions Careers";
+      document.title = t.meta.closedTitle;
       let meta = document.querySelector<HTMLMetaElement>('meta[name="robots"]');
       if (!meta) {
         meta = document.createElement("meta");
@@ -40,7 +40,7 @@ export default function JobView({ id }: { id: string }) {
       }
       meta.content = "noindex, follow";
     }
-  }, [isPool, job, missing, locale]);
+  }, [isPool, job, missing, locale, t]);
 
   useEffect(() => {
     if (!job) return;
@@ -59,13 +59,13 @@ export default function JobView({ id }: { id: string }) {
   const deptName = (d: string) => (t.deptNames as Record<string, string>)[d] || d;
   const modeName = (m: string) => (t.modeNames as Record<string, string>)[m] || m;
   const others = job ? jobs.filter((j) => j.id !== job.id) : [];
-  const englishOnly = !!job && locale === "es" && postingReadsEnglish(job.description.es, job.description.en);
+  const englishOnly = !!job && locale !== "en" && postingReadsEnglish(job.description.es, job.description.en);
 
   return (
     <Frame>
       {loading ? (
         <section className="wrap cr-page-head">
-          <p className="lede">{locale === "es" ? "Cargando..." : "Loading..."}</p>
+          <p className="lede">{t.ui.loading}</p>
         </section>
       ) : missing ? (
         <section className="wrap cr-page-head cr-closed">
@@ -122,7 +122,7 @@ export default function JobView({ id }: { id: string }) {
               / <span>{deptName(job.dept)}</span>
             </span>
             <div className="hero-co-grid">
-              <h1 className="display">{job.title[locale]}</h1>
+              <h1 className="display">{jobString(job.title, locale)}</h1>
             </div>
             <dl className="co-meta">
               <div>
@@ -152,12 +152,12 @@ export default function JobView({ id }: { id: string }) {
           <section className="wrap cr-detail">
             <div className="cr-body">
               {englishOnly ? <p className="cr-lang-note">{t.ui.englishPosting}</p> : null}
-              {job.description[locale] ? <p className="intro">{job.description[locale]}</p> : null}
-              {job.responsibilities[locale].length > 0 ? (
+              {jobString(job.description, locale) ? <p className="intro">{jobString(job.description, locale)}</p> : null}
+              {jobStrings(job.responsibilities, locale).length > 0 ? (
                 <>
                   <h2>{t.jobs.whatYouDo}</h2>
                   <ol className="cr-list">
-                    {job.responsibilities[locale].map((item, i) => (
+                    {jobStrings(job.responsibilities, locale).map((item, i) => (
                       <li key={item}>
                         <span>{String(i + 1).padStart(2, "0")}</span>
                         {item}
@@ -166,11 +166,11 @@ export default function JobView({ id }: { id: string }) {
                   </ol>
                 </>
               ) : null}
-              {job.requirements[locale].length > 0 ? (
+              {jobStrings(job.requirements, locale).length > 0 ? (
                 <>
                   <h2>{t.jobs.whatWeSeek}</h2>
                   <ol className="cr-list">
-                    {job.requirements[locale].map((item, i) => (
+                    {jobStrings(job.requirements, locale).map((item, i) => (
                       <li key={item}>
                         <span>{String(i + 1).padStart(2, "0")}</span>
                         {item}

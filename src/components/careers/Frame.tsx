@@ -4,10 +4,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useLanguage } from "@/i18n/context";
+import { htmlLang } from "@/i18n/locales";
+import LangMenu from "./LangMenu";
 import { siteLinks } from "./shared";
 
+function setMeta(selector: string, attr: "name" | "property", key: string, content: string) {
+  let el = document.head.querySelector<HTMLMetaElement>(`${selector}[${attr}="${key}"]`);
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute(attr, key);
+    document.head.appendChild(el);
+  }
+  el.content = content;
+}
+
 export default function Frame({ children }: { children: ReactNode }) {
-  const { t, locale, setLocale } = useLanguage();
+  const { t, locale } = useLanguage();
   const pathname = usePathname();
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -19,13 +31,19 @@ export default function Frame({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const prev = document.documentElement.lang;
-    document.documentElement.lang = locale;
+    document.documentElement.lang = htmlLang(locale);
     document.documentElement.classList.add("ts-careers-root");
-    const titles: Record<string, string> = {
-      "/": locale === "es" ? "Carreras en Trading Solutions" : "Careers — Trading Solutions",
-      "/vacantes": locale === "es" ? "Vacantes — Trading Solutions" : "Open positions — Trading Solutions Careers",
+    const pages: Record<string, { title: string; description: string }> = {
+      "/": { title: t.meta.homeTitle, description: t.meta.homeDescription },
+      "/vacantes": { title: t.meta.jobsTitle, description: t.meta.jobsDescription },
     };
-    if (titles[pathname]) document.title = titles[pathname];
+    const page = pages[pathname];
+    if (page) {
+      document.title = page.title;
+      setMeta("meta", "name", "description", page.description);
+      setMeta("meta", "property", "og:title", page.title);
+      setMeta("meta", "property", "og:description", page.description);
+    }
     return () => {
       document.documentElement.lang = prev;
       document.documentElement.classList.remove("ts-careers-root");
@@ -142,6 +160,9 @@ export default function Frame({ children }: { children: ReactNode }) {
 
   return (
     <div className="ts-x has-js" data-lang={locale} ref={rootRef}>
+      {locale === "zh-CN" ? (
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500&display=swap" />
+      ) : null}
       <header className={`nav${open ? " open" : ""}`} id="nav">
         <div className="wrap nav-in">
           <Link href="/" className="nav-logo" aria-label="Trading Solutions Careers">
@@ -174,6 +195,7 @@ export default function Frame({ children }: { children: ReactNode }) {
             <a href={siteLinks.about} className="btn btn-line">
               {t.ui.mainSite}
             </a>
+            <LangMenu />
             <Link href="/vacantes" className="btn btn-dark">
               {t.nav.viewJobs}
             </Link>
@@ -243,14 +265,7 @@ export default function Frame({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="foot-bottom">
-            <div className="lang">
-              <button type="button" className={locale === "es" ? "on" : ""} aria-pressed={locale === "es"} onClick={() => setLocale("es")}>
-                ES
-              </button>
-              <button type="button" className={locale === "en" ? "on" : ""} aria-pressed={locale === "en"} onClick={() => setLocale("en")}>
-                EN
-              </button>
-            </div>
+            <LangMenu placement="up" />
             <span className="mono">© Trading Solutions. 2026 — {t.footer.rights}</span>
           </div>
         </div>

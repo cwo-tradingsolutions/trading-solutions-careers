@@ -1,5 +1,6 @@
 import type { Job } from "@/lib/vacancies-adapter";
-import type { Locale } from "@/i18n/translations";
+import { jobCopyLocale, type Locale } from "@/i18n/locales";
+import { translations } from "@/i18n/translations";
 
 export const SITE = "https://tradingsolutions.com";
 
@@ -37,15 +38,13 @@ export function deptMatches(jobDept: string, filter: string, label: (dept: strin
   return jobDept.toLowerCase() === f || label(jobDept).toLowerCase() === f;
 }
 
-type AreaVisual = { base: string; widths: number[]; alt: Record<Locale, string> };
+type AreaAltKey = "teamAlt" | "opsAlt" | "techAlt" | "adminAlt";
+type AreaVisual = { base: string; widths: number[]; altKey: AreaAltKey };
 
 const FALLBACK: AreaVisual = {
   base: "careers-team",
   widths: [800, 1600, 2400],
-  alt: {
-    en: "A team working together in an open office",
-    es: "Un equipo trabajando junto en una oficina abierta",
-  },
+  altKey: "teamAlt",
 };
 
 export function areaVisual(dept: string): AreaVisual {
@@ -54,30 +53,21 @@ export function areaVisual(dept: string): AreaVisual {
     return {
       base: "careers-operations",
       widths: [800, 1600],
-      alt: {
-        en: "Operations specialist beside containers at a terminal",
-        es: "Especialista de operaciones junto a contenedores en una terminal",
-      },
+      altKey: "opsAlt",
     };
   }
   if (/tec|tech|desarroll|software|it\b/.test(d)) {
     return {
       base: "careers-technology",
       widths: [800, 1600],
-      alt: {
-        en: "Team reviewing work together on a laptop",
-        es: "Equipo revisando un trabajo juntos en un computador",
-      },
+      altKey: "techAlt",
     };
   }
   if (/admin|corporat|finanz|finance|people|talent|wellness|human/.test(d)) {
     return {
       base: "careers-administration",
       widths: [800, 1600],
-      alt: {
-        en: "Colleagues working at their desks in the office",
-        es: "Compañeros trabajando en sus escritorios en la oficina",
-      },
+      altKey: "adminAlt",
     };
   }
   return FALLBACK;
@@ -122,7 +112,7 @@ export function splitSentence(text: string): [string, string] {
 }
 
 export function splitFreedom(desc: string): [string, string] {
-  for (const marker of ["More freedom.", "Más libertad."]) {
+  for (const marker of ["More freedom.", "Más libertad.", "Mais liberdade.", "更多自由。"]) {
     const i = desc.indexOf(marker);
     if (i >= 0) return [desc.slice(0, i + marker.length), desc.slice(i + marker.length).trim()];
   }
@@ -133,17 +123,26 @@ export function splitFreedom(desc: string): [string, string] {
  * Accept a LinkedIn profile however it was copied and turn it into a usable URL.
  * The field stays type=text so "linkedin.com/in/perfil" is not rejected by the browser.
  */
-const SALARY_ES: Record<string, string> = {
-  "Competitive (USD)": "Competitiva (USD)",
-  Competitive: "Competitiva",
-  Negotiable: "A convenir",
-};
-
 /** Known compensation phrases are chrome. Other ranges stay as published. */
 export function displaySalary(salary: string, locale: Locale): string {
   const trimmed = salary.trim();
-  if (locale === "es" && SALARY_ES[trimmed]) return SALARY_ES[trimmed];
+  const phrases = translations[locale].ui;
+  if (trimmed === "Competitive (USD)") return phrases.salaryCompetitiveUsd;
+  if (trimmed === "Competitive") return phrases.salaryCompetitive;
+  if (trimmed === "Negotiable") return phrases.salaryNegotiable;
   return salary;
+}
+
+export function jobString(field: { es: string; en: string }, locale: Locale): string {
+  const copy = jobCopyLocale(locale);
+  if (copy === "es" && field.es.trim()) return field.es;
+  return field.en || field.es;
+}
+
+export function jobStrings(field: { es: string[]; en: string[] }, locale: Locale): string[] {
+  const copy = jobCopyLocale(locale);
+  if (copy === "es" && field.es.length) return field.es;
+  return field.en.length ? field.en : field.es;
 }
 
 const SPANISH_MARKERS = new Set([
