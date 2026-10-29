@@ -5,13 +5,13 @@ import { translations } from "@/i18n/translations";
 export const SITE = "https://tradingsolutions.com";
 
 export const siteLinks = {
-  about: `${SITE}/company/about`,
-  maritime: `${SITE}/services/maritime`,
-  ground: `${SITE}/services/ground`,
-  air: `${SITE}/services/air`,
-  customs: `${SITE}/services/customs`,
-  contact: `${SITE}/company/contact`,
-  legal: `${SITE}/company/legal`,
+  about: `${SITE}/about`,
+  maritime: `${SITE}/maritime`,
+  ground: `${SITE}/ground`,
+  air: `${SITE}/air`,
+  customs: `${SITE}/customs`,
+  contact: `${SITE}/contact`,
+  legal: `${SITE}/legal`,
   linkedinJobs: "https://www.linkedin.com/company/trading-sol/jobs/",
   linkedin: "https://www.linkedin.com/company/trading-sol/",
   instagram: "https://www.instagram.com/tradingsolutions/",
