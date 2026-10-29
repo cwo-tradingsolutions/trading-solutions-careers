@@ -171,6 +171,8 @@ type Vacancy = {
   owner_recruiter_id?: string | null;
   /** Quien puede operarla igual sin aparecer frente al candidato. */
   support_recruiter_id?: string | null;
+  /** Hiring Lead del área. No es el dueño del proceso (owner_recruiter_id). */
+  hiring_lead_email?: string | null;
 };
 
 /** El equipo de Talent, para saber de quién es cada vacante. */
@@ -614,6 +616,15 @@ export default function PipelineFunnel({
     return m;
   }, [filtered, ordenarPorBateria]);
 
+  const leadPorVacante = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const v of vacancies) {
+      const email = (v.hiring_lead_email ?? "").trim();
+      if (email) m[v.id] = email;
+    }
+    return m;
+  }, [vacancies]);
+
   const litGate = useMemo(() => {
     if (litGateId) {
       const elegido = KELLY_GATES.find((g) => g.id === litGateId);
@@ -844,6 +855,15 @@ export default function PipelineFunnel({
                 </div>
               );
             })()}
+            {vacFilter !== "all" && (() => {
+              const email = (vacancies.find((x) => x.id === vacFilter)?.hiring_lead_email ?? "").trim();
+              if (!email) return null;
+              return (
+                <div className="text-[11px] text-[var(--ts-gray-60)]">
+                  Hiring Lead: <span className="font-bold text-[var(--ts-black)]">{email}</span>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -890,6 +910,7 @@ export default function PipelineFunnel({
             onOpen={setSelectedCand}
             bateria={bateria}
             esperandoIds={esperandoIds}
+            leadPorVacante={leadPorVacante}
           />
 
           {/* Rechazados aparte del journey. Contratados viven en el gate 12. */}
@@ -929,7 +950,14 @@ export default function PipelineFunnel({
       )}
 
       {/* Side panel con detalles del candidato */}
-      {selectedCand && <CandDetailPanel cand={selectedCand} onClose={() => setSelectedCand(null)} onChanged={() => { void load(); }} />}
+      {selectedCand && (
+        <CandDetailPanel
+          cand={selectedCand}
+          hiringLeadEmail={leadPorVacante[selectedCand.vacancy_id] ?? null}
+          onClose={() => setSelectedCand(null)}
+          onChanged={() => { void load(); }}
+        />
+      )}
       {agregar && (
         <AgregarCandidato
           vacantes={vacancies.filter((v) => v.status == null || v.status === "open")}
@@ -1018,7 +1046,7 @@ function AgregarCandidato({
  * (canvas, ink, mute). El azul solo marca el paso encendido y el eyebrow.
  */
 function JourneyBoard({
-  byGate, lit, onLit, selectedIds, onToggle, onSelectAll, onOpen, bateria, esperandoIds,
+  byGate, lit, onLit, selectedIds, onToggle, onSelectAll, onOpen, bateria, esperandoIds, leadPorVacante,
 }: {
   byGate: Record<string, Cand[]>;
   lit: KellyGate;
@@ -1029,6 +1057,7 @@ function JourneyBoard({
   onOpen: (c: Cand) => void;
   bateria: Record<string, BatEstado>;
   esperandoIds: Set<string>;
+  leadPorVacante: Record<string, string>;
 }) {
   const cands = byGate[lit.id] || [];
   const todos = cands.length > 0 && cands.every((c) => selectedIds.has(c.id));
@@ -1203,6 +1232,7 @@ function JourneyBoard({
                 selected={selectedIds.has(c.id)}
                 esperando={esperandoIds.has(c.id)}
                 bateria={bateria[c.id]}
+                hiringLead={leadPorVacante[c.vacancy_id] ?? null}
                 onToggle={() => onToggle(c.id)}
                 onOpen={() => onOpen(c)}
               />
@@ -1232,13 +1262,14 @@ function semaforoDe(c: Cand, bat?: BatEstado): string | null {
 }
 
 function JourneyCard({
-  cand, gate, selected, esperando, bateria, onToggle, onOpen,
+  cand, gate, selected, esperando, bateria, hiringLead, onToggle, onOpen,
 }: {
   cand: Cand;
   gate: KellyGate;
   selected: boolean;
   esperando: boolean;
   bateria?: BatEstado;
+  hiringLead?: string | null;
   onToggle: () => void;
   onOpen: () => void;
 }) {
@@ -1295,6 +1326,11 @@ function JourneyCard({
         <div style={{ fontSize: 12, color: "#6e6e73", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {cand.email}
         </div>
+        {hiringLead && (
+          <div style={{ fontSize: 12, color: "#6e6e73", marginTop: 4 }}>
+            Hiring Lead: {hiringLead}
+          </div>
+        )}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
           <span style={pill}>{cand.ht_vacancies?.title || "—"}</span>
           {mostrarSub && sub !== gate.label && (
@@ -2193,7 +2229,7 @@ function RejectedColumn({
 }
 
 // ─── Side panel con detalle + respuestas del prefiltro ──────────────
-function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: () => void; onChanged?: () => void }) {
+function CandDetailPanel({ cand, onClose, onChanged, hiringLeadEmail }: { cand: Cand; onClose: () => void; onChanged?: () => void; hiringLeadEmail?: string | null }) {
   const pf = cand.prefilter_data;
   const decision = cand.prefilter_decision;
   const decisionBadge = decision === "pass" ? { label: "✅ PASS", color: "#10B981" }
@@ -2257,6 +2293,9 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
           <div>
             <h2 className="text-xl font-bold">{cand.name}</h2>
             <p className="text-xs text-gray-500 mt-0.5">{cand.ht_vacancies?.title || "—"}</p>
+            {hiringLeadEmail && (
+              <p className="text-xs text-gray-500 mt-0.5">Hiring Lead: {hiringLeadEmail}</p>
+            )}
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-black text-2xl leading-none w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100">×</button>
         </div>
