@@ -870,7 +870,7 @@
 
 /* ============ v3 — tema global (Rivian + Robinhood con colores Trading) ============ */
 .ts-x{--bg:#F7F7F5;--surface:#FFFFFF;--surface-2:#EFEFEC;--ink:#111111;--ink-2:#6F6F6A;--ink-3:#9A9A94;--line:#E6E6E1;
-  --r-lg:26px;--r-md:16px;--r-sm:12px;--ts-blue:#0988FC;--ts-blue-h:#0C7AE0}
+  --r-lg:26px;--r-md:16px;--r-sm:12px;--ts-blue:#0870D6;--ts-blue-h:#066AC9}
 .ts-x{background:var(--bg);color:var(--ink)}
 .ts-x .nav::before{background:rgba(247,247,245,.72)}
 .ts-x .nav.open .nav-links{background:rgba(247,247,245,.92)}
@@ -891,7 +891,7 @@
 /* botones: pildoras mas grandes; azul Trading para la accion principal */
 .ts-x .btn{height:48px;padding:0 24px;font-size:14.5px;font-weight:500;letter-spacing:-0.005em}
 .ts-x .btn-block{height:50px;font-size:14px}
-.ts-x .btn-blue{background:var(--ts-blue)!important;color:#fff!important;box-shadow:0 1px 2px rgba(9,136,252,.25),0 8px 20px rgba(9,136,252,.18)!important}
+.ts-x .btn-blue{background:var(--ts-blue)!important;color:#fff!important;box-shadow:0 1px 2px rgba(8,112,214,.25),0 8px 20px rgba(8,112,214,.18)!important}
 .ts-x .btn-blue:hover{background:var(--ts-blue-h)!important}
 .ts-x .btn-blue::before{display:none}
 .ts-x .nav-right .btn{height:40px;padding:0 18px;font-size:13.5px}
@@ -906,7 +906,7 @@
 .ts-x a.sec-row:hover h3,.ts-x .foot-in a:hover{color:var(--ts-blue)}
 
 /* ================= v3 — concepto Rivian + Robinhood con colores Trading ================= */
-.ts-x{--ts-blue:#0988FC;--ts-blue-h:#0C7AE0;--ts-ink:#111111;--ts-ink-2:#6F6F6A;--ts-bg:#F7F7F5;--ts-surface:#FFFFFF;--ts-line:#E6E6E1}
+.ts-x{--ts-blue:#0870D6;--ts-blue-h:#066AC9;--ts-ink:#111111;--ts-ink-2:#6F6F6A;--ts-bg:#F7F7F5;--ts-surface:#FFFFFF;--ts-line:#E6E6E1}
 .ts-x{background:var(--ts-bg)}
 .ts-x .v3-btn{display:inline-flex;align-items:center;justify-content:center;height:48px;padding:0 26px;border-radius:999px;font-size:15px;font-weight:500;letter-spacing:-0.005em;transition:background .2s ease,transform .2s ease;white-space:nowrap}
 .ts-x .v3-btn:active{transform:scale(.98)}
@@ -1009,7 +1009,7 @@
 .ts-x .panel-copy{padding:clamp(24px,3vw,44px)}
 .ts-x .panel-copy h3{font-weight:400;letter-spacing:-0.045em;font-size:clamp(40px,5.2vw,88px)}
 .ts-x .panel-copy .mono{font-size:13px}
-.ts-x .reel-prog i{background:var(--ts-blue)}
+.ts-x .reel-prog i{background:#0988FC}
 .ts-x .reel-nums span{font-size:13px}
 .ts-x .page[data-page="index"] .reel{margin-bottom:clamp(40px,6vw,96px)}
 .ts-x .nav-right .btn{white-space:nowrap}
@@ -1292,7 +1292,7 @@ html.ts-search-open{overflow:hidden}
 .ts-x .cr-filter > span{font-size:14px;font-weight:500;color:var(--ink-2)}
 .ts-x .cr-filter .chip{border:0;font:inherit;font-size:13.5px;cursor:pointer}
 .ts-x .cr-filter .chip:hover{color:var(--ink)}
-.ts-x .cr-filter .chip:focus-visible{outline:2px solid var(--ts-blue);outline-offset:2px}
+.ts-x .cr-filter .chip:focus-visible{outline:2px solid #0988FC;outline-offset:2px}
 .ts-x .cr-count{font-size:14px;color:var(--ink-2);margin-left:auto}
 
 /* detalle de vacante */

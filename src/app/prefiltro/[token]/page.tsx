@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import "./submit.css";
 
 const TS_BLACK = "#111111";
 const TS_BLUE = "#0988FC";
@@ -876,14 +877,7 @@ export default function PrefiltroForm() {
             <button
               onClick={handleSubmit}
               disabled={(phase as Phase) === "submitting" || !isFormValid()}
-              style={{
-                width: "100%", padding: "16px 32px",
-                background: isFormValid() ? TS_BLACK : "#999",
-                color: "white", border: "none", borderRadius: 999,
-                fontSize: 16, fontWeight: 700,
-                cursor: isFormValid() ? "pointer" : "not-allowed",
-                transition: "background 0.2s",
-              }}
+              className={isFormValid() ? "prefiltro-submit" : "prefiltro-submit is-idle"}
             >
               {(phase as Phase) === "submitting" ? "Submitting…" : "Submit answers"}
             </button>
@@ -980,14 +974,7 @@ export default function PrefiltroForm() {
             <button
               onClick={handleSubmit}
               disabled={(phase as Phase) === "submitting" || !isFormValid()}
-              style={{
-                width: "100%", padding: "16px 32px",
-                background: isFormValid() ? TS_BLACK : "#999",
-                color: "white", border: "none", borderRadius: 999,
-                fontSize: 16, fontWeight: 700,
-                cursor: isFormValid() ? "pointer" : "not-allowed",
-                transition: "background 0.2s",
-              }}
+              className={isFormValid() ? "prefiltro-submit" : "prefiltro-submit is-idle"}
             >
               {(phase as Phase) === "submitting" ? "Submitting…" : "Submit answers"}
             </button>
@@ -1310,14 +1297,7 @@ export default function PrefiltroForm() {
           <button
             onClick={handleSubmit}
             disabled={(phase as Phase) === "submitting" || !isFormValid()}
-            style={{
-              width: "100%", padding: "16px 32px",
-              background: isFormValid() ? TS_BLACK : "#999",
-              color: "white", border: "none", borderRadius: 999,
-              fontSize: 16, fontWeight: 700,
-              cursor: isFormValid() ? "pointer" : "not-allowed",
-              transition: "background 0.2s",
-            }}
+            className={isFormValid() ? "prefiltro-submit" : "prefiltro-submit is-idle"}
           >
             {(phase as Phase) === "submitting" ? "Enviando…" : "Enviar respuestas"}
           </button>

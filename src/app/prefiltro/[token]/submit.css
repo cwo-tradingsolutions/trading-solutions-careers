@@ -1,0 +1,22 @@
+.prefiltro-submit {
+  width: 100%;
+  padding: 16px 32px;
+  background: #0870d6;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.prefiltro-submit:hover:not(:disabled) {
+  background: #066ac9;
+}
+
+.prefiltro-submit.is-idle,
+.prefiltro-submit:disabled.is-idle {
+  background: #999;
+  cursor: not-allowed;
+}
