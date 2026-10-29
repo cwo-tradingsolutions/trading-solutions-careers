@@ -379,6 +379,8 @@ export function spansEnGate(events: DashEvent[], gateId: string, asOf: string): 
 export type SlaActual = {
   /** Hay reloj fiable del código en el que está ahora. */
   evaluable: boolean;
+  /** Backfill, o el último evento no es la etapa actual. Fuera del %. */
+  approx: boolean;
   breached: boolean;
   days: number | null;
   sla: number | null;
@@ -387,25 +389,31 @@ export type SlaActual = {
 /**
  * Fuera de SLA = días en el código ACTUAL > STAGE_SLA_DAYS de ese código.
  *
- * No se recorre el historial del gate: haberse pasado en prefiltro enviado
- * y estar hoy dentro del SLA de prefiltro pasado no cuenta. Tampoco se
- * suma el SLA de los códigos del gate.
+ * El último evento tiene que ser esa etapa. Si es backfill, o el historial
+ * no cuadra con la etapa actual, queda aproximado y no entra al porcentaje.
+ * Un incumplimiento ya saldado (otro código del mismo gate) no cuenta, y
+ * los SLA de Prefiltro o Médicos/Seguridad no se suman.
  */
-export function slaActual(events: DashEvent[], gateId: string, asOf: string): SlaActual {
-  const current = spansEnGate(events, gateId, asOf).at(-1);
-  if (!current || current.approx || current.sla == null) {
-    return { evaluable: false, breached: false, days: null, sla: current?.sla ?? null };
+export function slaActual(events: DashEvent[], stage: string | null, asOf: string): SlaActual {
+  const t = new Date(asOf).getTime();
+  const evs = events
+    .filter((e) => e.to_stage && new Date(e.changed_at).getTime() <= t)
+    .sort((a, b) => new Date(a.changed_at).getTime() - new Date(b.changed_at).getTime());
+  const last = evs[evs.length - 1];
+  const g = kellyGateFromStage(stage);
+  if (!last || !g || g.stages.length === 0 || normalizeStage(last.to_stage) !== normalizeStage(stage)) {
+    return { evaluable: false, approx: true, days: null, sla: null, breached: false };
   }
-  return {
-    evaluable: true,
-    breached: current.days > current.sla,
-    days: current.days,
-    sla: current.sla,
-  };
+  const days = daySpan(last.changed_at, asOf);
+  const sla = stageSla(stage);
+  if (last.source === "backfill" || sla == null) {
+    return { evaluable: false, approx: true, days, sla, breached: false };
+  }
+  return { evaluable: true, approx: false, days, sla, breached: days > sla };
 }
 
-export function fueraDeSlaEnGate(events: DashEvent[], gateId: string, asOf: string): boolean {
-  return slaActual(events, gateId, asOf).breached;
+export function fueraDeSlaEnGate(events: DashEvent[], stage: string, asOf: string): boolean {
+  return slaActual(events, stage, asOf).breached;
 }
 
 export function offerAccept(
@@ -518,20 +526,18 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
   const asOf = input.now;
   const vacs = input.vacancies.filter((v) => vacancyOk(v, filters));
   const vacIds = new Set(vacs.map((v) => v.id));
-  const cohort = input.candidates.filter((c) => {
-    if (!vacIds.has(c.vacancy_id)) return false;
-    if (filters.source && canalDe(c.source) !== filters.source) return false;
-    if (!inPeriod(c.created_at, filters.from, filters.to)) return false;
-    return true;
-  });
+  // Vacante + canal, sin recortar por fecha de aplicación. TTH y offer
+  // filtran por la fecha del evento. Conversión, canal y calidad usan la cohorte.
+  const scoped = input.candidates
+    .filter((c) => vacIds.has(c.vacancy_id))
+    .filter((c) => !filters.source || canalDe(c.source) === filters.source)
+    .map((c) => {
+      const evs = prep.eventsByCand.get(c.id) ?? [];
+      return { c, evs, maxGate: maxGateIndex(evs.map((e) => e.to_stage)) };
+    });
+  const enriched = scoped.filter((r) => inPeriod(r.c.created_at, filters.from, filters.to));
 
   const ternaN = KELLY_GATES.find((g) => g.id === "terna")?.n ?? 7;
-
-  const enriched = cohort.map((c) => {
-    const evs = prep.eventsByCand.get(c.id) ?? [];
-    const maxGate = maxGateIndex(evs.map((e) => e.to_stage));
-    return { c, evs, maxGate };
-  });
 
   // ── TTF: hire_date en el periodo, ambas fechas presentes ──
   const ttfValues: number[] = [];
@@ -540,10 +546,6 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
     const m = prep.milestoneByVac.get(v.id);
     if (!m?.hr_request_date || !m.hire_date) continue;
     if (!inPeriod(m.hire_date, filters.from, filters.to)) continue;
-    if (filters.source) {
-      const has = enriched.some((e) => e.c.vacancy_id === v.id);
-      if (!has) continue;
-    }
     const days = daySpan(m.hr_request_date, m.hire_date);
     ttfValues.push(days);
     const month = m.hire_date.slice(0, 7);
@@ -557,7 +559,7 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
   // ── TTH ──
   const tthValues: number[] = [];
   const tthByMonth = new Map<string, number[]>();
-  for (const row of enriched) {
+  for (const row of scoped) {
     const hires = row.evs.filter((e) => kellyGateFromStage(e.to_stage)?.id === "onboarding");
     if (hires.length === 0) continue;
     const first = hires.reduce((a, b) =>
@@ -656,7 +658,7 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
     const bucket = slaByGate.get(g.id);
     if (!bucket) continue;
     bucket.people += 1;
-    const clock = slaActual(row.evs, g.id, asOf);
+    const clock = slaActual(row.evs, row.c.stage, asOf);
     if (g.stages.length === 0 || !clock.evaluable) {
       bucket.approx += 1;
       slaApprox += 1;
@@ -735,7 +737,7 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
 
   // ── Offer ──
   const offer = offerAccept(
-    enriched.map((r) => ({ events: r.evs, rejected: r.c.rejected })),
+    scoped.map((r) => ({ events: r.evs, rejected: r.c.rejected })),
     { from: filters.from, to: filters.to },
   );
 
@@ -752,7 +754,6 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
     }
     agingDays.push(daySpan(m.hr_request_date, asOf));
   }
-  const openPacked = pack(openVacs.length, openVacs.length);
   const agingMed = median(agingDays);
   const agingPacked = pack(agingMed, agingDays.length);
 
@@ -787,7 +788,7 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
     for (const row of people) {
       const g = gateActual(row.c.stage);
       if (g.rechazado || !g.gate || g.gate.id === "onboarding") continue;
-      const breached = g.gate.stages.length > 0 && slaActual(row.evs, g.gate.id, asOf).breached;
+      const breached = slaActual(row.evs, row.c.stage, asOf).breached;
       if (breached) overSla += 1;
       const cur = gateCounts.get(g.gate.id) ?? { n: 0, over: 0, label: g.gate.label };
       cur.n += 1;
@@ -856,9 +857,9 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
         pending: offer.pending,
       },
       open: {
-        value: openPacked.value,
+        value: openVacs.length,
         n: openVacs.length,
-        insufficient: openPacked.insufficient,
+        insufficient: false,
         delta: null,
         agingMedian: agingPacked.value,
         agingN: agingDays.length,
@@ -966,9 +967,8 @@ export function buildDrill(input: DashboardInput, vacancyId: string): { vacancy:
     if (g.rechazado || !g.gate || g.gate.id === "onboarding") continue;
     const evs = prep.eventsByCand.get(c.id) ?? [];
     const noCode = g.gate.stages.length === 0;
-    const clock = slaActual(evs, g.gate.id, input.now);
+    const clock = slaActual(evs, c.stage, input.now);
     if (noCode || !clock.breached) continue;
-    const current = spansEnGate(evs, g.gate.id, input.now).at(-1);
     const last = [...evs].sort(
       (a, b) => new Date(b.changed_at).getTime() - new Date(a.changed_at).getTime(),
     )[0];
@@ -979,10 +979,10 @@ export function buildDrill(input: DashboardInput, vacancyId: string): { vacancy:
       id: c.id,
       name: c.name,
       stageLabel: etiquetaEtapa(c.stage),
-      days: current && !current.approx ? Math.round(current.days * 10) / 10 : null,
+      days: clock.days == null ? null : Math.round(clock.days * 10) / 10,
       sla: noCode ? null : stageSla(c.stage),
       overSla: true,
-      approx: backfill || !current || current.approx,
+      approx: backfill || clock.approx,
       source: canalDe(c.source),
       lastEvent: `${lastLabel} · ${when}${backfill ? " · backfill" : ""}`,
       href: input.example ? null : `/hr-admin/report/${c.id}`,

@@ -14,6 +14,7 @@ import {
   daySpan,
   exampleInput,
   fueraDeSlaEnGate,
+  slaActual,
   maxGateIndex,
   median,
   offerAccept,
@@ -169,23 +170,23 @@ describe("SLA por código, sin sumar", () => {
   it("un código pasado de su SLA saca al candidato aunque la suma del gate no", () => {
     // 6 días en el código actual (enviado, SLA 5). La suma del gate es 9: no se usa.
     const passed = [ev("prefiltro_enviado", 0)];
-    assert.equal(fueraDeSlaEnGate(passed, "prefiltro", at(6)), true);
+    assert.equal(fueraDeSlaEnGate(passed, "prefiltro_enviado", at(6)), true);
     assert.equal(daySpan(at(0), at(6)) < 9, true);
 
     // 3 + 1 + 1, el código actual dentro de su SLA.
     const inside = [ev("prefiltro_enviado", 0), ev("prefiltro_pasado", 3), ev("prefiltro_revision", 4)];
-    assert.equal(fueraDeSlaEnGate(inside, "prefiltro", at(5)), false);
+    assert.equal(fueraDeSlaEnGate(inside, "prefiltro_revision", at(5)), false);
 
     // El código actual es pasado (SLA 2) y ya lleva 3 días.
     const ahoraPasado = [ev("prefiltro_enviado", 0), ev("prefiltro_pasado", 3)];
-    assert.equal(fueraDeSlaEnGate(ahoraPasado, "prefiltro", at(6)), true);
+    assert.equal(fueraDeSlaEnGate(ahoraPasado, "prefiltro_pasado", at(6)), true);
 
     // Justo en el SLA no es fuera (> estricto).
-    assert.equal(fueraDeSlaEnGate([ev("prefiltro_enviado", 0)], "prefiltro", at(5)), false);
+    assert.equal(fueraDeSlaEnGate([ev("prefiltro_enviado", 0)], "prefiltro_enviado", at(5)), false);
 
     // Backfill no cuenta como incumplimiento.
     assert.equal(
-      fueraDeSlaEnGate([ev("prefiltro_enviado", 0, "backfill")], "prefiltro", at(30)),
+      fueraDeSlaEnGate([ev("prefiltro_enviado", 0, "backfill")], "prefiltro_enviado", at(30)),
       false,
     );
   });
@@ -193,11 +194,12 @@ describe("SLA por código, sin sumar", () => {
   it("solo cuenta quien se pasa en el código actual", () => {
     // 6 días en enviado (SLA 5) y hoy 1 día en pasado (SLA 2): el incumplimiento ya pasó.
     const yaNo = [ev("prefiltro_enviado", 0), ev("prefiltro_pasado", 6)];
-    assert.equal(fueraDeSlaEnGate(yaNo, "prefiltro", at(7)), false);
+    assert.equal(slaActual(yaNo, "prefiltro_pasado", at(7)).breached, false);
+    assert.equal(fueraDeSlaEnGate(yaNo, "prefiltro_pasado", at(7)), false);
 
     // Sigue en enviado y ya va en 6 días.
     const ahora = [ev("prefiltro_enviado", 0)];
-    assert.equal(fueraDeSlaEnGate(ahora, "prefiltro", at(6)), true);
+    assert.equal(fueraDeSlaEnGate(ahora, "prefiltro_enviado", at(6)), true);
 
     const input = baseInput();
     input.now = at(7);
@@ -218,6 +220,18 @@ describe("SLA por código, sin sumar", () => {
     assert.equal(d.kpis.sla.over, 1);
   });
 
+  it("backfill actual o historial que no cuadra queda fuera del porcentaje", () => {
+    const backfillAhora = [ev("prefiltro_enviado", 0), ev("prefiltro_pasado", 2, "backfill")];
+    const clock = slaActual(backfillAhora, "prefiltro_pasado", at(9));
+    assert.equal(clock.evaluable, false);
+    assert.equal(clock.approx, true);
+    assert.equal(clock.breached, false);
+
+    const noCuadra = slaActual([ev("prefiltro_enviado", 0)], "prefiltro_pasado", at(6));
+    assert.equal(noCuadra.evaluable, false);
+    assert.equal(noCuadra.approx, true);
+  });
+
   it("el filtro de etapa mueve el SLA y no el embudo", () => {
     const all = buildDashboard(exampleInput());
     const only = buildDashboard({
@@ -227,6 +241,71 @@ describe("SLA por código, sin sumar", () => {
     assert.equal(only.funnel.find((g) => g.n === 1)?.reached, all.funnel.find((g) => g.n === 1)?.reached);
     assert.ok((only.kpis.sla.n ?? 0) < all.kpis.sla.n);
     assert.equal(only.kpis.sla.over, 3);
+  });
+});
+
+describe("periodo de TTH y offer, conteo de abiertas, TTF con canal", () => {
+  it("quien aplicó antes y se contrató en el periodo entra a TTH y a offer", () => {
+    const input = baseInput();
+    input.now = at(40);
+    input.filters = { ...emptyFilters(), from: at(10), to: at(20) };
+    input.vacancies = [
+      { id: "v", title: "V", area: "A", country: "Colombia", status: "closed", owner_recruiter_id: null },
+    ];
+    input.candidates = [{
+      id: "h",
+      name: "Antes",
+      vacancy_id: "v",
+      stage: "contratado",
+      source: "web",
+      created_at: at(0),
+      rejected: false,
+    }];
+    input.events = [
+      { candidate_id: "h", to_stage: "aplico", changed_at: at(0), source: "ui" },
+      { candidate_id: "h", to_stage: "oferta", changed_at: at(12), source: "ui" },
+      { candidate_id: "h", to_stage: "contratado", changed_at: at(15), source: "ui" },
+    ];
+    const d = buildDashboard(input);
+    assert.equal(d.kpis.tth.n, 1);
+    assert.equal(d.kpis.tth.insufficient, true);
+    assert.equal(d.kpis.offer.accepted, 1);
+    assert.equal(d.kpis.offer.n, 1);
+    assert.equal(d.kpis.conversion.n, 0);
+  });
+
+  it("dos vacantes abiertas se muestran aunque n<5", () => {
+    const input = baseInput();
+    input.vacancies = [
+      { id: "o1", title: "A", area: "A", country: "Colombia", status: "open", owner_recruiter_id: null },
+      { id: "o2", title: "B", area: "A", country: "Colombia", status: "open", owner_recruiter_id: null },
+    ];
+    input.milestones = [];
+    const d = buildDashboard(input);
+    assert.equal(d.kpis.open.value, 2);
+    assert.equal(d.kpis.open.n, 2);
+    assert.equal(d.kpis.open.insufficient, false);
+    assert.equal(d.kpis.open.agingInsufficient, true);
+  });
+
+  it("el filtro de canal no saca del TTF una vacante sin candidatos de ese canal", () => {
+    const input = baseInput();
+    input.filters = { ...emptyFilters(), source: "LinkedIn" };
+    input.vacancies = [
+      { id: "v", title: "V", area: "A", country: "Colombia", status: "closed", owner_recruiter_id: null },
+    ];
+    input.milestones = [{ vacancy_id: "v", hr_request_date: at(0), hire_date: at(10) }];
+    input.candidates = [{
+      id: "c",
+      name: "C",
+      vacancy_id: "v",
+      stage: "aplico",
+      source: "Referido",
+      created_at: at(1),
+      rejected: false,
+    }];
+    const d = buildDashboard(input);
+    assert.equal(d.kpis.ttf.n, 1);
   });
 });
 
