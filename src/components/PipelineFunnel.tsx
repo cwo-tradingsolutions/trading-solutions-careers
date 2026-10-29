@@ -16,6 +16,7 @@ import { rubricaDeVacante } from "@/lib/rubricas";
 import { escucharPedidos, tomarPedidoDeCandidato } from "@/lib/abrirCandidato";
 import HistorialContactos from "@/components/HistorialContactos";
 import SeguimientoVacante from "@/components/SeguimientoVacante";
+import { InvitarEntrevistaModal } from "@/components/InvitarEntrevistaModal";
 
 // Map de stage → icono Lucide. Centralizado para reutilizar en cualquier render.
 const STAGE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -1861,6 +1862,7 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
   const [feedback, setFeedback] = useState<string>("");
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showJointScheduling, setShowJointScheduling] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
   const currentStage = cand.stage || "aplico";
   const nextStage = siguienteDelBoton(currentStage);
   const isTerminal = currentStage === "rechazado" || currentStage === "contratado";
@@ -1978,6 +1980,21 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
               title="Regenera el token del cuestionario y crea un nuevo draft en tu Gmail con el link"
             >
               🔄 Reenviar Prefiltro
+            </button>
+          )}
+
+          {/* Invitación Wellness → HM. Va en la ficha, como Reenviar Prefiltro,
+              y no toca el botón Agendar (ts_interviews) para poder rebasar
+              sobre feat/ats-fase0-soft-delete. */}
+          {!isTerminal && (
+            <button
+              type="button"
+              onClick={() => setShowInvite(true)}
+              disabled={busy}
+              className="text-xs font-bold px-4 py-2 rounded-full border-2 border-black text-black bg-white hover:bg-gray-50 disabled:opacity-50"
+              title="Envía la invitación de Wellness o de Hiring Manager. En preview solo llega a la lista de prueba."
+            >
+              Invitar a entrevista
             </button>
           )}
 
@@ -2458,6 +2475,14 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
             onClose();
           }, 1200);
         }}
+      />
+    )}
+
+    {showInvite && (
+      <InvitarEntrevistaModal
+        candidateId={cand.id}
+        candidateName={cand.name || ""}
+        onClose={() => setShowInvite(false)}
       />
     )}
 
