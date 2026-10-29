@@ -158,6 +158,7 @@ export async function POST(request: NextRequest) {
               phone: phone || null,
               stage: "aplico",
               source: isInternal ? "public_form_internal" : "public_form",
+              preferred_language: isEnglishTemplate(vacTemplate) ? "en" : "es",
               notes: why_ts ? `[Public form] ${why_ts}` : `[Public form] · application_id=${newId}`,
               preferred_language: isEnglishTemplate(vacTemplate) ? "en" : "es",
               created_at: new Date().toISOString(),
