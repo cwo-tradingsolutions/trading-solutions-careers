@@ -176,7 +176,7 @@ export const translations = {
       positionClosedBody: "Este enlace ya no tiene una vacante abierta. Mira las vacantes actuales o deja tu hoja de vida en la base de talento.",
       englishPosting: "Vacante publicada en inglés",
       language: "Idioma",
-      previewTestBanner: "Modo prueba — los envíos no se guardan ni se envían",
+      previewTestBanner: "Modo prueba: no se guarda ni se envía",
       loading: "Cargando...",
       loadingJobs: "Cargando vacantes...",
       salaryCompetitiveUsd: "Competitiva (USD)",
