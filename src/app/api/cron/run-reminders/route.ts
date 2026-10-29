@@ -176,6 +176,9 @@ export async function GET(req: NextRequest) {
               paused_until: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
               reason: `Sin respuesta tras ${rule.max_iterations} recordatorios · ${rule.scenario_key}`,
               paused_by: "cron",
+              deleted_at: null,
+              deleted_by: null,
+              delete_reason: null,
             });
           results.push({ candidate_id: cand.id, status: "exhausted_paused" });
         } else if (rule.on_exhausted_action === "mark_rejected") {

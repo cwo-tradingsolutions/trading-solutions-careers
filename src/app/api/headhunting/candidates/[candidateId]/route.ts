@@ -115,8 +115,8 @@ export async function PATCH(
 
 /**
  * DELETE /api/headhunting/candidates/[candidateId]
- * Elimina un candidato y registros relacionados (cascading via FK donde aplica).
- * Usado para limpiar tests, duplicados, etc.
+ * Borrado lógico. El historial (etapas, pruebas, contactos, entrevistas) queda.
+ * Restaurar: POST .../restore
  */
 export async function DELETE(
   req: NextRequest,
@@ -130,22 +130,28 @@ export async function DELETE(
     if (!candidateId) {
       return NextResponse.json({ error: 'candidateId requerido' }, { status: 400 });
     }
+    const reason = req.nextUrl.searchParams.get('reason');
+    const deletedAt = new Date().toISOString();
 
-    // Borrar registros relacionados primero (no todas tienen FK cascade)
-    await supabaseAdmin.from('ht_results').delete().eq('candidate_id', candidateId);
-    await supabaseAdmin.from('ts_candidate_experience').delete().eq('candidate_id', candidateId);
-    await supabaseAdmin.from('ts_reminders_sent').delete().eq('candidate_id', candidateId);
-    await supabaseAdmin.from('ts_candidate_reminders_paused').delete().eq('candidate_id', candidateId);
-
-    const { error } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from('ht_candidates')
-      .delete()
-      .eq('id', candidateId);
+      .update({
+        deleted_at: deletedAt,
+        deleted_by: 'hr-admin',
+        delete_reason: reason,
+        updated_at: deletedAt,
+      })
+      .eq('id', candidateId)
+      .select('id')
+      .maybeSingle();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ success: true, deleted: candidateId });
+    if (!data) {
+      return NextResponse.json({ error: 'Candidato no encontrado' }, { status: 404 });
+    }
+    return NextResponse.json({ success: true, soft_deleted: true, id: candidateId });
   } catch (err: any) {
     console.error('Candidate DELETE error:', err);
     return NextResponse.json({ error: err?.message || 'Error interno' }, { status: 500 });

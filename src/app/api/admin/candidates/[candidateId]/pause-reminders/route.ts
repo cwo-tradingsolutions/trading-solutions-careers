@@ -30,6 +30,9 @@ export async function POST(
         paused_until: until,
         reason: reason || null,
         paused_by: "manual",
+        deleted_at: null,
+        deleted_by: null,
+        delete_reason: null,
       });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -48,7 +51,11 @@ export async function DELETE(
 
   const { error } = await supabaseAdmin
     .from("ts_candidate_reminders_paused")
-    .delete()
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by: "hr-admin",
+      delete_reason: "recordatorios reanudados",
+    })
     .eq("candidate_id", params.candidateId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

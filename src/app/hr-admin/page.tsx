@@ -245,10 +245,16 @@ export default function HRAdminPage() {
               <Hand className="w-3.5 h-3.5" />
               <span>Decisiones</span>
             </button>
+            {/* Fase 0: el flujo escribe en ts_interviews (no existe) y manda
+                el correo directo por Resend. Se deja el modal y la ruta;
+                el botón no abre nada hasta la Fase 1. */}
             <button
+              type="button"
+              disabled
+              aria-disabled="true"
               onClick={() => setScheduleOpen(true)}
-              className="flex items-center gap-1.5 bg-ts-accent hover:bg-[var(--ts-accent-hover)] text-white text-[12px] font-medium px-3.5 py-1.5 rounded-ts-sm transition-colors"
-              title="Agendar entrevista"
+              className="flex items-center gap-1.5 bg-ts-accent text-white text-[12px] font-medium px-3.5 py-1.5 rounded-ts-sm opacity-50 cursor-not-allowed"
+              title="Próximamente"
             >
               <Calendar className="w-3.5 h-3.5" />
               <span>Agendar</span>

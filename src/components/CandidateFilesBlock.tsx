@@ -79,7 +79,7 @@ export default function CandidateFilesBlock({
   }
 
   async function eliminar(f: Archivo) {
-    if (!confirm(`¿Eliminar "${f.title || "este documento"}" del expediente? No se puede deshacer.`)) return;
+    if (!confirm(`¿Ocultar "${f.title || "este documento"}" del expediente? El archivo queda guardado.`)) return;
     try {
       const r = await fetch(`/api/candidates/${candidateId}/files?fileId=${f.id}`, { method: "DELETE" });
       const j = await r.json();

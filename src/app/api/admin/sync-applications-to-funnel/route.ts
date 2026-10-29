@@ -15,7 +15,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { supabaseAdmin } from "@/lib/supabase";
+import { supabaseAdmin, supabaseFromIncludingDeleted } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
 import { recordStageEvents } from "@/lib/stage-events";
 // El mapa job_id → vacancy_id es compartido con /api/applications · esta copia
@@ -54,9 +54,8 @@ export async function POST(req: NextRequest) {
     // al que aplicó, no quedarse en la ficha del cargo anterior.
     const emails = apps.map((a: any) => String(a.email || "").toLowerCase().trim()).filter(Boolean);
     const orFilter = emails.map(e => `email.ilike.${e}`).join(",");
-    const { data: existing } = await supabaseAdmin
-      .from("ht_candidates")
-      .select("id, email, vacancy_id")
+    const { data: existing } = await supabaseFromIncludingDeleted("ht_candidates")
+      .select("id, email, vacancy_id, deleted_at")
       .or(orFilter);
     const llave = (email: string, vacancyId: string) => `${email}|${vacancyId}`;
     const existingMap = new Map(

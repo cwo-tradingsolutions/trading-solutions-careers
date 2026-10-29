@@ -15,7 +15,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { supabaseAdmin } from "@/lib/supabase";
+import { supabaseAdmin, supabaseFromIncludingDeleted } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
 
 // IDs de Supabase verificados via /api/headhunting/vacancies el 2026-04-30
@@ -104,15 +104,19 @@ export async function POST(req: NextRequest) {
         }
 
         // ¿Ya existe en Supabase ht_candidates?
-        const { data: existing } = await supabaseAdmin
-          .from("ht_candidates")
-          .select("id, status")
+        const { data: existing } = await supabaseFromIncludingDeleted("ht_candidates")
+          .select("id, status, deleted_at")
           .eq("client_id", TS_CLIENT_ID)
           .eq("vacancy_id", vacancyId)
           .eq("email", c.email)
           .limit(1)
-          .single();
+          .maybeSingle();
 
+        if (existing?.deleted_at) {
+          // Oculto a propósito. No se duplica ni se restaura desde este sync.
+          result.candidates_updated++;
+          continue;
+        }
         if (existing) {
           // No sobreescribir si ya completó la prueba o está en progreso
           if (existing.status === "completed" || existing.status === "in_progress") {
