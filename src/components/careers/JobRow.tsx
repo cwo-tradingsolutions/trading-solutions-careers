@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useLanguage } from "@/i18n/context";
 import type { Job } from "@/lib/vacancies-adapter";
-import { GoArrow, jobString } from "./shared";
+import { displayLevel, displayLocation, GoArrow, jobString } from "./shared";
 
 export default function JobRow({ job }: { job: Job }) {
   const { t, locale } = useLanguage();
@@ -14,10 +14,10 @@ export default function JobRow({ job }: { job: Job }) {
       <h3>{jobString(job.title, locale)}</h3>
       <div className="meta">
         <b>{dept}</b>
-        {job.level}
+        {displayLevel(job.level, locale)}
       </div>
       <div className="meta">
-        <b>{job.location}</b>
+        <b>{displayLocation(job.location, locale)}</b>
         {mode}
       </div>
       <span className="go" aria-hidden="true">

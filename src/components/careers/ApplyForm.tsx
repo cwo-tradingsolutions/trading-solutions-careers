@@ -7,6 +7,7 @@ import type { Job } from "@/lib/vacancies-adapter";
 import { jobString, normalizarLinkedin, siteLinks } from "./shared";
 
 const MAX_CV = 5 * 1024 * 1024;
+const FIELD_ORDER = ["full_name", "email", "phone", "linkedin", "area", "cv", "why_ts", "consent"];
 
 type Mode = "job" | "pool";
 
@@ -62,7 +63,13 @@ export default function ApplyForm({
     if (mode === "pool" && !area) next.area = t.ui.areaRequired;
     if (!consent) next.consent = t.ui.consentRequired;
     setErrors(next);
-    return Object.keys(next).length === 0;
+    const firstInvalid = FIELD_ORDER.find((id) => next[id]);
+    if (firstInvalid) {
+      const el = document.getElementById(firstInvalid);
+      el?.focus();
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    return !firstInvalid;
   };
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -136,10 +143,12 @@ export default function ApplyForm({
   };
 
   if (sent) {
+    const heading = mode === "pool" ? t.ui.poolSuccessTitle : previewTestMode ? t.ui.previewTestSuccess : t.jobs.successTitle;
+    const message = previewTestMode ? (mode === "pool" ? t.ui.previewTestSuccess : "") : t.jobs.successMsg;
     return (
-      <div>
-        <h2>{t.jobs.successTitle}</h2>
-        <p>{t.jobs.successMsg}</p>
+      <div className="form-success">
+        <h2>{heading}</h2>
+        {message ? <p>{message}</p> : null}
         <Link href="/vacantes" className="btn btn-blue" style={{ marginTop: 18 }}>
           {t.jobs.backToJobsBtn}
         </Link>
@@ -306,16 +315,30 @@ export default function ApplyForm({
           />
         )}
         <label className="check" data-invalid={errors.consent ? "true" : undefined}>
-          <input type="checkbox" name="consent" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+          <input
+            id="consent"
+            type="checkbox"
+            name="consent"
+            checked={consent}
+            aria-invalid={errors.consent ? true : undefined}
+            aria-describedby={errors.consent ? "consent-err" : undefined}
+            onChange={(e) => setConsent(e.target.checked)}
+          />
           <span>
-            {t.ui.privacyAgree}{" "}
+            {t.ui.privacyAgree}
+            {t.ui.privacyAfter ? "" : " "}
             <a href={siteLinks.legal} target="_blank" rel="noopener">
               {t.ui.privacyPolicy}
             </a>
+            {t.ui.privacyAfter}
             <span className="sr-only"> ({t.ui.required})</span>
           </span>
         </label>
-        {errors.consent ? <span className="err">{errors.consent}</span> : null}
+        {errors.consent ? (
+          <span className="err" id="consent-err">
+            {errors.consent}
+          </span>
+        ) : null}
         <button type="submit" className="btn btn-blue" disabled={submitting}>
           {submitting ? t.ui.sending : mode === "pool" ? t.ui.sendCv : t.jobs.submit}
         </button>

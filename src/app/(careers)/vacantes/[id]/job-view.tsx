@@ -7,7 +7,7 @@ import Frame from "@/components/careers/Frame";
 import JobRow from "@/components/careers/JobRow";
 import ApplyForm from "@/components/careers/ApplyForm";
 import { useOpenJobs } from "@/components/careers/useOpenJobs";
-import { departmentsFrom, displaySalary, jobString, jobStrings, linkedInShareHref, postingReadsEnglish, siteLinks } from "@/components/careers/shared";
+import { departmentsFrom, displayLevel, displayLocation, displaySalary, jobString, jobStrings, linkedInShareHref, postingReadsEnglish, siteLinks } from "@/components/careers/shared";
 import { useLanguage } from "@/i18n/context";
 
 export default function JobView({ id, previewTestMode = false }: { id: string; previewTestMode?: boolean }) {
@@ -59,7 +59,7 @@ export default function JobView({ id, previewTestMode = false }: { id: string; p
   const deptName = (d: string) => (t.deptNames as Record<string, string>)[d] || d;
   const modeName = (m: string) => (t.modeNames as Record<string, string>)[m] || m;
   const others = job ? jobs.filter((j) => j.id !== job.id) : [];
-  const englishOnly = !!job && locale !== "en" && postingReadsEnglish(job.description.es, job.description.en);
+  const englishOnly = !!job && locale !== "en" && postingReadsEnglish(job);
 
   return (
     <Frame>
@@ -127,7 +127,7 @@ export default function JobView({ id, previewTestMode = false }: { id: string; p
             <dl className="co-meta">
               <div>
                 <dt>{t.ui.location}</dt>
-                <dd>{job.location}</dd>
+                <dd>{displayLocation(job.location, locale)}</dd>
               </div>
               <div>
                 <dt>{t.ui.modeFilter}</dt>
@@ -135,7 +135,7 @@ export default function JobView({ id, previewTestMode = false }: { id: string; p
               </div>
               <div>
                 <dt>{t.ui.level}</dt>
-                <dd>{job.level}</dd>
+                <dd>{displayLevel(job.level, locale)}</dd>
               </div>
               {job.salary ? (
                 <div>

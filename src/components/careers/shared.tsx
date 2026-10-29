@@ -133,6 +133,20 @@ export function displaySalary(salary: string, locale: Locale): string {
   return salary;
 }
 
+/** Seniority labels stored in English. Unknown values stay as published. */
+export function displayLevel(level: string, locale: Locale): string {
+  if (level.trim() === "Mid-Level") return translations[locale].ui.levelMid;
+  return level;
+}
+
+/** City names stored in English. The rest of the location stays as published. */
+export function displayLocation(location: string, locale: Locale): string {
+  const phrases = translations[locale].ui;
+  const trimmed = location.trim();
+  if (trimmed === "Panama City, Panama") return `${phrases.cityPanama}, ${phrases.countryPanama}`;
+  return location.replaceAll("Panama City", phrases.cityPanama);
+}
+
 export function jobString(field: { es: string; en: string }, locale: Locale): string {
   const copy = jobCopyLocale(locale);
   if (copy === "es" && field.es.trim()) return field.es;
@@ -158,13 +172,28 @@ export function looksSpanish(text: string): boolean {
   return hits >= 4 && hits / words.length >= 0.08;
 }
 
-/** Spanish UI is showing an English job narrative, so the page should say so. */
-export function postingReadsEnglish(esText: string, enText: string): boolean {
+function sectionReadsEnglish(esText: string, enText: string): boolean {
   const es = esText.trim();
   const en = enText.trim();
-  if (!es && !en) return false;
-  if (es && en && es === en) return true;
-  return es.length > 0 && !looksSpanish(es);
+  if (!es && !en) return true;
+  if (!es) return true;
+  if (en && es === en) return true;
+  return !looksSpanish(es);
+}
+
+/**
+ * The Spanish UI is showing an English job narrative, so the page should say so.
+ * A mixed posting (English intro, Spanish bullets) is shown as stored and is not labeled English-only.
+ */
+export function postingReadsEnglish(job: Pick<Job, "description" | "responsibilities" | "requirements">): boolean {
+  const sections: Array<[string, string]> = [
+    [job.description.es, job.description.en],
+    [job.responsibilities.es.join(" "), job.responsibilities.en.join(" ")],
+    [job.requirements.es.join(" "), job.requirements.en.join(" ")],
+  ];
+  const present = sections.filter(([es, en]) => es.trim() || en.trim());
+  if (!present.length) return false;
+  return present.every(([es, en]) => sectionReadsEnglish(es, en));
 }
 
 export function linkedInShareHref(jobUrl: string): string {

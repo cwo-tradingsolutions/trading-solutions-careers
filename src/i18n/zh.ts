@@ -1,10 +1,10 @@
 /** Simplified Chinese UI. Vacancy body copy is not translated here. */
 export const zhCN = {
-  nav: { culture: "文化", areas: "领域", experience: "体验", viewJobs: "查看职位" },
+  nav: { culture: "文化", areas: "领域", experience: "成长经历", viewJobs: "查看职位" },
   hero: {
     tag: "Trading Solutions 招聘",
     title: "你的下一章\n从这里开始。",
-    subtitle: "我们是一家精品货运代理（boutique freight forwarder），业务覆盖 150 多个国家。我们寻找好奇、投入、并愿意与我们一起成长的人。",
+    subtitle: "我们是一家精品货运代理（boutique freight forwarder），业务覆盖 150 多个国家。我们寻找好奇、投入，并愿意与我们一起成长的人。",
     cta: "探索机会",
     ctaSecondary: "了解我们的文化"
   },
@@ -21,7 +21,7 @@ export const zhCN = {
     cards: [
       { title: "加速成长", desc: "国际项目、高影响力的工作和愿意投入你发展的领导者，会让你的职业更快展开。上限由你自己决定。" },
       { title: "全球覆盖", desc: "我们在 150 多个国家开展海运、陆运、空运和报关服务。每一天都是解决真实物流挑战的机会。" },
-      { title: "扩张的文化", desc: "每个想法都有空间。每种声音都重要。我们建设一个奖励好奇、庆祝创新、并挑战界限的环境。" }
+      { title: "扩张的文化", desc: "每个想法都有空间。每种声音都重要。我们建设一个奖励好奇、庆祝创新，并挑战界限的环境。" }
     ],
     blackBlock: {
       title: "我们相信想要更多的人。",
@@ -41,7 +41,7 @@ export const zhCN = {
     commercial: { name: "商务", count: "" }
   },
   experience: {
-    tag: "体验",
+    tag: "成长经历",
     title: "我们聘请杰出的人才。加入这个过程，感觉是这样的。",
     steps: [
       { num: "01", label: "发现", title: "你找到我们。我们让你好奇。", desc: "你浏览我们的机会，然后有什么对上了。这不只是一份工作——而是在国际尺度上做重要事情的可能。" },
@@ -67,7 +67,7 @@ export const zhCN = {
     button: "查看所有职位"
   },
   footer: {
-    tagline: "精品货运代理。我们以精确和目的运送重要的东西。",
+    tagline: "以精准与使命感，运送真正重要的货物。",
     services: "服务",
     company: "公司",
     companyAbout: "关于我们",
@@ -80,7 +80,7 @@ export const zhCN = {
   },
   jobs: {
     pageTitle: "在招职位",
-    pageSubtitle: "找到与你的抱负相称的角色。",
+    pageSubtitle: "找到与你的抱负相称的职位。",
     backHome: "回到首页",
     searchPlaceholder: "按职位、领域或技能搜索...",
     deptLabel: "部门：",
@@ -101,17 +101,17 @@ export const zhCN = {
     fullName: "姓名",
     fullNamePlaceholder: "你的姓名",
     email: "电子邮箱",
-    emailPlaceholder: "you@email.com",
+    emailPlaceholder: "你的名字@email.com",
     phone: "电话",
     phonePlaceholder: "+1 (555) 000-0000",
     linkedin: "LinkedIn",
-    linkedinPlaceholder: "linkedin.com/in/your-profile",
+    linkedinPlaceholder: "linkedin.com/in/你的主页",
     cvLabel: "简历",
     cvDrag: "拖入简历或",
     cvSelect: "选择文件",
     cvFormats: "PDF、DOC 或 DOCX（最大 10 MB）",
     whyTs: "为什么是 Trading Solutions？",
-    whyTsPlaceholder: "告诉我们什么在推动你，以及什么会让你在这个角色里出色...",
+    whyTsPlaceholder: "告诉我们你的动力，以及什么会让你在这个职位里出色...",
     submit: "提交申请",
     cancel: "取消",
     successTitle: "申请已发送",
@@ -172,6 +172,8 @@ export const zhCN = {
     englishPosting: "此职位以英文发布",
     language: "语言",
     previewTestBanner: "测试模式 — 提交内容不会被保存或发送",
+    previewTestSuccess: "测试提交已发送（未保存）",
+    poolSuccessTitle: "已收到简历",
     loading: "加载中...",
     loadingJobs: "正在加载职位...",
     salaryCompetitiveUsd: "具有竞争力（美元）",
@@ -182,9 +184,13 @@ export const zhCN = {
     adminAlt: "同事们在办公室的工位上工作",
     location: "地点",
     level: "级别",
+    levelMid: "中级",
+    cityPanama: "巴拿马城",
+    countryPanama: "巴拿马",
     compensation: "薪酬",
     privacyAgree: "我同意按照",
-    privacyPolicy: "隐私政策",
+    privacyPolicy: "《隐私政策》",
+    privacyAfter: "处理我的个人数据",
     knowSomeone: "认识适合这个职位的人？",
     shareLinkedIn: "在 LinkedIn 上分享",
     keepExploring: "继续看看",
@@ -198,7 +204,7 @@ export const zhCN = {
     emailInvalid: "请输入有效的电子邮箱。",
     nameRequired: "请输入你的姓名。",
     consentRequired: "发送前请同意处理你的个人数据。",
-    linkedinInvalid: "请使用 LinkedIn 链接，例如 linkedin.com/in/your-profile。",
+    linkedinInvalid: "请使用 LinkedIn 链接，例如 linkedin.com/in/你的主页。",
     sending: "正在发送...",
     sendError: "没能发送。请过几分钟再试。",
     listHeading: "在招职位列表",
@@ -220,7 +226,7 @@ export const zhCN = {
     homeTitle: "招聘 — Trading Solutions",
     homeDescription: "你的下一章从这里开始。加入这家业务覆盖 150 多个国家的精品货运代理。",
     jobsTitle: "在招职位 — Trading Solutions",
-    jobsDescription: "找到与你的抱负相称的角色。Trading Solutions 的在招职位。",
+    jobsDescription: "找到与你的抱负相称的职位。Trading Solutions 的在招职位。",
     poolTitle: "留下你的简历 — Trading Solutions",
     poolDescription: "即使今天没有看到合适的职位，也可以留下简历。Trading Solutions 会为未来的职位保留你的资料。",
     closedTitle: "此职位已关闭 — Trading Solutions",

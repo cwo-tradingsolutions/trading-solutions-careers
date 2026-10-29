@@ -245,18 +245,30 @@ html[lang="zh-CN"] .ts-x h1,
   color: #5c5c56;
   opacity: 1;
 }
-.ts-x .field .err {
+.ts-x .field,
+.ts-x .check,
+.ts-x .field input,
+.ts-x .field textarea,
+.ts-x .field select,
+.ts-x .check input {
+  scroll-margin-top: 96px;
+}
+.ts-x .err {
   color: #a52a2a;
   font-size: 12.5px;
   line-height: 1.4;
+}
+.ts-x .check + .err {
+  display: block;
+  margin-top: 6px;
+}
+.ts-x .form-success h2 {
+  margin-bottom: 12px;
 }
 .ts-x .field input[aria-invalid="true"],
 .ts-x .field textarea[aria-invalid="true"],
 .ts-x .field select[aria-invalid="true"] {
   border-color: #a52a2a;
-}
-.ts-x .check[data-invalid="true"] {
-  color: #a52a2a;
 }
 .ts-x .form-status.gap {
   color: var(--ink);
