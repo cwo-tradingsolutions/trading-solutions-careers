@@ -141,9 +141,8 @@ export default function FunnelDashboard({
   return (
     <div className="pb-8">
       <p className="text-[13px] text-[var(--ts-muted)] max-w-[720px] mb-4">
-        Cohorte de aplicación (<span className="text-[var(--ts-ink)]">created_at</span>).
+        Cohorte de aplicación para conversión y canal. TTH por fecha de contratación. Offer por fecha de oferta.
         TTF usa <span className="text-[var(--ts-ink)]">hire_date</span>.
-        La oferta usa el primer evento en gate ≥10.
         El filtro de etapa no mueve el embudo: solo el SLA, la tabla y el drill.
       </p>
 
@@ -223,7 +222,7 @@ export default function FunnelDashboard({
               hint={data.kpis.open.agingInsufficient
                 ? `aging ${MUESTRA} (n=${data.kpis.open.agingN}) · ${data.kpis.open.sinHito} ${SIN_HITO}`
                 : `aging mediana ${fmtDays(data.kpis.open.agingMedian)} · target ${data.kpis.open.target ?? "sin target"} d · ${data.kpis.open.sinHito} ${SIN_HITO}`}
-              value={data.kpis.open.insufficient ? MUESTRA : String(data.kpis.open.value ?? "—")}
+              value={String(data.kpis.open.value ?? 0)}
               n={data.kpis.open.n}
               delta={fmtDelta(data.kpis.open.delta, "count")}
             />
