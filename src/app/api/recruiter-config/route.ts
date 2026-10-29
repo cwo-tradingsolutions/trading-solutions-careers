@@ -12,6 +12,7 @@
 import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
+import { previewLibraryBlocked } from "@/lib/preview-readonly";
 
 export const runtime = "nodejs";
 
@@ -26,6 +27,7 @@ export async function OPTIONS() {
 }
 
 async function ensureTable() {
+  if (previewLibraryBlocked()) return;
   const sql = neon(process.env.DATABASE_URL!);
   await sql`
     CREATE TABLE IF NOT EXISTS recruiter_config (

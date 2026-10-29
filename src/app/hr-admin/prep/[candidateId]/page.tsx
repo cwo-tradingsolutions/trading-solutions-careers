@@ -80,7 +80,7 @@ export default function InterviewPrepPage() {
       `}</style>
 
       {/* Toolbar (no print) */}
-      <div className="no-print sticky top-0 z-10 bg-black text-white px-6 py-3 flex items-center justify-between">
+      <div className="no-print sticky top-10 z-10 bg-black text-white px-6 py-3 flex items-center justify-between">
         <div className="text-[10px] uppercase tracking-[2.5px] font-bold opacity-80">
           {isCWOMode ? "CWO Handoff" : "Interview Prep"} · {c.name}
         </div>

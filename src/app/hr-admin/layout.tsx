@@ -9,7 +9,10 @@ export const metadata: Metadata = {
 export default function HRAdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <div data-ui="universe" className="min-h-screen bg-ts-canvas text-ts-ink">
-      {children}
+      <div className="fixed top-0 inset-x-0 z-[60] h-10 flex items-center justify-center bg-amber-400 px-4 text-center text-[13px] font-semibold text-black shadow-sm">
+        Preview solo lectura — los cambios no se guardan
+      </div>
+      <div className="pt-10">{children}</div>
     </div>
   );
 }

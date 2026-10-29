@@ -31,9 +31,12 @@ export async function GET(req: NextRequest) {
     const days = url.searchParams.get("days");
     const limit = Math.min(50, Number(url.searchParams.get("limit") || 25));
 
+    // Producción no tiene current_role ni overall_score (sí current_job_role).
+    // Seleccionar las columnas que no existen hace que PostgREST responda 500
+    // y Buscar / Agendar queden vacíos. Este preview lee el nombre que sí está.
     let query = supabaseAdmin
       .from("ht_candidates")
-      .select("id, name, email, phone, current_role, vacancy_id, stage, status, overall_score, created_at, updated_at, ht_vacancies(title, area)")
+      .select("id, name, email, phone, current_job_role, vacancy_id, stage, status, created_at, updated_at, ht_vacancies(title, area)")
       .not("email", "ilike", "%@tradingsolutions.com")
       .order("updated_at", { ascending: false })
       .limit(limit);
@@ -42,14 +45,15 @@ export async function GET(req: NextRequest) {
       // OR across name/email/current_role
       const safe = q.replace(/[%_]/g, '');
       query = query.or(
-        `name.ilike.%${safe}%,email.ilike.%${safe}%,current_role.ilike.%${safe}%`
+        `name.ilike.%${safe}%,email.ilike.%${safe}%,current_job_role.ilike.%${safe}%`
       );
     }
     if (vacancyId) query = query.eq("vacancy_id", vacancyId);
     if (stage) query = query.eq("stage", stage);
     if (status) query = query.eq("status", status);
-    if (minScore) query = query.gte("overall_score", Number(minScore));
-    if (maxScore) query = query.lte("overall_score", Number(maxScore));
+    // overall_score no existe en producción. Filtrar por él tumba la consulta.
+    void minScore;
+    void maxScore;
     if (days) {
       const since = new Date();
       since.setDate(since.getDate() - Number(days));
@@ -64,13 +68,13 @@ export async function GET(req: NextRequest) {
       name: c.name,
       email: c.email,
       phone: c.phone,
-      current_role: c.current_role,
+      current_role: c.current_job_role,
       vacancy_id: c.vacancy_id,
       vacancy_title: c.ht_vacancies?.title || null,
       vacancy_area: c.ht_vacancies?.area || null,
       stage: c.stage,
       status: c.status,
-      overall_score: c.overall_score,
+      overall_score: null,
       created_at: c.created_at,
       updated_at: c.updated_at,
     }));

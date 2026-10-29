@@ -34,6 +34,7 @@ export async function OPTIONS() {
 }
 
 async function ensureTables() {
+  if (process.env.PREVIEW_READ_ONLY !== "0") return;
   const sql = neon(process.env.DATABASE_URL!);
   await sql`
     CREATE TABLE IF NOT EXISTS assessment_preview_runs (
