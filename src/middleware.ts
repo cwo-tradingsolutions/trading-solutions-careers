@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { previewReadOnlyBlock } from '@/lib/preview-readonly';
 
 /**
  * Middleware combinado:
@@ -43,6 +44,12 @@ async function isValidSession(token: string | undefined, secret: string | undefi
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Preview de Vercel puede apuntar a la base de producción. Ahí no se escribe.
+  const blocked = previewReadOnlyBlock(process.env.VERCEL_ENV, request.method, pathname);
+  if (blocked) {
+    return NextResponse.json(blocked, { status: 403 });
+  }
 
   // ---------- 1) Protección de /hr-admin ----------
   if (pathname.startsWith('/hr-admin')) {

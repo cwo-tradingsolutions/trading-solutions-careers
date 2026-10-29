@@ -13,7 +13,8 @@ import JointSchedulingModal from "./JointSchedulingModal";
 import CandidateFilesBlock from "./CandidateFilesBlock";
 import EvaluacionPanel from "./EvaluacionPanel";
 import { rubricaDeVacante } from "@/lib/rubricas";
-import { escucharPedidos, tomarPedidoDeCandidato } from "@/lib/abrirCandidato";
+import { escucharPedidos, pedirAbrirCandidato, tomarPedidoDeCandidato } from "@/lib/abrirCandidato";
+import FunnelDashboard from "@/components/FunnelDashboard";
 import HistorialContactos from "@/components/HistorialContactos";
 import SeguimientoVacante from "@/components/SeguimientoVacante";
 
@@ -309,6 +310,7 @@ export default function PipelineFunnel({
   /** Abre el rediscovery HT de la vacante filtrada. Opcional: el dashboard ya lo tiene en la card. */
   onBuscarBanco?: (vacancy: { id: string; title: string }) => void;
 } = {}) {
+  const [vista, setVista] = useState<"pipeline" | "dashboard">("pipeline");
   const [candidates, setCandidates] = useState<Cand[]>([]);
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
   /** El equipo de Talent. Si la tabla todavía no existe, queda vacío y el
@@ -600,6 +602,22 @@ export default function PipelineFunnel({
             <h1 className="ts-display text-[44px] md:text-[56px] text-[var(--ts-black)] m-0">
               Funnel
             </h1>
+            <div className="mt-3 inline-flex rounded-full border border-[color:var(--ts-line)] bg-white p-0.5">
+              <button
+                type="button"
+                onClick={() => setVista("pipeline")}
+                className={`rounded-full px-4 py-1 text-[13px] ${vista === "pipeline" ? "bg-[var(--ts-ink)] text-white" : "text-[var(--ts-ink)]"}`}
+              >
+                Pipeline
+              </button>
+              <button
+                type="button"
+                onClick={() => setVista("dashboard")}
+                className={`rounded-full px-4 py-1 text-[13px] ${vista === "dashboard" ? "bg-[var(--ts-ink)] text-white" : "text-[var(--ts-ink)]"}`}
+              >
+                Dashboard
+              </button>
+            </div>
             <p className="text-[15px] text-[var(--ts-gray-60)] mt-3 max-w-[640px] leading-[1.55]">
               Vista del proceso completo · {totals} candidatos
               {vacFilter !== "all" && <span className="text-[var(--ts-black)] font-semibold"> · filtro activo</span>}
@@ -787,6 +805,15 @@ export default function PipelineFunnel({
         </div>
       </div>
 
+      {vista === "dashboard" ? (
+        <FunnelDashboard
+          onOpenCandidate={(id) => {
+            pedirAbrirCandidato(id);
+            setVista("pipeline");
+          }}
+        />
+      ) : (
+      <>
       {/* Seguimiento de contactos de la vacante elegida: quién espera
           respuesta nuestra y quién no tiene ningún contacto. */}
       {vacFilter !== "all" && (
@@ -958,6 +985,8 @@ export default function PipelineFunnel({
           />
           {/* end rechazados */}
         </>
+      )}
+      </>
       )}
 
       {/* Side panel con detalles del candidato */}
