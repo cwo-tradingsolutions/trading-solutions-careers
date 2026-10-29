@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 
 // Node.js runtime para aceptar bodies grandes (CV base64 puede ser hasta ~7MB)
 export const runtime = "nodejs";
@@ -20,6 +21,10 @@ export async function POST(req: NextRequest) {
     }
     if (!body.referrer_name || !String(body.referrer_name).trim()) {
       return NextResponse.json({ error: "Tu nombre es obligatorio" }, { status: 400 });
+    }
+
+    if (isPreviewTestMode()) {
+      return previewTestJson("POST /api/referrals");
     }
 
     // Anti-spam mínimo: rate limit por IP (1 referral por minuto)
