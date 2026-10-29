@@ -31,6 +31,7 @@ import {
   REJECTION_REPLY_TO,
 } from "@/lib/rejection-email";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
+import { validarRechazo } from "@/lib/rejection-rules";
 
 
 export const runtime = "nodejs";
@@ -54,11 +55,18 @@ export async function POST(
     const createDraft: boolean = body.create_rejection_draft !== false;
     const rejectedBy: string = String(body.rejected_by || "kelly").trim();
 
-    if (!categoryKey) {
-      return NextResponse.json({ error: "category_key requerido" }, { status: 400 });
+    const rechazo = validarRechazo({
+      category_key: categoryKey,
+      note: notePrivate || notePublic,
+    });
+    if (!rechazo.ok) {
+      return NextResponse.json({ error: rechazo.error }, { status: 400 });
     }
     if (!subDetailKey) {
-      return NextResponse.json({ error: "sub_detail_key requerido" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Elegí el detalle de la categoría de rechazo." },
+        { status: 400 },
+      );
     }
 
     // Validar que category + sub_detail existan en el catálogo
@@ -70,7 +78,10 @@ export async function POST(
       .maybeSingle();
 
     if (!category) {
-      return NextResponse.json({ error: "Categoría no encontrada o inactiva" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Esa categoría de rechazo no existe o está inactiva." },
+        { status: 400 },
+      );
     }
 
     const subDetailValid = (category.sub_details as any[]).some(
@@ -78,7 +89,7 @@ export async function POST(
     );
     if (!subDetailValid) {
       return NextResponse.json({
-        error: "sub_detail_key no pertenece a esta categoría",
+        error: "El detalle no pertenece a esta categoría de rechazo.",
         available: (category.sub_details as any[]).map((sd: any) => sd.key),
       }, { status: 400 });
     }

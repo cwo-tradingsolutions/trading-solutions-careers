@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase';
+import { validarCanalReclutador } from '@/lib/candidate-source';
 
 // GET /api/headhunting/candidates?vacancy_id=xxx&client_id=xxx
 export async function GET(req: NextRequest) {
@@ -53,6 +54,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const canal = validarCanalReclutador(body.source);
+    if (!canal.ok) {
+      return NextResponse.json({ error: canal.error }, { status: 400 });
+    }
+
     // Check for duplicate email in same vacancy
     const { data: existing } = await supabaseAdmin
       .from('ht_candidates')
@@ -78,6 +84,8 @@ export async function POST(req: NextRequest) {
         phone: phone || null,
         cv_url: cv_url || null,
         status: 'pending',
+        source: canal.source,
+        stage: 'aplico',
       })
       .select()
       .single();

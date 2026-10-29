@@ -16,6 +16,8 @@ import { rubricaDeVacante } from "@/lib/rubricas";
 import { escucharPedidos, tomarPedidoDeCandidato } from "@/lib/abrirCandidato";
 import HistorialContactos from "@/components/HistorialContactos";
 import SeguimientoVacante from "@/components/SeguimientoVacante";
+import { CanalSelect, errorCanal } from "@/components/CamposObligatorios";
+import { etiquetaCanal } from "@/lib/candidate-source";
 
 // Map de stage → icono Lucide. Centralizado para reutilizar en cualquier render.
 const STAGE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -378,6 +380,7 @@ export default function PipelineFunnel({
     [vacantesVisibles, verCerradas, vacFilter],
   );
   const [loading, setLoading] = useState(true);
+  const [agregar, setAgregar] = useState(false);
   const [selectedCand, setSelectedCand] = useState<Cand | null>(null);
   // Quiénes escribieron y esperan respuesta nuestra · lo llena el panel de
   // seguimiento y se marca en las tarjetas.
@@ -681,6 +684,14 @@ export default function PipelineFunnel({
                 <option value="web">Aplicaron por la web</option>
               </select>
             </div>
+            <button
+              type="button"
+              onClick={() => setAgregar(true)}
+              className="text-xs font-bold px-3 py-2.5 bg-black text-white"
+              style={{ borderRadius: 0 }}
+            >
+              Agregar candidato
+            </button>
             <span className="ts-eyebrow text-[10px]">Vacante</span>
             <div className="flex items-center gap-2">
               <select
@@ -918,6 +929,11 @@ export default function PipelineFunnel({
                               <div className="mt-2 inline-block ts-eyebrow text-[9px] tracking-[1.5px] text-[var(--ts-gray-90)] border border-[var(--ts-gray-20)] px-1.5 py-0.5">
                                 {c.ht_vacancies?.title || "—"}
                               </div>
+                              {!c.source && (
+                                <div className="mt-1.5 inline-block ts-eyebrow text-[9px] tracking-[1.5px] text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5">
+                                  Sin canal
+                                </div>
+                              )}
                               {c.source === "cv_proceso_anterior" && (
                                 <div
                                   className="mt-1.5 inline-block ts-eyebrow text-[9px] tracking-[1.5px] text-[var(--ts-gray-60)] bg-[var(--ts-gray-10)] px-1.5 py-0.5"
@@ -980,6 +996,84 @@ export default function PipelineFunnel({
 
       {/* Side panel con detalles del candidato */}
       {selectedCand && <CandDetailPanel cand={selectedCand} onClose={() => setSelectedCand(null)} onChanged={() => { void load(); }} />}
+      {agregar && (
+        <AgregarCandidato
+          vacantes={vacancies.filter((v) => v.status == null || v.status === "open")}
+          onClose={() => setAgregar(false)}
+          onCreado={() => { setAgregar(false); void load(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AgregarCandidato({
+  vacantes,
+  onClose,
+  onCreado,
+}: {
+  vacantes: { id: string; title: string }[];
+  onClose: () => void;
+  onCreado: () => void;
+}) {
+  const [nombre, setNombre] = useState("");
+  const [email, setEmail] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [vacante, setVacante] = useState(vacantes[0]?.id || "");
+  const [canal, setCanal] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-6" onClick={onClose}>
+      <form
+        className="bg-white w-full max-w-lg p-5 space-y-3"
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const canalError = errorCanal(canal);
+          if (!nombre.trim() || !email.trim() || !vacante) { setMsg("Nombre, email y vacante son obligatorios."); return; }
+          if (canalError) { setMsg(canalError); return; }
+          setBusy(true);
+          setMsg(null);
+          try {
+            const r = await fetch("/api/headhunting/candidates", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                client_id: TS_CLIENT_ID,
+                vacancy_id: vacante,
+                name: nombre.trim(),
+                email: email.trim(),
+                phone: telefono.trim() || null,
+                source: canal,
+              }),
+            });
+            const j = await r.json().catch(() => ({}));
+            if (!r.ok) { setMsg(j.error || "No se pudo crear el candidato."); return; }
+            onCreado();
+          } catch (err: any) {
+            setMsg(err?.message || "Error de red.");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <h2 className="text-lg font-bold">Agregar candidato</h2>
+        <input className="w-full border border-gray-300 px-3 py-2 text-sm" placeholder="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+        <input className="w-full border border-gray-300 px-3 py-2 text-sm" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input className="w-full border border-gray-300 px-3 py-2 text-sm" placeholder="Teléfono (opcional)" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+        <select className="w-full border border-gray-300 px-3 py-2 text-sm bg-white" value={vacante} onChange={(e) => setVacante(e.target.value)}>
+          {vacantes.map((v) => <option key={v.id} value={v.id}>{v.title}</option>)}
+        </select>
+        <CanalSelect value={canal} onChange={setCanal} />
+        {msg && <div className="text-sm text-red-700">{msg}</div>}
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="text-sm px-3 py-2">Cancelar</button>
+          <button type="submit" disabled={busy} className="text-sm font-bold px-4 py-2 bg-black text-white disabled:opacity-50">
+            {busy ? "Guardando…" : "Crear"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -1840,7 +1934,7 @@ function RejectedColumn({
         <div className="space-y-1.5 max-h-[280px] overflow-y-auto">
           {visibleCands.map(c => {
             const isSelected = selectedIds.has(c.id);
-            const catShort = c.rejection_category ? REJECTION_CATEGORY_SHORT[c.rejection_category] : null;
+            const catShort = c.rejection_category ? (REJECTION_CATEGORY_SHORT[c.rejection_category] || c.rejection_category) : "Sin motivo";
             return (
               <div
                 key={c.id}
@@ -1861,11 +1955,9 @@ function RejectedColumn({
                     )}
                   </div>
                   <div className="text-[10px] text-[var(--ts-gray-60)] mt-0.5">{c.ht_vacancies?.title || '—'}</div>
-                  {catShort && (
-                    <div className="text-[9px] uppercase tracking-[1px] text-[var(--ts-red)] mt-1 font-bold">
-                      {catShort}
-                    </div>
-                  )}
+                  <div className="text-[9px] uppercase tracking-[1px] text-[var(--ts-red)] mt-1 font-bold">
+                    {catShort}
+                  </div>
                 </button>
 
                 {/* Correo de rechazo · queda en borrador para enviarlo desde Gmail */}
@@ -1919,6 +2011,8 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string>("");
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [canal, setCanal] = useState(cand.source || "");
+  const [canalMsg, setCanalMsg] = useState<string | null>(null);
   const [showJointScheduling, setShowJointScheduling] = useState(false);
   const currentStage = cand.stage || "aplico";
   const nextStage = siguienteDelBoton(currentStage);
@@ -2220,6 +2314,32 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
           </Section>
 
           {/* Estado */}
+          <Section title="Canal">
+            <div className="text-[11px] text-gray-500 mb-2">{cand.source ? etiquetaCanal(cand.source) : "Sin canal"}</div>
+            <CanalSelect value={canal} onChange={setCanal} />
+            <button
+              type="button"
+              className="mt-2 text-xs font-bold px-3 py-1.5 bg-black text-white"
+              onClick={async () => {
+                const err = errorCanal(canal);
+                if (err) { setCanalMsg(err); return; }
+                setCanalMsg(null);
+                const r = await fetch(`/api/headhunting/candidates/${cand.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ source: canal, exigir_canal: true }),
+                });
+                const j = await r.json().catch(() => ({}));
+                if (!r.ok) { setCanalMsg(j.error || "No se guardó el canal."); return; }
+                setCanalMsg("Canal guardado.");
+                onChanged?.();
+              }}
+            >
+              Guardar canal
+            </button>
+            {canalMsg && <div className="text-xs mt-1 text-gray-700">{canalMsg}</div>}
+          </Section>
+
           <Section title="Estado actual">
             <Row k="Stage" v={<span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{cand.stage || "aplico"}</span>} />
             <Row k="Status Integridad" v={cand.status} />
@@ -2242,8 +2362,10 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
           </Section>
 
           {/* Motivo de rechazo · solo si ya está clasificado */}
-          {cand.stage === "rechazado" && cand.rejection_category && (
-            <RejectionDetailBlock cand={cand} />
+          {cand.stage === "rechazado" && (
+            cand.rejection_category
+              ? <RejectionDetailBlock cand={cand} />
+              : <Section title="Motivo"><div className="text-sm text-amber-800">Sin motivo</div></Section>
           )}
 
           {/* Elevare results — solo si ya hizo el assessment */}

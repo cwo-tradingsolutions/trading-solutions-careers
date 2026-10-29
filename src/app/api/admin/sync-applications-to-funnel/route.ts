@@ -112,7 +112,9 @@ export async function POST(req: NextRequest) {
             email,
             phone: app.phone || null,
             stage: "aplico",
-            source: "public_form",
+            source: String(app.email || "").toLowerCase().endsWith("@tradingsolutions.com")
+              ? "public_form_internal"
+              : "public_form",
             notes: app.why_ts ? `[Public form] ${app.why_ts}` : `[Public form] · application_id=${app.id}`,
             created_at: app.created_at,
             updated_at: new Date().toISOString(),

@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { fechaIso } from "@/lib/vacancy-dates";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -177,8 +178,10 @@ export async function GET(req: NextRequest) {
           linkedin_active_date: m.linkedin_active_date,
           vacancy_started_date: m.vacancy_started_date,
           hire_date: m.hire_date,
+          target_fill_date: m.target_fill_date ?? null,
           notes: m.notes,
         },
+        fechas_faltantes: !fechaIso(m.hr_request_date) || !fechaIso(m.target_fill_date),
         metrics: {
           days_active: daysActive,
           target_days: target,

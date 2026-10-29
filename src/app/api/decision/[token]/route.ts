@@ -7,6 +7,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { recordStageEvent } from "@/lib/stage-events";
+import { validarRechazo } from "@/lib/rejection-rules";
+import { normalizeStage } from "@/lib/stage-labels";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -164,10 +166,23 @@ export async function POST(
         });
       }
     } else if (body.decision === 'no_avanza') {
-      // Marcar rechazado automáticamente
+      const rechazo = validarRechazo({
+        category_key: body.category_key,
+        note: body.reasoning,
+      });
+      if (!rechazo.ok) {
+        return NextResponse.json({ error: rechazo.error }, { status: 400 });
+      }
       await supabaseAdmin
         .from("ht_candidates")
-        .update({ stage: 'rechazado', status: 'rejected', updated_at: new Date().toISOString() })
+        .update({
+          stage: 'rechazado',
+          status: 'rejected',
+          rejection_category: rechazo.category_key,
+          rejection_note_private: rechazo.note,
+          rejected_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", existing.candidate_id);
       stageUpdated = true;
       await recordStageEvent({
@@ -181,6 +196,12 @@ export async function POST(
     } else if (body.decision === 'recommend_other_vacancy' && body.recommended_vacancy_id && body.move_now) {
       // Mover candidato a la otra vacante en stage aplico (o el que indique target_stage)
       const movedToStage = body.target_stage || 'aplico';
+      if (normalizeStage(movedToStage) === 'rechazado') {
+        return NextResponse.json(
+          { error: "Para rechazar hay que elegir «No avanza» e indicar la categoría." },
+          { status: 400 },
+        );
+      }
       await supabaseAdmin
         .from("ht_candidates")
         .update({
