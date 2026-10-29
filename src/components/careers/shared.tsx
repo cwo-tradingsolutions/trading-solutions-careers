@@ -133,6 +133,45 @@ export function splitFreedom(desc: string): [string, string] {
  * Accept a LinkedIn profile however it was copied and turn it into a usable URL.
  * The field stays type=text so "linkedin.com/in/perfil" is not rejected by the browser.
  */
+const SALARY_ES: Record<string, string> = {
+  "Competitive (USD)": "Competitiva (USD)",
+  Competitive: "Competitiva",
+  Negotiable: "A convenir",
+};
+
+/** Known compensation phrases are chrome. Other ranges stay as published. */
+export function displaySalary(salary: string, locale: Locale): string {
+  const trimmed = salary.trim();
+  if (locale === "es" && SALARY_ES[trimmed]) return SALARY_ES[trimmed];
+  return salary;
+}
+
+const SPANISH_MARKERS = new Set([
+  "de", "la", "el", "que", "en", "los", "las", "para", "con", "una", "por", "del", "al", "su", "se", "un", "y", "como", "más", "esta", "este",
+]);
+
+export function looksSpanish(text: string): boolean {
+  if (/[áéíóúñü¿¡]/i.test(text)) return true;
+  const words = text.toLowerCase().split(/[^a-záéíóúñü]+/).filter(Boolean);
+  if (words.length < 8) return false;
+  let hits = 0;
+  for (const word of words) if (SPANISH_MARKERS.has(word)) hits++;
+  return hits >= 4 && hits / words.length >= 0.08;
+}
+
+/** Spanish UI is showing an English job narrative, so the page should say so. */
+export function postingReadsEnglish(esText: string, enText: string): boolean {
+  const es = esText.trim();
+  const en = enText.trim();
+  if (!es && !en) return false;
+  if (es && en && es === en) return true;
+  return es.length > 0 && !looksSpanish(es);
+}
+
+export function linkedInShareHref(jobUrl: string): string {
+  return `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(jobUrl)}`;
+}
+
 export function normalizarLinkedin(valor: string): string {
   const v = (valor || "").trim().replace(/\s+/g, "");
   if (!v) return "";

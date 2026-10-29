@@ -58,8 +58,17 @@ html.ts-careers-root body {
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0) 32%, rgba(0, 0, 0, 0.1) 55%, rgba(0, 0, 0, 0.72) 100%);
 }
 @media (max-width: 640px) {
+  /* The two people sit at the edges of a wide photo. A 390px cover crop
+     has to pick one side; 96% frames the worker on the right. */
   .ts-x .cr-hero .bg img {
-    object-position: 62% 35%;
+    object-position: 96% center;
+  }
+  /* Bottom of the hero holds the eyebrow. Dark enough that white type stays at least 4.5:1 on the bright sky. */
+  .ts-x .cr-hero::before {
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.28) 0%, rgba(0, 0, 0, 0.62) 46%, rgba(0, 0, 0, 0.9) 100%);
+  }
+  .ts-x .cr-hero.v3-hero::after {
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.28) 62%, rgba(0, 0, 0, 0.08) 100%);
   }
 }
 

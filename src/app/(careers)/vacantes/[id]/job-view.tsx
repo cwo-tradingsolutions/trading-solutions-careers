@@ -7,7 +7,7 @@ import Frame from "@/components/careers/Frame";
 import JobRow from "@/components/careers/JobRow";
 import ApplyForm from "@/components/careers/ApplyForm";
 import { useOpenJobs } from "@/components/careers/useOpenJobs";
-import { departmentsFrom, siteLinks } from "@/components/careers/shared";
+import { departmentsFrom, displaySalary, linkedInShareHref, postingReadsEnglish, siteLinks } from "@/components/careers/shared";
 import { useLanguage } from "@/i18n/context";
 
 export default function JobView({ id }: { id: string }) {
@@ -16,13 +16,14 @@ export default function JobView({ id }: { id: string }) {
   const { t, locale } = useLanguage();
   const { jobs, loading } = useOpenJobs();
   const [showJump, setShowJump] = useState(true);
+  const [shareHref, setShareHref] = useState("");
   const isPool = id === "pool";
   const job = isPool ? undefined : jobs.find((j) => j.id === Number(id));
   const missing = !loading && !isPool && !job;
 
   useEffect(() => {
     if (isPool) {
-      document.title = locale === "es" ? "Base de talento — Trading Solutions" : "Talent pool — Trading Solutions Careers";
+      document.title = locale === "es" ? "Deja tu hoja de vida — Trading Solutions" : "Leave your CV — Trading Solutions Careers";
       return;
     }
     if (job) {
@@ -42,6 +43,12 @@ export default function JobView({ id }: { id: string }) {
   }, [isPool, job, missing, locale]);
 
   useEffect(() => {
+    if (!job) return;
+    const jobUrl = `${window.location.origin}/vacantes/${job.id}`;
+    setShareHref(linkedInShareHref(jobUrl));
+  }, [job]);
+
+  useEffect(() => {
     const el = document.getElementById("apply");
     if (!el) return;
     const io = new IntersectionObserver(([entry]) => setShowJump(!entry.isIntersecting), { threshold: 0.15 });
@@ -52,8 +59,7 @@ export default function JobView({ id }: { id: string }) {
   const deptName = (d: string) => (t.deptNames as Record<string, string>)[d] || d;
   const modeName = (m: string) => (t.modeNames as Record<string, string>)[m] || m;
   const others = job ? jobs.filter((j) => j.id !== job.id) : [];
-  const englishOnly =
-    !!job && locale === "es" && job.description.en.trim().length > 0 && job.description.es.trim() === job.description.en.trim();
+  const englishOnly = !!job && locale === "es" && postingReadsEnglish(job.description.es, job.description.en);
 
   return (
     <Frame>
@@ -88,7 +94,7 @@ export default function JobView({ id }: { id: string }) {
               </Link>
             </span>
             <div className="hero-co-grid">
-              <h1 className="display">{t.ui.poolTitle}</h1>
+              <h1 className="display">{t.ui.leaveCv}</h1>
             </div>
             <p className="lede">{t.ui.poolIntro}</p>
           </section>
@@ -134,7 +140,7 @@ export default function JobView({ id }: { id: string }) {
               {job.salary ? (
                 <div>
                   <dt>{t.ui.compensation}</dt>
-                  <dd>{job.salary}</dd>
+                  <dd>{displaySalary(job.salary, locale)}</dd>
                 </div>
               ) : null}
             </dl>
@@ -178,7 +184,7 @@ export default function JobView({ id }: { id: string }) {
               <ApplyForm mode="job" job={job} areas={departmentsFrom(jobs)} refCode={refCode} />
               <div className="cr-share">
                 <span>{t.ui.knowSomeone}</span>
-                <a href={siteLinks.linkedinJobs} target="_blank" rel="noopener">
+                <a href={shareHref || linkedInShareHref(`https://careers.tradingsolutions.com/vacantes/${job.id}`)} target="_blank" rel="noopener">
                   {t.ui.shareLinkedIn}
                 </a>
               </div>

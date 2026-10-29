@@ -66,7 +66,7 @@ export default function Frame({ children }: { children: ReactNode }) {
       });
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") nav.classList.remove("open");
+      if (e.key === "Escape") setOpen(false);
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });

@@ -152,8 +152,8 @@ export default function ApplyForm({
 
   return (
     <>
-      <h2>{t.jobs.applyBtn}</h2>
-      <p>{title}</p>
+      <h2>{mode === "pool" ? t.ui.leaveCv : t.jobs.applyBtn}</h2>
+      {mode === "job" ? <p>{title}</p> : null}
       <form data-form="Job application" noValidate onSubmit={onSubmit}>
         <input
           type="text"
@@ -300,7 +300,7 @@ export default function ApplyForm({
         </label>
         {errors.consent ? <span className="err">{errors.consent}</span> : null}
         <button type="submit" className="btn btn-blue" disabled={submitting}>
-          {submitting ? t.ui.sending : t.jobs.submit}
+          {submitting ? t.ui.sending : mode === "pool" ? t.ui.sendCv : t.jobs.submit}
         </button>
         {status ? (
           <p className={`form-status${status.gap ? " gap" : ""}`} role="status" aria-live="polite" data-ok={status.ok === false ? "0" : undefined}>
