@@ -67,7 +67,7 @@ export const ptBR = {
     button: "Ver todas as vagas"
   },
   footer: {
-    tagline: "Boutique freight forwarder. Movemos o que importa, com precisão e propósito.",
+    tagline: "Agente de cargas boutique. Movemos o que importa, com precisão e propósito.",
     services: "Serviços",
     company: "Empresa",
     companyAbout: "Sobre",
@@ -115,7 +115,7 @@ export const ptBR = {
     submit: "Enviar candidatura",
     cancel: "Cancelar",
     successTitle: "Candidatura enviada",
-    successMsg: "Obrigado pelo seu interesse na Trading Solutions. Nossa equipe vai revisar seu perfil e entrar em contato em breve.",
+    successMsg: "",
     backToJobsBtn: "Voltar às vagas"
   },
   deptNames: {

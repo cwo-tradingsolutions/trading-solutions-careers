@@ -134,7 +134,9 @@ export default function JobView({ id, previewTestMode = false }: { id: string; p
                 <dd>{modeName(job.mode)}</dd>
               </div>
               <div>
-                <dt>{t.ui.level}</dt>
+                {displayLevel(job.level, locale).toLowerCase().startsWith(t.ui.level.toLowerCase()) ? null : (
+                  <dt>{t.ui.level}</dt>
+                )}
                 <dd>{displayLevel(job.level, locale)}</dd>
               </div>
               {job.salary ? (

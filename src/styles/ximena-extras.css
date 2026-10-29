@@ -27,6 +27,13 @@ html[lang="zh-CN"] .ts-x h1,
   line-height: 1.3;
   font-family: "Open Sauce Two", "Noto Sans SC", Inter, sans-serif;
 }
+@media (max-width: 360px) {
+  .ts-preview-banner {
+    padding: 8px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+}
 
 .ts-lang {
   position: relative;

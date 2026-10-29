@@ -72,7 +72,7 @@ export const translations = {
       button: "Ver todas las vacantes"
     },
     footer: {
-      tagline: "Boutique freight forwarder. Movemos lo que importa, con precisión y propósito.",
+      tagline: "Agente de carga boutique. Movemos lo que importa, con precisión y propósito.",
       services: "Servicios",
       company: "Compañía",
       companyAbout: "Nosotros",
@@ -120,7 +120,7 @@ export const translations = {
       submit: "Enviar postulación",
       cancel: "Cancelar",
       successTitle: "Postulación enviada",
-      successMsg: "Gracias por tu interés en Trading Solutions. Nuestro equipo revisará tu perfil y te contactaremos pronto.",
+      successMsg: "",
       backToJobsBtn: "Volver a vacantes"
     },
     deptNames: {
@@ -411,7 +411,7 @@ export const translations = {
       positionClosedBody: "This link no longer has an open role. See current openings or leave your CV with the talent pool.",
       englishPosting: "Published in English",
       language: "Language",
-      previewTestBanner: "Test mode — submissions are not saved or sent",
+      previewTestBanner: "Test mode: not saved or sent",
       previewTestSuccess: "Test submission sent (not saved)",
       poolSuccessTitle: "CV received",
       loading: "Loading...",

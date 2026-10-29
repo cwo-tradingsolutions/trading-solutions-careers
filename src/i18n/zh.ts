@@ -101,7 +101,7 @@ export const zhCN = {
     fullName: "姓名",
     fullNamePlaceholder: "你的姓名",
     email: "电子邮箱",
-    emailPlaceholder: "你的名字@email.com",
+    emailPlaceholder: "name@email.com",
     phone: "电话",
     phonePlaceholder: "+1 (555) 000-0000",
     linkedin: "LinkedIn",
