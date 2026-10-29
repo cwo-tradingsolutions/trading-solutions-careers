@@ -3425,7 +3425,7 @@ function Vacantes() {
 
 function SettingsModal({ onClose }: { onClose: () => void }) {
   const [config, setConfig] = useState<{ email_from: string; email_bcc: string; email_reply_to: string; booking_url: string; resend_domain_status: string } | null>(null);
-  const [gmailStatus, setGmailStatus] = useState<{ connected: boolean; email?: string } | null>(null);
+  const [gmailStatus, setGmailStatus] = useState<{ connected: boolean; email?: string; environment?: string; connect_label?: string } | null>(null);
   const [bookingDraft, setBookingDraft] = useState('');
   const [bccDraft, setBccDraft] = useState('');
   const [replyToDraft, setReplyToDraft] = useState('');
@@ -3448,7 +3448,11 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
   async function disconnectGmail() {
     if (!confirm('¿Desconectar Gmail? Los próximos correos volverán a salir desde Resend (Elevare default).')) return;
     await fetch('/api/google/disconnect', { method: 'POST' });
-    setGmailStatus({ connected: false });
+    setGmailStatus((prev) => ({
+      connected: false,
+      environment: prev?.environment,
+      connect_label: prev?.connect_label,
+    }));
   }
 
   async function save() {
@@ -3482,7 +3486,9 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
               <div>
                 <div className="text-xs uppercase font-semibold tracking-wider text-gray-700">Gmail · Conexión directa (recomendado)</div>
                 <div className="text-sm font-bold mt-1">
-                  {gmailStatus?.connected ? `✓ Conectado como ${gmailStatus.email}` : '⚠ No conectado'}
+                  {gmailStatus?.connected
+                    ? `✓ Conectado como ${gmailStatus.email}`
+                    : gmailStatus?.connect_label || '⚠ No conectado'}
                 </div>
               </div>
               {gmailStatus?.connected ? (
@@ -3494,7 +3500,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
                   href="/api/google/auth"
                   className="text-xs px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 font-semibold"
                 >
-                  Conectar Gmail
+                  {gmailStatus?.connect_label || 'Conectar Gmail'}
                 </a>
               )}
             </div>
@@ -3503,6 +3509,11 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
                 <>
                   Los correos del ATS salen <strong>desde tu cuenta {gmailStatus.email}</strong> directamente, con tu firma y branding TS.
                   Cada email queda en tu carpeta <strong>Enviados</strong> de Gmail. Reply-To y BCC funcionan sobre tu cuenta real.
+                </>
+              ) : gmailStatus?.connect_label ? (
+                <>
+                  Este preview no usa la conexión de Google de producción. {gmailStatus.connect_label} guarda un token aparte.
+                  Hasta entonces Gmail y Calendar de este preview quedan apagados.
                 </>
               ) : (
                 <>

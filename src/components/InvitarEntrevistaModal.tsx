@@ -36,7 +36,7 @@ type LoadState = {
   wellness_exists: boolean;
   table_ready: boolean;
   candidate_tz: string | null;
-  google: { connected: boolean; calendar_scope_ok: boolean; email?: string };
+  google: { connected: boolean; calendar_scope_ok: boolean; email?: string; connect_label?: string };
   preview: { active: boolean; allowlist_configured: boolean; allowlist_expected?: string };
   defaults: {
     tz: string;
@@ -134,7 +134,8 @@ export function InvitarEntrevistaModal({
   }
 
   const hmBlocked = round === "hm" && load != null && !load.wellness_exists;
-  const needsReconnect = load != null && !load.google.calendar_scope_ok;
+  const previewConnectLabel = load && !load.google.connected ? load.google.connect_label : undefined;
+  const needsReconnect = load != null && !load.google.calendar_scope_ok && !previewConnectLabel;
 
   async function submit() {
     if (fixture) return;
@@ -193,6 +194,15 @@ export function InvitarEntrevistaModal({
       <div className={embedded ? "p-5 space-y-4" : "p-5 space-y-4 max-h-[78vh] overflow-y-auto"}>
         {loadError && <div className="bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700">{loadError}</div>}
         {!load && !loadError && <div className="text-xs text-gray-500">Cargando…</div>}
+
+        {previewConnectLabel && (
+          <a
+            href={RECONNECT_CALENDAR_PATH}
+            className="block bg-amber-50 border border-amber-300 text-amber-950 rounded-lg px-3 py-2 text-sm font-semibold"
+          >
+            {previewConnectLabel}
+          </a>
+        )}
 
         {load && needsReconnect && (
           <a

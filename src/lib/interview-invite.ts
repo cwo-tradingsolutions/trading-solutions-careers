@@ -7,6 +7,10 @@
  */
 import { ATS_FROM_NAME } from "./ats-from";
 import { isChinaProcess, resolveCandidateLang, type CandidateLang } from "./candidate-lang";
+import {
+  PREVIEW_GOOGLE_CONNECT_LABEL,
+  type GoogleOAuthEnvironment,
+} from "./google-oauth-env";
 
 export const INTERVIEW_FROM_EMAIL = "jointheteam@tradingsolutions.com";
 export const DEFAULT_TZ = "America/Bogota";
@@ -27,6 +31,29 @@ export const PREVIEW_ALLOWLIST = [
 
 export const RECONNECT_CALENDAR_LABEL = "Reconectar Google (falta permiso de Calendar)";
 export const RECONNECT_CALENDAR_PATH = "/api/google/auth";
+
+export { PREVIEW_GOOGLE_CONNECT_LABEL };
+
+/**
+ * Banner de Google en la invitación.
+ * Preview sin token propio: "Conecta Google para preview".
+ * Token presente sin calendar: el aviso de reconectar de siempre.
+ * Producción sin token sigue mostrando el aviso de Calendar (igual que antes,
+ * porque calendar_scope_ok queda en false).
+ */
+export function googleReconnectBanner(input: {
+  environment: GoogleOAuthEnvironment;
+  connected: boolean;
+  calendarScopeOk: boolean;
+}): { label: string; href: string } | null {
+  if (input.environment === "preview" && !input.connected) {
+    return { label: PREVIEW_GOOGLE_CONNECT_LABEL, href: RECONNECT_CALENDAR_PATH };
+  }
+  if (!input.calendarScopeOk) {
+    return { label: RECONNECT_CALENDAR_LABEL, href: RECONNECT_CALENDAR_PATH };
+  }
+  return null;
+}
 
 export type InterviewRound = "wellness" | "hm";
 

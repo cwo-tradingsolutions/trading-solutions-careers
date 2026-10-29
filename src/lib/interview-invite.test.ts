@@ -7,7 +7,9 @@ import {
   buildInviteArtifacts,
   buildMeetEventPayload,
   decideDelivery,
+  googleReconnectBanner,
   interviewFromHeader,
+  PREVIEW_GOOGLE_CONNECT_LABEL,
   renderInterviewEmail,
   validateInviteForm,
   zonedWallTimeToUtc,
@@ -212,6 +214,22 @@ test("the form requires date, time, timezone, duration and interviewer", () => {
   assert.match(formError({ ...base, duration_min: "" }), /duración/i);
   assert.match(formError({ ...base, interviewer_name: "  " }), /entrevistador/i);
   assert.match(formError({ ...base, interviewer_email: "" }), /correo del entrevistador/i);
+});
+
+test("preview without its own token shows Conecta Google para preview and does not reuse the calendar reconnect", () => {
+  const banner = googleReconnectBanner({ environment: "preview", connected: false, calendarScopeOk: false });
+  assert.equal(banner?.label, PREVIEW_GOOGLE_CONNECT_LABEL);
+  assert.equal(banner?.label, "Conecta Google para preview");
+  assert.equal(banner?.href, "/api/google/auth");
+
+  const scoped = googleReconnectBanner({ environment: "preview", connected: true, calendarScopeOk: false });
+  assert.equal(scoped?.label, "Reconectar Google (falta permiso de Calendar)");
+
+  const ready = googleReconnectBanner({ environment: "preview", connected: true, calendarScopeOk: true });
+  assert.equal(ready, null);
+
+  const production = googleReconnectBanner({ environment: "production", connected: false, calendarScopeOk: false });
+  assert.equal(production?.label, "Reconectar Google (falta permiso de Calendar)");
 });
 
 test("calendar.events is requested and a gmail-only grant must reconnect", () => {

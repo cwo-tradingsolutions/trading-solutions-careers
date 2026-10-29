@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getStoredTokens, sendViaGmail } from "@/lib/gmail";
+import { googleOAuthEnvironment } from "@/lib/google-oauth-env";
 import { hasCalendarWriteScope } from "@/lib/google-scopes";
 import { insertInterviewEvent } from "@/lib/google-calendar";
 import { recordStageEvent } from "@/lib/stage-events";
@@ -37,6 +38,8 @@ import {
   normalizeEmail,
   RECONNECT_CALENDAR_LABEL,
   RECONNECT_CALENDAR_PATH,
+  googleReconnectBanner,
+  PREVIEW_GOOGLE_CONNECT_LABEL,
   resolveInviteLang,
   type PriorInterview,
   validateInviteForm,
@@ -73,17 +76,31 @@ async function loadPrior(candidateId: string): Promise<{ prior: PriorInterview[]
   return { prior: (data || []) as PriorInterview[], tableReady: true };
 }
 
-async function googleStatus(): Promise<{ connected: boolean; email?: string; calendar_scope_ok: boolean }> {
+async function googleStatus(): Promise<{
+  connected: boolean;
+  email?: string;
+  calendar_scope_ok: boolean;
+  environment: ReturnType<typeof googleOAuthEnvironment>;
+  connect_label?: string;
+}> {
+  const environment = googleOAuthEnvironment(process.env.VERCEL_ENV);
+  const disconnected = {
+    connected: false as const,
+    calendar_scope_ok: false as const,
+    environment,
+    ...(environment === "preview" ? { connect_label: PREVIEW_GOOGLE_CONNECT_LABEL } : {}),
+  };
   try {
     const tokens = await getStoredTokens();
-    if (!tokens) return { connected: false, calendar_scope_ok: false };
+    if (!tokens) return disconnected;
     return {
       connected: true,
       email: tokens.email,
       calendar_scope_ok: hasCalendarWriteScope(tokens.scope),
+      environment,
     };
   } catch {
-    return { connected: false, calendar_scope_ok: false };
+    return disconnected;
   }
 }
 
@@ -236,19 +253,31 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
       event: preview.event,
       meet_url: null,
       calendar_event_id: null,
-      reconnect: google.calendar_scope_ok ? null : { label: RECONNECT_CALENDAR_LABEL, href: RECONNECT_CALENDAR_PATH },
+      reconnect: googleReconnectBanner({
+        environment: google.environment,
+        connected: google.connected,
+        calendarScopeOk: google.calendar_scope_ok,
+      }),
       note: "Vista previa. No se envió correo, no se creó el evento y no se escribió la invitación: el correo del candidato no está en la lista de prueba.",
     });
   }
 
   if (!google.connected) {
+    const banner = googleReconnectBanner({
+      environment: google.environment,
+      connected: false,
+      calendarScopeOk: false,
+    });
     return NextResponse.json(
       {
         success: false,
         sent: false,
         action: "blocked_scope",
-        error: "Gmail no está conectado. Entrá a /api/google/auth con jointheteam@tradingsolutions.com.",
-        reconnect: { label: RECONNECT_CALENDAR_LABEL, href: RECONNECT_CALENDAR_PATH },
+        error:
+          google.environment === "preview"
+            ? PREVIEW_GOOGLE_CONNECT_LABEL
+            : "Gmail no está conectado. Entrá a /api/google/auth con jointheteam@tradingsolutions.com.",
+        reconnect: banner,
       },
       { status: 409 },
     );
