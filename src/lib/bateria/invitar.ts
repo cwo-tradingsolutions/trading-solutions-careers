@@ -9,7 +9,8 @@
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase';
 import { BATTERY_VERSION } from '@/lib/bateria/items';
-import { asuntoBateria, htmlBateria, textoBateria, asuntoBateriaEn, htmlBateriaEn, textoBateriaEn, FIRMA, FIRMA_EN } from '@/lib/bateria/correo';
+import { asuntoBateria, htmlBateria, textoBateria, asuntoBateriaEn, htmlBateriaEn, textoBateriaEn } from '@/lib/bateria/correo';
+import { ATS_FROM_NAME } from '@/lib/ats-from';
 import { resolveCandidateLang } from '@/lib/candidate-lang';
 import { isGmailConnected, sendViaGmail } from '@/lib/gmail';
 import { getResend, EMAIL_FROM } from '@/lib/resend';
@@ -140,7 +141,7 @@ export async function enviarBateriaAuto(candidatoId: string, origin: string): Pr
     if (gmail.connected) {
       const r = await sendViaGmail({
         to: c.email, subject: asunto, html, replyTo: RESPONDER_A,
-        fromName: `${lang === 'en' ? FIRMA_EN : FIRMA} · Trading Solutions`,
+        fromName: ATS_FROM_NAME,
       });
       if (!r.ok) return { enviado: false, motivo: r.error, url: ses.url };
       canal = 'gmail';
