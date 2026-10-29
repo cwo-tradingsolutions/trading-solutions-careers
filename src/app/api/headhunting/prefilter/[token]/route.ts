@@ -15,6 +15,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected, sendViaGmail } from "@/lib/gmail";
 import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
+import {
+  panamaOpsNoticeLines,
+  panamaPrefilterExpired,
+  scorePanamaOps,
+  type PanamaScore,
+} from "@/lib/panama-ops-prefilter";
 import { recordStageEvent } from "@/lib/stage-events";
 import { resolveCandidateLang, EN_SIGNATURE_NAME } from "@/lib/candidate-lang";
 import { TEMPLATE_ENGLISH_MIN_RANK, TEMPLATE_SALARY_CAP, type TemplateKey } from "@/lib/prefilter-templates";
@@ -294,11 +301,19 @@ export async function GET(
     return NextResponse.json({ error: "already_completed" }, { status: 409 });
   }
 
+  // @ts-expect-error supabase relation
+  const getTemplateKey = String(candidate.ht_vacancies?.form_template_key || "");
+  // Ops PA: the link lasts 7 days from send. An expired click does not
+  // extend it and does not delete the candidate.
+  if (getTemplateKey === "panama_ops" && panamaPrefilterExpired(candidate.prefilter_token_expires_at as string | null)) {
+    return NextResponse.json({ error: "expired" }, { status: 410 });
+  }
+
   // Token evergreen · si el candidato hace click, extendemos 7 días más.
   // Razón: drafts de Gmail pueden sentarse días antes de enviar · si el link
   // expira en el camino, candidato recibe link muerto sin culpa. Cada click
   // del candidato vivo re-activa el reloj.
-  if (candidate.prefilter_token_expires_at) {
+  if (getTemplateKey !== "panama_ops" && candidate.prefilter_token_expires_at) {
     const expires = new Date(candidate.prefilter_token_expires_at as string);
     const now = new Date();
     if (!isPreviewTestMode() && (expires < now || (expires.getTime() - now.getTime()) < 3 * 24 * 60 * 60 * 1000)) {
@@ -347,9 +362,14 @@ export async function POST(
   // @ts-expect-error supabase relation
   const templateKey = String(candidate.ht_vacancies?.form_template_key || "comex");
 
+  if (templateKey === "panama_ops" && panamaPrefilterExpired(candidate.prefilter_token_expires_at as string | null)) {
+    return NextResponse.json({ error: "expired" }, { status: 410 });
+  }
+
   let decision: Decision;
   let rejectionReason: { category: string; sub_detail: string } | null = null;
   let meta: Record<string, unknown>;
+  let panama: PanamaScore | null = null;
   const bloqueos: Bloqueo[] = [];
 
   if (templateKey === "china") {
@@ -418,6 +438,31 @@ export async function POST(
       work_authorized: workAuthorized,
       onsite_available: onsiteAvailable,
       pipl_consent: true,
+    };
+  } else if (templateKey === "panama_ops") {
+    if (!isYes(body.privacy_consent)) {
+      return NextResponse.json({ error: "privacy_consent_required" }, { status: 400 });
+    }
+    panama = scorePanamaOps(body);
+    decision = panama.decision;
+    for (const reason of panama.reasons) {
+      bloqueos.push({
+        regla: reason.text,
+        severidad: reason.effect === "knockout" ? "duro" : "blando",
+        categoria: reason.category ?? "",
+        sub_detail: reason.sub_detail ?? reason.text,
+        valor: reason.text,
+      });
+    }
+    meta = {
+      panama_ops: true,
+      decision: panama.decision,
+      decision_label: panama.decisionLabel,
+      stage: panama.stage,
+      reasons: panama.reasons,
+      notice: panamaOpsNoticeLines(panama),
+      salary_usd: null,
+      email_candidate: false,
     };
   } else if (templateKey === "sig_sst") {
     // ─── Rama SIG-SST · credenciales de ley + salario + inglés ──────
@@ -684,7 +729,9 @@ export async function POST(
       sub_detail: rejectionReason.sub_detail,
     });
   }
-  if (decision === "reject") decision = "review";
+  // Ops PA hard knock-outs stay rejected. Every other template still
+  // converts an automatic reject into review (Kelly, 29-sep-2026).
+  if (decision === "reject" && templateKey !== "panama_ops") decision = "review";
 
   // La prioridad ordena la mesa de decision. Arriba lo que puede estar mal y
   // cuesta caro: dato blando con una senal que lo contradice. Abajo el hecho
@@ -701,9 +748,12 @@ export async function POST(
     prioridad_revision: prioridadRevision,
   };
 
+  const storedBody = { ...body } as Record<string, unknown>;
+  if (templateKey === "panama_ops") storedBody.salary_usd = null;
+
   const updates: Record<string, unknown> = {
     prefilter_data: {
-      ...body,
+      ...storedBody,
       _meta: meta,
     },
     prefilter_decision: decision,
@@ -716,7 +766,21 @@ export async function POST(
   // nadie ha revisado es lo que dejo a doce personas esperando en silencio.
 
   // Actualizar stage según decisión
-  if (decision === "pass") updates.stage = "prefiltro_pasado";
+  if (panama) {
+    updates.stage = panama.stage;
+    if (panama.decision === "reject") {
+      updates.rejected_at = new Date().toISOString();
+      updates.rejection_note_private = panama.reasons
+        .filter((reason) => reason.effect === "knockout")
+        .map((reason) => reason.text)
+        .join("; ");
+      const catalogued = panama.reasons.find((reason) => reason.effect === "knockout" && reason.category);
+      if (catalogued) {
+        updates.rejection_category = catalogued.category;
+        updates.rejection_sub_detail = catalogued.sub_detail;
+      }
+    }
+  } else if (decision === "pass") updates.stage = "prefiltro_pasado";
   else if (decision === "review") updates.stage = "prefiltro_revision";
 
   if (isPreviewTestMode()) {
@@ -742,7 +806,7 @@ export async function POST(
       toStage: updates.stage as string,
       vacancyId: (candidate.vacancy_id as string) ?? null,
       source: "system",
-      note: `prefiltro: ${decision}`,
+      note: panama ? panamaOpsNoticeLines(panama).join(" · ") : `prefiltro: ${decision}`,
     });
   }
 
@@ -752,6 +816,23 @@ export async function POST(
     if (gmail.connected) {
       // @ts-expect-error supabase relation
       const vacancyTitle = candidate.ht_vacancies?.title || "vacante";
+      if (panama) {
+        const lines = panamaOpsNoticeLines(panama);
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://trading-solutions-careers.vercel.app";
+        await sendViaGmail({
+          to: "jointheteam@tradingsolutions.com",
+          subject: `[Prefiltro ${panama.decisionLabel}] ${candidate.name} · ${vacancyTitle}`,
+          html: `<!DOCTYPE html><html><body style="font-family: Inter, sans-serif; padding: 16px; color: #1a1a1a;">
+            <p><strong>${candidate.name}</strong> completed the Panama Operations prefilter.</p>
+            <p>Recorded decision: <strong>${lines[0]}</strong></p>
+            ${lines.slice(1).length ? `<ul>${lines.slice(1).map((line) => `<li>${line}</li>`).join("")}</ul>` : "<p>No flags.</p>"}
+            <p>No email was sent to the candidate${panama.decision === "reject" ? " (knock-out)." : "."}</p>
+            <p><a href="${baseUrl}/hr-admin?tab=prefiltros">Open HR Admin</a></p>
+          </body></html>`,
+          fromName: ATS_FROM_NAME,
+        });
+        return NextResponse.json({ success: true });
+      }
       const enRojo = bloqueos.length > 0;
       const decisionEmoji = enRojo ? "🔴" : "✅";
       const decisionLabel = enRojo ? "EN ROJO · decide tú" : "PASA";

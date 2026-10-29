@@ -192,7 +192,7 @@ export default function PrefiltroForm() {
   const [paBlAwb, setPaBlAwb] = useState("");
   const [paWarehouse, setPaWarehouse] = useState("");
   const [paEnglish, setPaEnglish] = useState("");          // A1–C2
-  const [paSalaryUsd, setPaSalaryUsd] = useState("");
+  const [paStart30, setPaStart30] = useState("");         // "yes" | "no"
   const [paWhyTs, setPaWhyTs] = useState("");
 
   // Template seleccionado (default comex si no hay info)
@@ -299,7 +299,7 @@ export default function PrefiltroForm() {
         paBlAwb &&
         paWarehouse &&
         paEnglish &&
-        paSalaryUsd.trim() !== "" &&
+        paStart30 &&
         paWhyTs.trim().length >= 10 &&
         habeasAccepted // privacy consent EN
       );
@@ -414,7 +414,7 @@ export default function PrefiltroForm() {
         bl_awb_docs: paBlAwb === "yes",
         warehouse_ftz: paWarehouse === "yes",
         english_level: paEnglish,
-        salary_usd: paSalaryUsd.trim(), // dato · no descarta
+        start_within_30_days: paStart30 === "yes",
         why_ts: paWhyTs.trim(),
         extra: extra.trim(),
         privacy_consent: true,
@@ -935,7 +935,7 @@ export default function PrefiltroForm() {
           <Section title="3 · Freight experience">
             <Q label="Years of experience in freight forwarding / logistics in Panama (or equivalent)">
               <input type="number" min={0} max={50} value={paYearsFreight} onChange={(e) => setPaYearsFreight(e.target.value)} style={inputStyle} placeholder="0" />
-              <p style={hintStyle}>We typically look for <strong>4+ years</strong>. Fewer years still go to review — they are not an automatic no.</p>
+              <p style={hintStyle}>We look for <strong>4+ years</strong>. Fewer years are flagged for a recruiter to review. They are not a knock-out.</p>
             </Q>
             <Q label="Hands-on experience with ocean freight (FCL / LCL)?">
               <SelectChips value={paOcean} onChange={setPaOcean} options={YESNO_EN} />
@@ -951,13 +951,14 @@ export default function PrefiltroForm() {
             </Q>
           </Section>
 
-          <Section title="4 · English &amp; compensation">
+          <Section title="4 · English and start date">
             <Q label="English level">
               <SelectChips value={paEnglish} onChange={setPaEnglish} options={PA_ENGLISH} />
-              <p style={hintStyle}>This role needs about <strong>B1 or above</strong>. Below B1 is flagged for review, not auto-rejected.</p>
+              <p style={hintStyle}><strong>B1 is required.</strong> A1 or A2 does not move forward.</p>
             </Q>
-            <Q label="Expected monthly base (USD)">
-              <input value={paSalaryUsd} onChange={(e) => setPaSalaryUsd(e.target.value)} style={inputStyle} placeholder="e.g. 1400" inputMode="numeric" />
+            <Q label="Can you start within 30 days?">
+              <SelectChips value={paStart30} onChange={setPaStart30} options={YESNO_EN} />
+              <p style={hintStyle}>A later start is flagged for review. It is not a knock-out.</p>
             </Q>
           </Section>
 
