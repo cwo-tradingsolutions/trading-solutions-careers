@@ -1,6 +1,7 @@
 import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from 'next/server';
+import { validarFechasWeb, columnaCierreWebExiste } from "@/lib/vacancy-web-dates";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -78,6 +79,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const fechas = await validarFechasWeb(
+      body.fecha_apertura ?? body.posted_at,
+      body.fecha_objetivo ?? body.target_close_date,
+    );
+    if (!fechas.ok) {
+      return NextResponse.json({ error: fechas.error }, { status: 400, headers: corsHeaders });
+    }
+
     const sql = neon(process.env.DATABASE_URL!);
     const result = await sql(
       `INSERT INTO vacancies (
@@ -102,7 +111,16 @@ export async function POST(request: NextRequest) {
       ]
     );
 
-    return NextResponse.json(result[0], { status: 201, headers: corsHeaders });
+    const creada = result[0];
+    await sql(`UPDATE vacancies SET posted_at = $1 WHERE id = $2`, [fechas.apertura, creada.id]);
+    if (fechas.objetivo && await columnaCierreWebExiste()) {
+      await sql(`UPDATE vacancies SET target_close_date = $1 WHERE id = $2`, [fechas.objetivo, creada.id]);
+    }
+
+    return NextResponse.json(
+      { ...creada, posted_at: fechas.apertura, target_close_date: fechas.objetivo, aviso_fechas: fechas.aviso },
+      { status: 201, headers: corsHeaders },
+    );
   } catch (error) {
     console.error('POST /api/vacancies error:', error);
     return NextResponse.json(

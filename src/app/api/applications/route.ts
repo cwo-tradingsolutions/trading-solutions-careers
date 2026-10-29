@@ -11,6 +11,7 @@ import { recordStageEvent } from "@/lib/stage-events";
 import { resolverVacante } from "@/lib/vacancy-map";
 import { isEnglishTemplate, resolveCandidateLang } from "@/lib/candidate-lang";
 import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
+import { canalPostulacionPublica } from "@/lib/candidate-source";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -46,6 +47,8 @@ export async function POST(request: NextRequest) {
     }
 
     const { job_id, job_title, full_name, email, phone, linkedin, cv_filename, cv_data, why_ts, ref } = body;
+    // El formulario público no pide canal y no se bloquea por eso.
+    const canalPublico = canalPostulacionPublica({ ref, interno: false });
 
     if (!job_id || !full_name || !email) {
       return NextResponse.json(
@@ -157,7 +160,7 @@ export async function POST(request: NextRequest) {
               email: emailNormalized,
               phone: phone || null,
               stage: "aplico",
-              source: isInternal ? "public_form_internal" : "public_form",
+              source: isInternal ? "public_form_internal" : canalPublico,
               preferred_language: isEnglishTemplate(vacTemplate) ? "en" : "es",
               notes: why_ts ? `[Public form] ${why_ts}` : `[Public form] · application_id=${newId}`,
               preferred_language: isEnglishTemplate(vacTemplate) ? "en" : "es",

@@ -6,7 +6,8 @@
     "dev": "next dev -p 3010",
     "build": "next build",
     "start": "next start -p 3010",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:required-fields": "node --experimental-strip-types --test src/lib/required-fields.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
