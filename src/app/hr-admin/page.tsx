@@ -5,6 +5,7 @@ import RubricasPanel from "@/components/RubricasPanel";
 import NueveBoxPanel from "@/components/NueveBoxPanel";
 import BateriaDashboard from "@/components/BateriaDashboard";
 import { LOGO_TS_SIMBOLO, LOGO_TS_CLASE_EN_OSCURO } from "@/lib/brand";
+import { CanalSelect, errorCanal, FechasVacanteFields, errorFechas } from "@/components/CamposObligatorios";
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
@@ -649,6 +650,7 @@ function CandidatesImportModal({ onClose, onDone }: { onClose: () => void; onDon
   const [submitting, setSubmitting] = useState(false);
   const [finalResult, setFinalResult] = useState<{ inserted: number; existing: number; errors: number } | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [canal, setCanal] = useState("linkedin_recruiter");
 
   // ── Quick import: detecta si el seed pre-cargado tiene apps pendientes ──
   const [quickPreview, setQuickPreview] = useState<{ will_insert: number; already_existing: number; total: number; breakdown: Array<{ vacancy: string; new: number; existed: number }> } | null>(null);
@@ -736,13 +738,15 @@ function CandidatesImportModal({ onClose, onDone }: { onClose: () => void; onDon
   };
 
   const runDryRun = async () => {
+    const canalError = errorCanal(canal);
+    if (canalError) { setSubmitError(canalError); return; }
     setSubmitting(true);
     setSubmitError(null);
     try {
       const r = await fetch('/api/headhunting/candidates/bulk-import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidates: parsed, dry_run: true }),
+        body: JSON.stringify({ candidates: parsed, source: canal, dry_run: true }),
       });
       const j = await r.json();
       if (!r.ok) {
@@ -759,6 +763,8 @@ function CandidatesImportModal({ onClose, onDone }: { onClose: () => void; onDon
   };
 
   const runImport = async () => {
+    const canalError = errorCanal(canal);
+    if (canalError) { setSubmitError(canalError); setStep('preview'); return; }
     setSubmitting(true);
     setSubmitError(null);
     setStep('submitting');
@@ -766,7 +772,7 @@ function CandidatesImportModal({ onClose, onDone }: { onClose: () => void; onDon
       const r = await fetch('/api/headhunting/candidates/bulk-import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidates: parsed, dry_run: false }),
+        body: JSON.stringify({ candidates: parsed, source: canal, dry_run: false }),
       });
       const j = await r.json();
       if (!r.ok) {
@@ -889,6 +895,10 @@ function CandidatesImportModal({ onClose, onDone }: { onClose: () => void; onDon
               </div>
             ) : null}
 
+            <div className="mb-4">
+              <CanalSelect value={canal} onChange={setCanal} />
+              <p className="text-[11px] text-gray-500 mt-1">El Excel de LinkedIn Recruiter trae el canal puesto, pero hay que confirmarlo.</p>
+            </div>
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-4 text-sm">
               <div className="font-bold text-gray-900 mb-1">…o subí un Excel nuevo</div>
               <p className="text-gray-700 leading-relaxed text-xs">
@@ -1235,6 +1245,7 @@ type VacancyOverview = {
     linkedin_active_date: string | null;
     vacancy_started_date: string | null;
     hire_date: string | null;
+    target_fill_date?: string | null;
     notes: string | null;
   };
   metrics: {
@@ -1586,6 +1597,104 @@ function VacanciesOverview({ vacancyFilter = 'all', onlyOpen = false }: { vacanc
   );
 }
 
+function FechasEditorVacanteAts({
+  vacancyId,
+  apertura,
+  objetivo,
+}: {
+  vacancyId: string;
+  apertura: string;
+  objetivo: string;
+}) {
+  const [a, setA] = useState(String(apertura || "").slice(0, 10));
+  const [o, setO] = useState(String(objetivo || "").slice(0, 10));
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <form
+      className="mt-1 space-y-1"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const err = errorFechas(a, o, true);
+        if (err) { setMsg(err); return; }
+        setBusy(true);
+        setMsg(null);
+        try {
+          const r = await fetch(`/api/headhunting/vacancies/${vacancyId}/dates`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fecha_apertura: a, fecha_objetivo: o }),
+          });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) { setMsg(j.error || "No se guardaron las fechas."); return; }
+          setMsg(j.aviso_fechas || "Fechas guardadas. Recargá la vista para verlas.");
+        } catch (err: any) {
+          setMsg(err?.message || "Error de red.");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <FechasVacanteFields apertura={a} objetivo={o} onApertura={setA} onObjetivo={setO} />
+      <button type="submit" disabled={busy} className="text-[10px] font-bold px-2 py-1 rounded bg-black text-white disabled:opacity-50">
+        {busy ? "Guardando…" : "Guardar fechas"}
+      </button>
+      {msg && <div className="text-[10px]">{msg}</div>}
+    </form>
+  );
+}
+
+function FechasEditorVacanteWeb({
+  vacancyId,
+  apertura,
+  objetivo,
+}: {
+  vacancyId: number;
+  apertura: string;
+  objetivo: string;
+}) {
+  const [a, setA] = useState(apertura);
+  const [o, setO] = useState(objetivo);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const falta = !apertura || !objetivo;
+  return (
+    <div className={`rounded-lg border p-3 ${falta ? "bg-amber-50 border-amber-300" : "bg-white border-gray-200"}`}>
+      {falta && <div className="text-xs font-bold text-amber-900 mb-1">Fechas faltantes · se pueden ver igual</div>}
+      <form
+        className="space-y-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const err = errorFechas(a, o, true);
+          if (err) { setMsg(err); return; }
+          setBusy(true);
+          setMsg(null);
+          try {
+            const r = await fetch(`/api/vacancies/${vacancyId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ fecha_apertura: a, fecha_objetivo: o }),
+            });
+            const j = await r.json().catch(() => ({}));
+            if (!r.ok) { setMsg(j.error || "No se guardaron las fechas."); return; }
+            setMsg(j.aviso_fechas || "Fechas guardadas.");
+          } catch (err: any) {
+            setMsg(err?.message || "Error de red.");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <FechasVacanteFields apertura={a} objetivo={o} onApertura={setA} onObjetivo={setO} />
+        <button type="submit" disabled={busy} className="text-xs font-bold px-3 py-1.5 rounded-full bg-black text-white disabled:opacity-50">
+          {busy ? "Guardando…" : "Guardar fechas"}
+        </button>
+        {msg && <div className="text-xs text-gray-700">{msg}</div>}
+      </form>
+    </div>
+  );
+}
+
 function OpenVacancyCard({ v, onResearch, onRediscover, onClose }: { v: VacancyOverview; onResearch: () => void; onRediscover?: () => void; onClose?: () => void }) {
   const m = v.milestones;
   const hasLinkedIn = !!m.linkedin_active_date;
@@ -1730,6 +1839,23 @@ function OpenVacancyCard({ v, onResearch, onRediscover, onClose }: { v: VacancyO
             {v.aging_candidates.slice(0, 2).map(a => `${a.name.split(' ')[0]} (${a.days_since_update}d)`).join(', ')}
             {v.aging_candidates.length > 2 && ` +${v.aging_candidates.length - 2} más`}
           </div>
+        </div>
+      )}
+
+      {(!m.hr_request_date || !m.target_fill_date) && (
+        <div className="bg-amber-50 border border-amber-300 rounded px-2 py-1.5 mb-2 text-[11px] text-amber-900">
+          <div className="font-bold">Fechas faltantes</div>
+          <div>{!m.hr_request_date ? "Sin fecha de apertura. " : ""}{!m.target_fill_date ? "Sin fecha de cierre objetivo." : ""}</div>
+          <FechasEditorVacanteAts
+            vacancyId={v.vacancy_id}
+            apertura={m.hr_request_date || ""}
+            objetivo={m.target_fill_date || ""}
+          />
+        </div>
+      )}
+      {m.hr_request_date && m.target_fill_date && (
+        <div className="text-[10px] text-gray-500 mb-2">
+          Apertura {String(m.hr_request_date).slice(0, 10)} · cierre objetivo {String(m.target_fill_date).slice(0, 10)}
         </div>
       )}
 
@@ -2736,6 +2862,7 @@ type LiveVacancy = {
   linkedin_url?: string;
   apply_email?: string;
   posted_at?: string;
+  target_close_date?: string | null;
   status?: string;
 };
 
@@ -3253,6 +3380,11 @@ function Vacantes() {
               {/* Detail expandido */}
               {expanded && (
                 <div className="border-t border-gray-200 bg-gray-50 px-4 py-4 space-y-4">
+                  <FechasEditorVacanteWeb
+                    vacancyId={v.id}
+                    apertura={v.posted_at ? String(v.posted_at).slice(0, 10) : ""}
+                    objetivo={v.target_close_date ? String(v.target_close_date).slice(0, 10) : ""}
+                  />
                   {/* Pipeline horizontal */}
                   <PipelineSummary stats={stats} />
 

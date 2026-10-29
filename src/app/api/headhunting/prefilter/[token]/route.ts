@@ -18,6 +18,7 @@ import { recordStageEvent } from "@/lib/stage-events";
 import { enviarBateriaAuto } from "@/lib/bateria/invitar";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { TEMPLATE_ENGLISH_MIN_RANK, TEMPLATE_SALARY_CAP, type TemplateKey } from "@/lib/prefilter-templates";
+import { etiquetaAvisoPrefiltro, flagSalarioSobreTope, textoSalarioAviso } from "@/lib/prefilter-salary";
 
 // Techos por vacancy_id (en COP mensuales)
 const SALARY_CAPS: Record<string, number> = {
@@ -106,6 +107,7 @@ const SEVERIDAD_POR_REGLA: Record<string, Severidad> = {
   licencia_vencida: "duro",
   sin_curso_50_horas: "duro",
   sin_autorizacion_trabajo_china: "duro",
+  sin_autorizacion_trabajo_panama: "duro",
   sin_tarjeta_profesional: "duro",
   ingles_a1_a2: "blando",
   ingles_b1: "blando",
@@ -115,6 +117,7 @@ const SEVERIDAD_POR_REGLA: Record<string, Severidad> = {
   sin_disponibilidad_presencial: "blando",
   sin_experiencia_rol: "blando",
   anos_industria: "blando",
+  anos_freight_panama: "blando",
   // Customer Documentation · todo lo que declara el candidato de si mismo
   sin_experiencia_doc_comex: "blando",
   sin_conciliacion_facturas: "blando",
@@ -221,13 +224,23 @@ function checkEnglishLevel(englishLevel: string | undefined, vacancyId: string, 
  */
 const CHINA_SALARY_CAP_USD = 1500;
 
-/** "USD 2,500/month gross" → 2500. Devuelve null si no hay número legible. */
-function parseSalaryUsd(raw: unknown): number | null {
-  const digits = String(raw ?? "").replace(/[^0-9.]/g, "");
-  if (!digits) return null;
-  const n = Number(digits);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
+/**
+ * Tope mensual USD (bruto) para Panama Operations Specialist.
+ * Igual que China: sobre el tope = flag/review, NUNCA auto-reject.
+ */
+const PANAMA_OPS_SALARY_CAP_USD = 1500;
+
+/** Inglés corto EN (A1–C2). Mínimo soft B1 para panama_ops. */
+const PANAMA_OPS_ENGLISH_RANK: Record<string, number> = {
+  A1: 1,
+  A2: 2,
+  B1: 3,
+  B2: 4,
+  C1: 5,
+  C2: 6,
+};
+const PANAMA_OPS_ENGLISH_MIN_RANK = 3; // B1
+const PANAMA_OPS_YEARS_MIN = 4;
 
 const TS_LINKEDIN_URL = "https://www.linkedin.com/company/trading-sol/";
 
@@ -399,25 +412,110 @@ export async function POST(
     }
     decision = bloqueos.length ? "review" : "pass";
 
-    // Presupuesto · sobre el tope no se rechaza, se manda a revisión.
-    const salaryUsd = parseSalaryUsd(body.salary_usd);
-    const salaryOverBudget = salaryUsd !== null && salaryUsd > CHINA_SALARY_CAP_USD;
-    if (salaryOverBudget && decision === "pass") {
-      decision = "review";
+    // Presupuesto · el mínimo del rango contra el tope. Sobre el tope no se
+    // rechaza: queda un bloqueo blando y la decisión baja a revisión.
+    const topeChina = flagSalarioSobreTope(body.salary_usd, CHINA_SALARY_CAP_USD);
+    if (topeChina.bloqueo) {
+      bloqueos.push(topeChina.bloqueo);
+      if (decision === "pass") decision = "review";
     }
 
     meta = {
       china: true,
       salary_usd_expectation: body.salary_usd ?? null, // dato · no descarta
-      salary_usd_parsed: salaryUsd,
+      salary_usd_parsed: topeChina.range?.min ?? null,
+      salary_usd_max: topeChina.range?.max ?? null,
       salary_cap_usd: CHINA_SALARY_CAP_USD,
-      salary_over_budget: salaryOverBudget,
+      salary_over_budget: topeChina.salaryOverBudget,
       english_min_required_rank: CHINA_ENGLISH_MIN_RANK,
       english_candidate_rank: englishRank,
       english_fails: englishFails,
       work_authorized: workAuthorized,
       onsite_available: onsiteAvailable,
       pipl_consent: true,
+    };
+  } else if (templateKey === "panama_ops") {
+    // ─── Rama PANAMA OPS · freight knock-outs (EN) ──────────────────
+    //   - Consentimiento privacy EN obligatorio (no PIPL, no habeas CO).
+    //   - Salario (salary_usd) es SOLO DATO · nunca descarta.
+    //   - Knock-outs → review flags: work_authorized_panama, onsite_panama_city.
+    //   - Soft mark: years_freight_panama < 4, english below B1.
+    if (!isYes(body.privacy_consent)) {
+      return NextResponse.json({ error: "privacy_consent_required" }, { status: 400 });
+    }
+
+    const englishKey = String(body.english_level || "").trim().toUpperCase();
+    const englishRank = PANAMA_OPS_ENGLISH_RANK[englishKey] ?? 0;
+    const englishFails = englishRank > 0 && englishRank < PANAMA_OPS_ENGLISH_MIN_RANK;
+    const workAuthorized = isYes(body.work_authorized_panama);
+    const onsitePanama = isYes(body.onsite_panama_city);
+    const yearsFreight = Number(body.years_freight_panama ?? 0);
+    const yearsShort = Number.isFinite(yearsFreight) && yearsFreight < PANAMA_OPS_YEARS_MIN;
+
+    if (!workAuthorized) {
+      bloqueos.push({
+        regla: "autorizacion_trabajo",
+        severidad: "duro",
+        categoria: "requisito_excluyente",
+        sub_detail: "sin_autorizacion_trabajo_panama",
+        valor: String(body.work_authorized_panama ?? ""),
+      });
+    }
+    if (!onsitePanama) {
+      bloqueos.push({
+        regla: "disponibilidad_presencial",
+        severidad: "duro",
+        categoria: "requisito_excluyente",
+        sub_detail: "sin_disponibilidad_presencial",
+        valor: String(body.onsite_panama_city ?? ""),
+      });
+    }
+    if (englishFails) {
+      bloqueos.push({
+        regla: "ingles_minimo",
+        severidad: "blando",
+        categoria: "idioma_insuficiente",
+        sub_detail: englishRank <= 2 ? "ingles_a1_a2" : "ingles_b1",
+        valor: String(body.english_level ?? ""),
+      });
+    }
+    if (yearsShort) {
+      bloqueos.push({
+        regla: "anos_freight_panama",
+        severidad: "blando",
+        categoria: "experiencia_insuficiente",
+        sub_detail: "anos_freight_panama",
+        valor: String(body.years_freight_panama ?? ""),
+      });
+    }
+
+    decision = bloqueos.length ? "review" : "pass";
+
+    const topePanama = flagSalarioSobreTope(body.salary_usd, PANAMA_OPS_SALARY_CAP_USD);
+    if (topePanama.bloqueo) {
+      bloqueos.push(topePanama.bloqueo);
+      if (decision === "pass") decision = "review";
+    }
+
+    meta = {
+      panama_ops: true,
+      salary_usd_expectation: body.salary_usd ?? null,
+      salary_usd_parsed: topePanama.range?.min ?? null,
+      salary_usd_max: topePanama.range?.max ?? null,
+      salary_cap_usd: PANAMA_OPS_SALARY_CAP_USD,
+      salary_over_budget: topePanama.salaryOverBudget,
+      english_min_required_rank: PANAMA_OPS_ENGLISH_MIN_RANK,
+      english_candidate_rank: englishRank,
+      english_fails: englishFails,
+      work_authorized_panama: workAuthorized,
+      onsite_panama_city: onsitePanama,
+      years_freight_panama: yearsFreight,
+      years_freight_short: yearsShort,
+      ocean_fcl_lcl: isYes(body.ocean_fcl_lcl),
+      air_freight: isYes(body.air_freight),
+      bl_awb_docs: isYes(body.bl_awb_docs),
+      warehouse_ftz: isYes(body.warehouse_ftz),
+      privacy_consent: true,
     };
   } else if (templateKey === "sig_sst") {
     // ─── Rama SIG-SST · credenciales de ley + salario + inglés ──────
@@ -761,9 +859,9 @@ export async function POST(
     if (gmail.connected) {
       // @ts-expect-error supabase relation
       const vacancyTitle = candidate.ht_vacancies?.title || "vacante";
-      const enRojo = bloqueos.length > 0;
-      const decisionEmoji = enRojo ? "🔴" : "✅";
-      const decisionLabel = enRojo ? "EN ROJO · decide tú" : "PASA";
+      const aviso = etiquetaAvisoPrefiltro(decision, bloqueos);
+      const { label: decisionLabel, emoji: decisionEmoji, enRojo } = aviso;
+      const salarioTxt = textoSalarioAviso(body);
       const listaBloqueos = bloqueos
         .map((b) => `<li>${b.sub_detail.replace(/_/g, " ")} — dato ${b.severidad}${b.valor ? ` (marcó: ${b.valor})` : ""}${b.contradiccion ? ` · <strong>${b.contradiccion}</strong>` : ""}</li>`)
         .join("");
@@ -777,12 +875,12 @@ export async function POST(
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Vacante:</td><td><strong>${vacancyTitle}</strong></td></tr>
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Email:</td><td>${candidate.email}</td></tr>
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Decisión:</td><td><strong>${decisionEmoji} ${decisionLabel}</strong></td></tr>
-            <tr><td style="padding: 4px 12px 4px 0; color: #666;">Salario que pidió:</td><td>${body.salary || "—"}</td></tr>
+            <tr><td style="padding: 4px 12px 4px 0; color: #666;">Salario que pidió:</td><td>${salarioTxt}</td></tr>
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Inglés:</td><td>${body.english_level || "—"}</td></tr>
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Ciudad:</td><td>${body.city || "—"}</td></tr>
             ${bateriaAuto ? `<tr><td style="padding: 4px 12px 4px 0; color: #666;">Batería TS:</td><td>${bateriaAuto.enviado ? `enviada automáticamente (${bateriaAuto.canal})` : `<strong>no salió</strong> · ${bateriaAuto.motivo}`}</td></tr>` : ""}
           </table>
-          ${enRojo ? `<div style="background: #FEF2F2; padding: 10px 14px; border-radius: 6px; color: #991B1B; font-size: 13px;"><strong>No se rechazó a nadie.</strong> Quedó en rojo esperando tu decisión:<ul style="margin: 8px 0 0; padding-left: 18px;">${listaBloqueos}</ul></div>` : ""}
+          ${enRojo ? `<div style="background: #FEF2F2; padding: 10px 14px; border-radius: 6px; color: #991B1B; font-size: 13px;"><strong>No se rechazó a nadie.</strong> Quedó en rojo esperando tu decisión:<ul style="margin: 8px 0 0; padding-left: 18px;">${listaBloqueos}</ul></div>` : bloqueos.length ? `<div style="background: #FFFBEB; padding: 10px 14px; border-radius: 6px; color: #92400E; font-size: 13px;"><strong>Revisión.</strong> El salario quedó sobre el tope. No se rechazó a nadie:<ul style="margin: 8px 0 0; padding-left: 18px;">${listaBloqueos}</ul></div>` : ""}
           <p><a href="${baseUrl}/hr-admin?tab=prefiltros" style="color: #2C64ED;">Ver en HR Admin →</a></p>
         </body></html>`,
         fromName: "Trading Solutions ATS",

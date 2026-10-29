@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { CheckCircle2, XCircle, ArrowRight, HelpCircle, AlertTriangle } from "lucide-react";
 import { stageLabel } from "@/lib/stage-labels";
+import { REJECTION_CATEGORIES } from "@/lib/rejection-rules";
 
 const TS_HERO = "https://cdn.prod.website-files.com/68fb7b9474bf8f90808cd50f/691645b652c1e9091b25f59c_FotosWeb_TradingSolutions-14_4_11zon.webp";
 const TS_LOGO = "https://cdn.prod.website-files.com/68fb7b9474bf8f90808cd50f/6913594489519813fe9e620e_logo%20web-03.png";
@@ -37,6 +38,7 @@ export default function DecisionPage() {
   const [recommendedVacancyId, setRecommendedVacancyId] = useState<string>('');
   const [moveNow, setMoveNow] = useState(true);
   const [reasoning, setReasoning] = useState('');
+  const [categoryKey, setCategoryKey] = useState('');
 
   useEffect(() => {
     fetch(`/api/decision/${token}`)
@@ -70,6 +72,7 @@ export default function DecisionPage() {
           recommended_vacancy_id: recommendedVacancyId || undefined,
           move_now: moveNow,
           reasoning,
+          category_key: categoryKey || undefined,
         }),
       });
       const j = await r.json();
@@ -229,6 +232,8 @@ export default function DecisionPage() {
             setMoveNow={setMoveNow}
             reasoning={reasoning}
             setReasoning={setReasoning}
+            categoryKey={categoryKey}
+            setCategoryKey={setCategoryKey}
             onBack={() => setDecision(null)}
             onSubmit={submit}
             submitting={phase === 'submitting'}
@@ -268,7 +273,7 @@ function DecisionButton({
 
 function DecisionForm({
   decision, state, targetStage, setTargetStage, recommendedVacancyId, setRecommendedVacancyId,
-  moveNow, setMoveNow, reasoning, setReasoning, onBack, onSubmit, submitting, error,
+  moveNow, setMoveNow, reasoning, setReasoning, categoryKey, setCategoryKey, onBack, onSubmit, submitting, error,
 }: any) {
   const ds: any = state;
   return (
@@ -313,8 +318,15 @@ function DecisionForm({
       {decision === 'no_avanza' && (
         <>
           <h3 className="text-lg font-bold mb-1">¿Por qué no avanza?</h3>
-          <p className="text-xs text-gray-600 mb-3">El candidato será marcado como rechazado. Esta razón queda en su expediente.</p>
-          <Reasoning reasoning={reasoning} setReasoning={setReasoning} placeholder="Sé específico — esto nos ayuda a calibrar futuras búsquedas. Ej: 'falta experiencia en pricing internacional', 'soft skills débiles', 'expectativa salarial muy alta', etc." required />
+          <p className="text-xs text-gray-600 mb-3">Hay que elegir una categoría. La nota es opcional. Sin categoría no se marca rechazado.</p>
+          <label className="block text-[10px] uppercase tracking-wider font-semibold text-gray-700 mb-1.5">Categoría *</label>
+          <select value={categoryKey} onChange={(e) => setCategoryKey(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-3 bg-white">
+            <option value="">Elegí la categoría</option>
+            {REJECTION_CATEGORIES.map((c) => (
+              <option key={c.key} value={c.key}>{c.label}</option>
+            ))}
+          </select>
+          <Reasoning reasoning={reasoning} setReasoning={setReasoning} placeholder="Nota opcional para el equipo." />
         </>
       )}
 
@@ -330,7 +342,7 @@ function DecisionForm({
 
       <button
         onClick={onSubmit}
-        disabled={submitting || (decision === 'no_avanza' && !reasoning.trim()) || (decision === 'needs_more_info' && !reasoning.trim()) || (decision === 'recommend_other_vacancy' && !recommendedVacancyId) || (decision === 'avanza' && !targetStage)}
+        disabled={submitting || (decision === 'no_avanza' && !categoryKey) || (decision === 'needs_more_info' && !reasoning.trim()) || (decision === 'recommend_other_vacancy' && !recommendedVacancyId) || (decision === 'avanza' && !targetStage)}
         className="w-full bg-black hover:bg-gray-800 disabled:bg-gray-300 text-white text-sm font-bold py-3 rounded-full inline-flex items-center justify-center gap-2"
       >
         {submitting ? 'Registrando…' : 'Registrar decisión'}

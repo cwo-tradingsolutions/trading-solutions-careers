@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { requireAdmin } from '@/lib/admin-auth';
+import { CANDIDATE_SOURCE_VALUES, validarCanalReclutador } from '@/lib/candidate-source';
 
 /**
  * GET /api/headhunting/candidates/[candidateId]
@@ -44,19 +45,10 @@ export async function GET(
 const ALLOWED_PATCH_FIELDS = ["vacancy_id", "name", "email", "phone", "status", "preferred_language", "source"];
 
 /**
- * Orígenes con los que se cataloga a un candidato. `cv_proceso_anterior` es
- * para las hojas de vida que Wellness carga de un banco o de un proceso previo:
- * sin esa marca quedan idénticas a quien aplicó por la web y no hay forma de
- * separar la búsqueda nueva de lo que ya se tenía.
+ * Orígenes con los que se cataloga a un candidato. La lista vive en
+ * candidate-source.ts (valores que el código ya usa, más Otro).
  */
-const ALLOWED_SOURCES = [
-  "public_form",
-  "public_form_internal",
-  "cv_proceso_anterior",
-  "linkedin",
-  "referido",
-  "email_manual",
-];
+const ALLOWED_SOURCES: readonly string[] = CANDIDATE_SOURCE_VALUES;
 
 export async function PATCH(
   req: NextRequest,
@@ -81,15 +73,15 @@ export async function PATCH(
     for (const k of ALLOWED_PATCH_FIELDS) {
       if (body[k] !== undefined) updates[k] = body[k];
     }
-    if (updates.source !== undefined) {
-      const src = String(updates.source || "").toLowerCase().trim();
-      if (!ALLOWED_SOURCES.includes(src)) {
+    if (updates.source !== undefined || body.exigir_canal === true) {
+      const canal = validarCanalReclutador(updates.source ?? body.source);
+      if (!canal.ok || !ALLOWED_SOURCES.includes(canal.source)) {
         return NextResponse.json(
-          { error: `source inválido · valores permitidos: ${ALLOWED_SOURCES.join(", ")}` },
+          { error: canal.ok ? "Ese canal no está permitido." : canal.error },
           { status: 400 },
         );
       }
-      updates.source = src;
+      updates.source = canal.source;
     }
 
     // La columna tiene CHECK (es|en) · sin esto un valor raro devuelve un 500 crudo.

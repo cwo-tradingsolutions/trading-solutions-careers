@@ -22,6 +22,7 @@ import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { recordStageEvent } from "@/lib/stage-events";
 import { enviarBateriaAuto } from "@/lib/bateria/invitar";
 import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { validarRechazo, MSG_RECHAZO_SILENCIOSO } from "@/lib/rejection-rules";
 
 const TS_LINKEDIN_URL = "https://www.linkedin.com/company/trading-sol/";
 
@@ -90,7 +91,7 @@ export async function POST(
     // Cargar candidato
     const { data: candidate, error: fetchErr } = await supabaseAdmin
       .from("ht_candidates")
-      .select("id, name, email, vacancy_id, stage, status, preferred_language, ht_vacancies(title, form_template_key, country)")
+      .select("id, name, email, vacancy_id, stage, status, source, preferred_language, ht_vacancies(title, form_template_key, country)")
       .eq("id", candidateId)
       .single();
 
@@ -103,9 +104,20 @@ export async function POST(
       updated_at: new Date().toISOString(),
     };
 
-    // Si se mueve a rechazado, también actualizar status
+    // Si se mueve a rechazado, también actualizar status.
+    // Sin categoría no se escribe: el descarte silencioso queda prohibido.
     if (targetStage === "rechazado") {
+      const rechazo = validarRechazo({
+        category_key: body.category_key ?? body.rejection_category,
+        note: body.note ?? body.rejection_note ?? body.note_private,
+      });
+      if (!rechazo.ok) {
+        return NextResponse.json({ error: rechazo.error || MSG_RECHAZO_SILENCIOSO }, { status: 400 });
+      }
       updates.status = "rejected";
+      updates.rejection_category = rechazo.category_key;
+      updates.rejection_note_private = rechazo.note;
+      updates.rejected_at = new Date().toISOString();
     }
 
     // Si se mueve a contratado, status también
