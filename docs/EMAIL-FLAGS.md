@@ -14,3 +14,5 @@ Each on/off flag stays off unless the value is `1`, `true`, `yes`, or `on`. Miss
 | `INTERVIEW_INVITES_UNRESTRICTED` | The only lift that mails the real candidate and the interviewer. | off | not set |
 
 `INTERVIEW_INVITES_ENABLED` does not gate the send. `decideDelivery` ignores it. The invite GET reports `production_enabled` from it. Planned prod value: not set.
+
+Agendar entrevista is hidden from the HR header. `POST /api/headhunting/candidates/[id]/schedule-interview` returns 410 and does not write `ts_interviews` or send mail. Old joint-booking links at `/agenda-conjunta/[token]` show a closed message. `POST /api/joint-schedulings/[token]/book` and `POST /api/admin/candidates/[id]/send-joint-scheduling` return 410 and do not create a calendar event. Manual assessment invites are unchanged.
