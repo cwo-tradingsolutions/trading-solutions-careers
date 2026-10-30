@@ -22,6 +22,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { resolveCandidateLang, isChinaProcess } from "@/lib/candidate-lang";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getResend, EMAIL_FROM, EMAIL_BCC } from "@/lib/resend";
+import { candidateSignatureHtml, candidateSignatureText } from "@/lib/ats-from";
 import { buildIcs, buildGoogleCalendarUrl } from "@/lib/ics";
 import crypto from "crypto";
 
@@ -126,10 +127,10 @@ export async function POST(
       description: lang === 'en'
         ? `Interview for the ${vacTitle} position at Trading Solutions.\n\n${
             body.meeting_url ? `Meeting link: ${body.meeting_url}\n\n` : ''
-          }If you need to reschedule, just reply to this email. See you there!\n\nTalent Acquisition Team · Trading Solutions`
+          }If you need to reschedule, just reply to this email. See you there!\n\n${candidateSignatureText("en")}`
         : `Entrevista para la posición de ${vacTitle} en Trading Solutions.\n\n${
             body.meeting_url ? `Link de la reunión: ${body.meeting_url}\n\n` : ''
-          }Si necesitas reagendar, responde a este correo. ¡Nos vemos!\n\nEquipo Talent Acquisition · Trading Solutions`,
+          }Si necesitas reagendar, responde a este correo. ¡Nos vemos!\n\n${candidateSignatureText("es")}`,
       start: scheduledAt,
       durationMinutes: duration,
       location: body.location,
@@ -188,7 +189,7 @@ export async function POST(
                 <a href="${googleUrl}" style="display: inline-block; background: #2C64ED; color: #fff; padding: 12px 24px; text-decoration: none; font-weight: 700; border-radius: 8px; font-size: 13px;">📆 Add to Google Calendar</a>
               </div>
               <p style="margin: 16px 0 0; font-size: 12px; color: #555; line-height: 1.55;">The attached .ics file also works with Outlook, Apple Calendar and others. If you can't make it, please reply to this email as soon as possible so we can reschedule.</p>
-              <p style="margin: 22px 0 0; font-size: 12px; color: #888;">Talent Acquisition Team · Trading Solutions</p>
+              ${candidateSignatureHtml("en")}
             </div>
           </div>
         `;
@@ -211,7 +212,7 @@ export async function POST(
                 <a href="${googleUrl}" style="display: inline-block; background: #2C64ED; color: #fff; padding: 12px 24px; text-decoration: none; font-weight: 700; border-radius: 8px; font-size: 13px;">📆 Agregar a Google Calendar</a>
               </div>
               <p style="margin: 16px 0 0; font-size: 12px; color: #555; line-height: 1.55;">El archivo adjunto (.ics) también funciona con Outlook, Apple Calendar y otros. Si no puedes asistir, responde este correo lo antes posible para reagendar.</p>
-              <p style="margin: 22px 0 0; font-size: 12px; color: #888;">Equipo Talent Acquisition · Trading Solutions</p>
+              ${candidateSignatureHtml("es")}
             </div>
           </div>
         `;
