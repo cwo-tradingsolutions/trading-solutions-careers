@@ -6,7 +6,7 @@ import { asuntoBateriaEn, htmlBateriaEn, textoBateriaEn } from '@/lib/bateria/co
 import { ATS_FROM_NAME } from '@/lib/ats-from';
 import { resolveCandidateLang, type CandidateLang } from '@/lib/candidate-lang';
 import { createDraftViaGmail, isGmailConnected } from '@/lib/gmail';
-import { getResend, EMAIL_FROM } from '@/lib/resend';
+import { sendCandidateMail } from '@/lib/ats-mail-store';
 import { moverABateria, sesionDe, limpiarBateriaPendiente, RESPONDER_A, type CandBateria } from '@/lib/bateria/invitar';
 
 export const runtime = 'nodejs';
@@ -94,8 +94,7 @@ export async function POST(req: NextRequest) {
 
     if (!candidatos.length) return NextResponse.json({ error: 'Sin candidatos' }, { status: 400 });
 
-    // Gmail primero: el borrador sale de la cuenta de reclutamiento, con su
-    // firma y su historial. Resend es la salida de emergencia.
+    // El borrador sale de jointheteam@. El envío directo también, por Gmail.
     const gmail = modo === 'borrador' ? await isGmailConnected() : { connected: false as boolean, email: undefined as string | undefined };
     if (modo === 'borrador' && !gmail.connected) {
       return NextResponse.json(
@@ -125,30 +124,39 @@ export async function POST(req: NextRequest) {
       const datos = { nombre: c.nombre ?? null, vacante: c.vacante ?? null, url: ses.url };
       const asunto = lang === 'en' ? asuntoBateriaEn(c.vacante ?? null) : asuntoBateria(c.vacante ?? null);
       const html = lang === 'en' ? htmlBateriaEn(datos) : htmlBateria(datos);
-      const texto = lang === 'en' ? textoBateriaEn(datos) : textoBateria(datos);
 
       let canal: string;
       let fallo: string | null = null;
+      let emailStatus: 'sent' | 'pending' | 'draft' | 'not_sent' = 'not_sent';
 
       if (modo === 'borrador') {
         const r = await createDraftViaGmail({ to: c.email, subject: asunto, html, fromName: ATS_FROM_NAME });
         canal = 'gmail-borrador';
-        if (!r.ok) fallo = r.error ?? 'Gmail rechazó el borrador';
+        if (!r.ok) {
+          fallo = 'Gmail no dejó el borrador';
+          console.error('bateria/enviar draft', r.error);
+        } else {
+          emailStatus = 'draft';
+        }
       } else {
-        const resend = getResend();
-        const { error: eMail } = await resend.emails.send({
-          from: EMAIL_FROM,
+        const delivered = await sendCandidateMail({
           to: c.email,
-          replyTo: RESPONDER_A,
+          candidate: c.email,
+          type: 'battery_invite',
           subject: asunto,
           html,
-          text: texto,
+          replyTo: RESPONDER_A,
         });
-        canal = 'resend';
-        if (eMail) fallo = eMail.message;
+        if (delivered.status === 'sent') {
+          canal = 'gmail';
+          emailStatus = 'sent';
+        } else {
+          canal = 'pending';
+          emailStatus = 'pending';
+        }
       }
 
-      if (!fallo) {
+      if (!fallo && emailStatus !== 'pending') {
         await supabaseAdmin
           .from('ts_bat_sessions')
           .update({ invited_at: new Date().toISOString(), invite_channel: canal, invite_count: ses.invite_count + 1, updated_at: new Date().toISOString() })
@@ -157,21 +165,23 @@ export async function POST(req: NextRequest) {
         if (c.id) await limpiarBateriaPendiente(c.id);
       }
 
-      resultado.push({ id: c.id, nombre: c.nombre, email: c.email, url: ses.url, reusada: ses.reusada, canal, idioma: lang, error: fallo });
+      resultado.push({ id: c.id, nombre: c.nombre, email: c.email, url: ses.url, reusada: ses.reusada, canal, idioma: lang, email_status: emailStatus, error: fallo });
     }
 
-    const ok = resultado.filter((r) => r.url && !r.error).length;
+    const ok = resultado.filter((r) => r.url && !r.error && r.email_status !== 'pending').length;
+    const pendientes = resultado.filter((r) => r.email_status === 'pending').length;
     return NextResponse.json(
       {
         modo,
         ok,
+        pendientes,
         fallaron: resultado.filter((r) => r.error).length,
         cuenta: gmail.email ?? null,
         resultado,
         nota:
           modo === 'borrador'
             ? `Quedaron ${ok} borradores en la bandeja de ${gmail.email ?? 'Gmail'}. Revíselos y déles Enviar. Ya quedaron en la etapa Batería.`
-            : `Salieron ${ok} correos y quedaron en la etapa Batería. Las respuestas llegan a ${RESPONDER_A}.`,
+            : `Salieron ${ok} correos por Gmail${pendientes ? ` y ${pendientes} quedaron pendientes` : ''}. Las respuestas llegan a ${RESPONDER_A}.`,
       },
       { headers: { 'Cache-Control': 'no-store' } }
     );

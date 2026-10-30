@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, initDB } from "@/lib/db";
 import { prefilter, toPrefilterData } from "@/lib/agent/prefilter";
 import { generatePortalToken } from "@/lib/portal-token";
-import { getResend, EMAIL_FROM } from "@/lib/resend";
-import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
+import { sendCandidateMail } from "@/lib/ats-mail-store";
 import { supabaseAdmin } from "@/lib/supabase";
 import { recordStageEvent } from "@/lib/stage-events";
 // La resolución job_id → vacancy_id es compartida con
@@ -284,24 +283,20 @@ export async function POST(request: NextRequest) {
 
         const html = lang === "en" ? htmlEn : htmlEs;
 
-        // Preferir Gmail si está conectado
-        const gmail = await isGmailConnected();
-        if (gmail.connected) {
-          await sendViaGmail({ to: email, subject, html, replyTo: replyTo ?? undefined, bcc: bcc ?? undefined });
-        } else {
-          const resend = getResend();
-          await resend.emails.send({
-            from: EMAIL_FROM,
-            to: email,
-            ...(bcc ? { bcc } : {}),
-            ...(replyTo ? { replyTo } : {}),
-            subject,
-            html,
-          });
+        const delivered = await sendCandidateMail({
+          to: email,
+          candidate: email,
+          type: "application_received",
+          subject,
+          html,
+          replyTo: replyTo ?? undefined,
+          bcc: bcc ?? undefined,
+        });
+        if (delivered.status === "pending") {
+          console.info(`[ats-mail] application acknowledgement pending id=${delivered.id}`);
         }
       } catch (e) {
-        // Email es best-effort — no bloquea la aplicación
-        console.warn('Email confirmación falló:', e);
+        console.error("No se pudo enviar ni encolar el acuse:", e);
       }
     }
 

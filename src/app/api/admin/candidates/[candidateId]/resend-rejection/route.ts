@@ -31,11 +31,11 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import {
   createDraftViaGmail,
-  sendViaGmail,
   isGmailConnected,
   findSentRejection,
   gmailDraftExists,
 } from "@/lib/gmail";
+import { sendCandidateMail } from "@/lib/ats-mail-store";
 import {
   buildRejectionHtml,
   rejectionEmailsEnabled,
@@ -181,7 +181,8 @@ export async function POST(
         replyTo: REJECTION_REPLY_TO,
       });
       if (!res.ok) {
-        return NextResponse.json({ error: "No se pudo crear el borrador", detail: res.error }, { status: 502 });
+        console.error("[resend-rejection] draft", res.error);
+        return NextResponse.json({ error: "No se pudo crear el borrador en Gmail.", status: "not_sent" }, { status: 502 });
       }
       await supabaseAdmin
         .from("ht_candidates")
@@ -197,15 +198,22 @@ export async function POST(
       });
     }
 
-    const res = await sendViaGmail({
+    const delivered = await sendCandidateMail({
       to: cand.email as string,
+      candidate: cand.email as string,
+      type: "rejection_resend",
       subject,
       html,
-      fromName,
       replyTo: REJECTION_REPLY_TO,
     });
-    if (!res.ok) {
-      return NextResponse.json({ error: "No se pudo enviar el correo", detail: res.error }, { status: 502 });
+    if (delivered.status === "pending") {
+      return NextResponse.json({
+        success: true,
+        mode: "send",
+        status: "pending",
+        to: cand.email,
+        message: "El correo quedó pendiente hasta reconectar jointheteam@.",
+      });
     }
 
     const sentAt = rejectionSentAt(true);

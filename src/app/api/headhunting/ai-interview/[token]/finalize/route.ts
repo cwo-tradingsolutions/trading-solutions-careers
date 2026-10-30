@@ -22,6 +22,7 @@ import {
   fetchElevenConversation,
   runCandidateFinalize,
 } from "@/lib/ai-interview-finalize";
+import { aiInterviewEnabled } from "@/lib/ai-interview-flag";
 
 // Permitir hasta 90s — los 3 agentes Claude en paralelo con transcripts de
 // 14K chars pueden tardar 40-60s. Vercel Pro permite hasta 90s.
@@ -229,6 +230,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { token: string } }
 ) {
+  if (!aiInterviewEnabled()) {
+    return NextResponse.json({ status: "disabled" }, { status: 503 });
+  }
   const { token } = params;
 
   try {

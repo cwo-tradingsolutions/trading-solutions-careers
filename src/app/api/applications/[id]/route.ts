@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { sql, initDB } from "@/lib/db";
 import { generatePortalToken } from "@/lib/portal-token";
-import { getResend, EMAIL_FROM } from "@/lib/resend";
-import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
+import { sendCandidateMail } from "@/lib/ats-mail-store";
 import { candidateSignatureHtml } from "@/lib/ats-from";
 import { applicationStatusEmailsEnabled } from "@/lib/application-status-email";
 import { buildRejectionHtml, REJECTION_REPLY_TO, rejectionEmailsEnabled, rejectionSubject } from "@/lib/rejection-email";
@@ -25,8 +24,8 @@ async function ensureDB() {
 async function sendStatusTransitionEmail(
   appRow: { id: number; full_name: string; email: string; job_title: string; job_id: number | null },
   newStatus: string
-) {
-  if (!appRow.email) return;
+): Promise<"sent" | "pending" | "skipped" | "unavailable"> {
+  if (!appRow.email) return "skipped";
   // Determinar qué template usar según status
   let subject = "";
   let html = "";
@@ -99,32 +98,23 @@ async function sendStatusTransitionEmail(
       ${candidateSignatureHtml("es")}
     `);
   } else {
-    return; // No envío auto para new/reviewing
+    return "skipped";
   }
 
   try {
-    const gmail = await isGmailConnected();
-    if (gmail.connected) {
-      await sendViaGmail({
-        to: appRow.email,
-        subject,
-        html,
-        replyTo: replyTo ?? undefined,
-        bcc: bcc ?? undefined,
-      });
-    } else {
-      const resend = getResend();
-      await resend.emails.send({
-        from: EMAIL_FROM,
-        to: appRow.email,
-        ...(bcc ? { bcc } : {}),
-        ...(replyTo ? { replyTo } : {}),
-        subject,
-        html,
-      });
-    }
+    const delivered = await sendCandidateMail({
+      to: appRow.email,
+      candidate: appRow.email,
+      type: "application_status",
+      subject,
+      html,
+      replyTo: replyTo ?? undefined,
+      bcc: bcc ?? undefined,
+    });
+    return delivered.status;
   } catch (e) {
-    console.warn(`Email transition ${newStatus} falló para app#${appRow.id}:`, e);
+    console.error(`Email transition ${newStatus} no se pudo encolar para app#${appRow.id}:`, e);
+    return "unavailable";
   }
 }
 
@@ -182,11 +172,11 @@ export async function PATCH(
         ? rejectionEmailsEnabled()
         : statusMail && applicationStatusEmailsEnabled()
     );
-    if (emailTriggered) {
-      await sendStatusTransitionEmail(prev, status);
-    }
+    const emailStatus = emailTriggered
+      ? await sendStatusTransitionEmail(prev, status)
+      : "skipped";
 
-    return NextResponse.json({ success: true, application: result[0], emailTriggered });
+    return NextResponse.json({ success: true, application: result[0], emailTriggered, email_status: emailStatus });
   } catch (error: unknown) {
     console.error("Error updating application:", error);
     return NextResponse.json(publicStepBody(), { status: 500 });

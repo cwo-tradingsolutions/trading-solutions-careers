@@ -12,12 +12,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { aiInterviewEnabled } from "@/lib/ai-interview-flag";
 
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   const authError = requireAdmin(req);
   if (authError) return authError;
+  if (!aiInterviewEnabled()) {
+    return NextResponse.json({ status: "disabled" }, { status: 503 });
+  }
 
   const url = new URL(req.url);
   const email = url.searchParams.get("email");

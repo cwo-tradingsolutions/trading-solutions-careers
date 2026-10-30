@@ -1,7 +1,7 @@
 /**
  * POST /api/google/disconnect — borra el token de Google de ESTE ambiente.
  * En preview no borra la fila de producción. Después, los emails de este
- * ambiente vuelven a salir vía Resend (default).
+ * ambiente quedan pendientes hasta que alguien vuelva a conectar el buzón.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";

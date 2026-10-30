@@ -14,12 +14,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { isPreviewTestMode } from "@/lib/preview-mode";
+import { aiInterviewEnabled } from "@/lib/ai-interview-flag";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: { token: string } }
 ) {
   const { token } = params;
+  if (!aiInterviewEnabled()) {
+    return NextResponse.json({ status: "disabled" }, { status: 503 });
+  }
 
   const { data: interview, error } = await supabaseAdmin
     .from("ht_ai_interviews")
