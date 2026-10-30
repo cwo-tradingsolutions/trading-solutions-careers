@@ -14,6 +14,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import Anthropic from "@anthropic-ai/sdk";
 import { crearAnthropic } from "@/lib/anthropic";
 import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
+import { publicStepBody } from "@/lib/candidate-public-error";
 
 // Permitir hasta 90s — los 3 agentes Claude en paralelo con transcripts de
 // 14K chars pueden tardar 40-60s. Vercel Pro permite hasta 90s.
@@ -384,9 +385,6 @@ export async function POST(
     });
   } catch (err) {
     console.error("ai-interview finalize error:", err);
-    return NextResponse.json(
-      { error: "Error interno", detail: (err as Error).message },
-      { status: 500 }
-    );
+    return NextResponse.json(publicStepBody(), { status: 500 });
   }
 }

@@ -386,7 +386,7 @@ export default function PrefiltroForm() {
         });
         if (!res.ok) {
           const j = await res.json();
-          setErrorMsg(j.error || "Submission error.");
+          setErrorMsg(j.error_en ? `${j.error} ${j.error_en}` : (j.error || "Submission error."));
           setPhase("error");
           return;
         }
@@ -429,7 +429,7 @@ export default function PrefiltroForm() {
         });
         if (!res.ok) {
           const j = await res.json();
-          setErrorMsg(j.error || "Submission error.");
+          setErrorMsg(j.error_en ? `${j.error} ${j.error_en}` : (j.error || "Submission error."));
           setPhase("error");
           return;
         }
@@ -536,7 +536,7 @@ export default function PrefiltroForm() {
       });
       if (!res.ok) {
         const j = await res.json();
-        setErrorMsg(j.error || "Error al enviar.");
+        setErrorMsg(j.error_en ? `${j.error} ${j.error_en}` : (j.error || "Error al enviar."));
         setPhase("error");
         return;
       }

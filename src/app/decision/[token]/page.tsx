@@ -45,7 +45,7 @@ export default function DecisionPage() {
       .then(async r => {
         const j = await r.json();
         if (!r.ok) {
-          setError(j.error || 'Error');
+          setError(j.error_en ? `${j.error} ${j.error_en}` : (j.error || "No pudimos completar este paso. Escríbenos a jointheteam@tradingsolutions.com"));
           setPhase('error');
         } else {
           setState(j);
@@ -77,13 +77,13 @@ export default function DecisionPage() {
       });
       const j = await r.json();
       if (!r.ok) {
-        setError(j.error || 'Error');
+        setError(j.error_en ? `${j.error} ${j.error_en}` : (j.error || "No pudimos completar este paso. Escríbenos a jointheteam@tradingsolutions.com"));
         setPhase('choose');
       } else {
         setPhase('done');
       }
-    } catch (e: any) {
-      setError(e?.message || 'Error de red');
+    } catch {
+      setError("No pudimos completar este paso. Escríbenos a jointheteam@tradingsolutions.com We couldn't complete this step. Write to us at jointheteam@tradingsolutions.com");
       setPhase('choose');
     }
   };

@@ -23,6 +23,7 @@ import {
   type PanamaScore,
 } from "@/lib/panama-ops-prefilter";
 import { recordStageEvent } from "@/lib/stage-events";
+import { publicStepBody } from "@/lib/candidate-public-error";
 import { enviarBateriaAuto } from "@/lib/bateria/invitar";
 import { batteryAutoSendEnabled, NOTA_BATERIA_PENDIENTE } from "@/lib/battery-auto-send";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
@@ -784,7 +785,8 @@ export async function POST(
     .eq("id", candidate.id);
 
   if (updateErr) {
-    return NextResponse.json({ error: "save_failed", detail: updateErr.message }, { status: 500 });
+    console.error("prefilter save", updateErr);
+    return NextResponse.json(publicStepBody(), { status: 500 });
   }
 
   // El submit del prefiltro decide la etapa por sí solo. Sin registrar el

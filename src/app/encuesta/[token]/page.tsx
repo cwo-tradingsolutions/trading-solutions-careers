@@ -36,21 +36,23 @@ export default function EncuestaPage() {
     if (!token) return;
     fetch(`/api/candidate-experience/${token}`)
       .then(async r => {
-        const j = await r.json();
+        const j = await r.json().catch(() => ({}));
         if (!r.ok) {
-          setError(j.error || 'Error al cargar encuesta');
+          if (r.status === 404) setError("missing");
+          else if (r.status === 410) setError("expired");
+          else setError("load");
         } else {
           setState(j);
           if (j.already_submitted) setSubmitted(true);
         }
         setLoading(false);
       })
-      .catch(() => { setError('No pudimos conectar al servidor'); setLoading(false); });
+      .catch(() => { setError("load"); setLoading(false); });
   }, [token]);
 
   const submit = async () => {
     if (npsScore == null) {
-      setError('Por favor, responde el NPS antes de enviar');
+      setError("nps");
       return;
     }
     setSubmitting(true);
@@ -71,15 +73,17 @@ export default function EncuestaPage() {
           improvement_suggestions: suggestions || null,
         }),
       });
-      const j = await r.json();
+      await r.json().catch(() => ({}));
       if (!r.ok) {
-        setError(j.error || 'Error al enviar');
+        if (r.status === 409) setError("already");
+        else if (r.status === 410) setError("expired");
+        else setError("send");
       } else {
         setSubmitted(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
-    } catch (e: any) {
-      setError(e?.message || 'Error de red');
+    } catch {
+      setError("send");
     } finally {
       setSubmitting(false);
     }
@@ -95,7 +99,13 @@ export default function EncuestaPage() {
         <div className="text-center">
           <div className="text-5xl mb-3">😕</div>
           <h2 className="text-xl font-bold mb-2">No pudimos abrir tu encuesta</h2>
-          <p className="text-sm text-gray-600">{error}</p>
+          {error === "missing" ? (
+            <p className="text-sm text-gray-600">No encontramos esta encuesta. Escríbenos a jointheteam@tradingsolutions.com</p>
+          ) : error === "expired" ? (
+            <p className="text-sm text-gray-600">Esta encuesta expiró. Escríbenos a jointheteam@tradingsolutions.com</p>
+          ) : (
+            <SurveyLoadCopy />
+          )}
         </div>
       </CenteredCard>
     );
@@ -188,7 +198,17 @@ export default function EncuestaPage() {
           </Section>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm text-red-800">{error}</div>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm text-red-800">
+              {error === "nps" ? (
+                "Por favor, responde el NPS antes de enviar"
+              ) : error === "already" ? (
+                "Esta encuesta ya fue respondida."
+              ) : error === "expired" ? (
+                "Esta encuesta expiró. Escríbenos a jointheteam@tradingsolutions.com"
+              ) : (
+                <SurveySendCopy />
+              )}
+            </div>
           )}
 
           <button
@@ -205,6 +225,30 @@ export default function EncuestaPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function SurveyLoadCopy() {
+  return (
+    <>
+      <p className="text-sm text-gray-700">
+        No pudimos cargar la encuesta. Escríbenos a{" "}
+        <a className="underline" href="mailto:jointheteam@tradingsolutions.com">jointheteam@tradingsolutions.com</a>
+      </p>
+      <p className="mt-3 text-sm text-gray-600">
+        We couldn&apos;t load the survey. Write to us at{" "}
+        <a className="underline" href="mailto:jointheteam@tradingsolutions.com">jointheteam@tradingsolutions.com</a>
+      </p>
+    </>
+  );
+}
+
+function SurveySendCopy() {
+  return (
+    <>
+      <p>No pudimos enviar la encuesta. Escríbenos a jointheteam@tradingsolutions.com</p>
+      <p className="mt-2">We couldn&apos;t send the survey. Write to us at jointheteam@tradingsolutions.com</p>
+    </>
   );
 }
 

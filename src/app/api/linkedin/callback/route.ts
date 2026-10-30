@@ -73,10 +73,7 @@ export async function GET(request: NextRequest) {
     );
     return res;
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "unknown_error";
-    return NextResponse.json(
-      { error: "token_exchange_failed", detail: msg },
-      { status: 500 }
-    );
+    console.error("linkedin callback", e);
+    return NextResponse.json({ error: "token_exchange_failed" }, { status: 500 });
   }
 }

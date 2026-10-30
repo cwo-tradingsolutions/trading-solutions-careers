@@ -13,6 +13,7 @@ import { isEnglishTemplate, resolveCandidateLang } from "@/lib/candidate-lang";
 import { candidateSignatureHtml } from "@/lib/ats-from";
 import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 import { canalPostulacionPublica } from "@/lib/candidate-source";
+import { publicStepBody } from "@/lib/candidate-public-error";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -316,8 +317,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error: unknown) {
     console.error("Error creating application:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(publicStepBody(), { status: 500 });
   }
 }
 
@@ -411,7 +411,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error("Error fetching applications:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(publicStepBody(), { status: 500 });
   }
 }

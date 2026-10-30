@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { findItem, ITEMS } from '@/lib/bateria/items';
 import { cerrarSesion } from '@/lib/bateria/cerrar';
 import { isPreviewTestMode, previewTestJson } from '@/lib/preview-mode';
+import { publicStepBody } from '@/lib/candidate-public-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,7 +62,10 @@ export async function POST(req: NextRequest) {
       { onConflict: 'session_id,item_code' }
     );
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      console.error('bateria/answer', error);
+      return NextResponse.json(publicStepBody(), { status: 500 });
+    }
 
     // Cierre automatico al responder el ultimo item.
     // Si el candidato cierra el navegador justo ahi —que es lo que pasa— el
