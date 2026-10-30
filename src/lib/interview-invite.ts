@@ -5,7 +5,7 @@
  * y el cuerpo del evento de Calendar con Google Meet. La ruta HTTP aplica
  * los efectos (Gmail send, Calendar, fila en ht_interviews).
  */
-import { ATS_FROM_NAME } from "./ats-from";
+import { ATS_FROM_NAME, candidateSignatureHtml } from "./ats-from";
 import { isChinaProcess, resolveCandidateLang, type CandidateLang } from "./candidate-lang";
 import {
   PREVIEW_GOOGLE_CONNECT_LABEL,
@@ -422,7 +422,7 @@ export function renderInterviewEmail(opts: {
 <strong>Interviewer:</strong> ${interviewer}
 </div>
 <p>If you need to reschedule, reply to this email.</p>
-<p>Best regards,<br/><strong>${ATS_FROM_NAME}</strong><br/>Trading Solutions</p>
+${candidateSignatureHtml("en")}
 </div></div>`
       : `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111;">
 <div style="background:#000;color:#fff;padding:16px 20px;border-radius:8px 8px 0 0;font-weight:800;letter-spacing:2px;font-size:14px;">TRADING SOLUTIONS</div>
@@ -436,7 +436,7 @@ export function renderInterviewEmail(opts: {
 <strong>Entrevistador:</strong> ${interviewer}
 </div>
 <p>Si necesitas reagendar, responde a este correo.</p>
-<p>Un abrazo,<br/><strong>${ATS_FROM_NAME}</strong><br/>Trading Solutions</p>
+${candidateSignatureHtml("es")}
 </div></div>`;
 
   return { subject, html, fromName: ATS_FROM_NAME };

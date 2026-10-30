@@ -10,7 +10,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
-import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { ATS_FROM_NAME, candidateSignatureHtml } from "@/lib/ats-from";
 
 export const runtime = "nodejs";
 
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
     <p>Elige el horario que mejor te funcione · solo vas a ver opciones donde todos estén disponibles al mismo tiempo. Una vez confirmes, se genera la videollamada de Google Meet automáticamente.</p>
     <p style="text-align:center"><a href="${jointLink}" class="cta">Elegir horario</a></p>
     <p>Si ninguno de los horarios disponibles te funciona, regálame una respuesta a este correo y buscamos juntos.</p>
-    <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>
+    ${candidateSignatureHtml("es")}
     <div class="footer">El enlace queda activo 7 días. La videollamada de Google Meet se genera automáticamente al confirmar el horario.</div>
   </div>
 </body></html>`;
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
     <p>Choose the time that works best for you · you will only see options where everyone is available at the same time. Once you confirm, the Google Meet video call is created automatically.</p>
     <p style="text-align:center"><a href="${jointLink}" class="cta">Choose a time</a></p>
     <p>If none of the available times work for you, just reply to this email and we will find one together.</p>
-    <p>Best regards,<br><strong>Talent Acquisition Team</strong> · Trading Solutions</p>
+    ${candidateSignatureHtml("en")}
     <div class="footer">The link stays active for 7 days. The Google Meet video call is created automatically when you confirm your time.</div>
   </div>
 </body></html>`;

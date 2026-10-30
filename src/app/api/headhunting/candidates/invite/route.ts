@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { Resend } from 'resend';
 import { createDraftViaGmail, isGmailConnected } from '@/lib/gmail';
 import crypto from 'crypto';
-import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { ATS_FROM_NAME, candidateSignatureHtml } from "@/lib/ats-from";
 
 function getResend(): Resend | null {
   const key = process.env.RESEND_API_KEY;
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
           <li>Responde con tu primera reacción</li>
         </ul></div>
       <p>Si tienes alguna pregunta, simplemente responde este correo.</p>
-      <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>${clientName}</p>
+      ${candidateSignatureHtml("es")}
     </div>
     <div class="footer">Powered by ELEVARE Career · Evaluación confidencial<br>Este enlace es personal e intransferible.</div>
   </div></body></html>`;

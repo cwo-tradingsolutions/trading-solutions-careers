@@ -9,7 +9,7 @@
  * crea borrador ni se envía; la decisión en el ATS sí se guarda.
  */
 
-import { ATS_FROM_NAME, ATS_FROM_NAME_EN } from "./ats-from";
+import { ATS_FROM_NAME, ATS_FROM_NAME_EN, candidateSignatureHtml } from "./ats-from";
 
 export type RejectionLang = "es" | "en";
 
@@ -75,15 +75,17 @@ export function rejectionPlain(firstName: string, vacancyTitle: string, lang: Re
 }
 
 /**
- * HTML of the approved text only. The body already includes the LinkedIn
- * line and the signature, so this does not append a second footer.
+ * HTML of the approved text. The plain signature lines are rendered with
+ * the shared strong block, once.
  */
 export function buildRejectionHtml(
   firstName: string,
   vacancyTitle: string,
   lang: RejectionLang = "es",
 ): string {
-  const text = rejectionPlain(firstName, vacancyTitle, lang);
+  const text = rejectionPlain(firstName, vacancyTitle, lang)
+    .replace(/\n*(?:Un abrazo|Best regards),\nTalent Acquisition Team\nTrading Solutions\s*$/, "")
+    .trimEnd();
   const inner = text
     .split(/\n\n/)
     .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br>")}</p>`)
@@ -97,6 +99,7 @@ export function buildRejectionHtml(
 </style></head><body>
   <div class="container">
     ${inner}
+    ${candidateSignatureHtml(lang)}
   </div>
 </body></html>`;
 }

@@ -17,7 +17,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
-import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { ATS_FROM_NAME, candidateSignatureHtml } from "@/lib/ats-from";
 
 export async function POST(
   req: NextRequest,
@@ -114,9 +114,7 @@ export async function POST(
 
     <p>Cuando termines, contame por este mismo correo. Si surge cualquier duda en el camino, escribime.</p>
 
-    <p>Un abrazo,<br>
-    <strong>Talent Acquisition Team</strong><br>
-    Trading Solutions</p>
+    ${candidateSignatureHtml("es")}
 
     <div class="footer">Antes de enviar, pegá los enlaces personalizados de Bluesite y Psicoalianza.</div>
   </div>
@@ -167,10 +165,7 @@ export async function POST(
 
     <p>Let us know through this same email when you are done. If anything comes up along the way, just write to us.</p>
 
-    <p>Best regards,<br>
-    <strong>Talent Acquisition Team</strong><br>
-    Talent Acquisition and Development<br>
-    Trading Solutions</p>
+    ${candidateSignatureHtml("en")}
 
     <div class="footer">Before sending, paste the personal Bluesite and Psicoalianza links.</div>
   </div>

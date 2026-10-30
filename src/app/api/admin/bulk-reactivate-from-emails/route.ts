@@ -16,7 +16,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
 import crypto from "crypto";
-import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { ATS_FROM_NAME, candidateSignatureHtml } from "@/lib/ats-from";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -38,7 +38,7 @@ function buildReplyHtml(firstName: string, vacancyTitle: string, freshUrl: strin
     <p style="text-align:center"><a href="${freshUrl}" class="cta">Continuar</a></p>
     <p style="font-size:12px;color:#737373;word-break:break-all">O cópialo: ${freshUrl}</p>
     <p>Cualquier cosa que necesites para avanzar, regálame una respuesta a este correo.</p>
-    <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>
+    ${candidateSignatureHtml("es")}
   </div>
 </body></html>`;
 }

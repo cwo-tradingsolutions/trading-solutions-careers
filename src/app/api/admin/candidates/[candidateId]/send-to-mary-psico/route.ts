@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
-import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { ATS_FROM_NAME, candidateSignatureHtml } from "@/lib/ats-from";
 
 export const runtime = "nodejs";
 
@@ -86,7 +86,7 @@ function buildEmailHtml(opts: {
 
     <p>Cuando tengas todo, nos avisas para coordinar entrevista final con Hiring Manager + CWO.</p>
 
-    <p>Gracias!<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>
+    ${candidateSignatureHtml("es")}
     <div class="footer">Generado desde el ATS al mover al candidato a "Pruebas Psicométricas".</div>
   </div>
 </body></html>`;

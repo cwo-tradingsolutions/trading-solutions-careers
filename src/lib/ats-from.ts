@@ -40,10 +40,13 @@ export function atsFromHeader(mailbox: string = ATS_FROM_EMAIL): string {
   return `${encodeMailboxDisplayName()} <${addr}>`;
 }
 
-/** Same closing block on every candidate email. */
+/**
+ * Same closing block on every candidate email.
+ * One markup: closing line, the team name in strong, then the company.
+ */
 export function candidateSignatureHtml(lang: "es" | "en" = "es"): string {
   const close = lang === "en" ? "Best regards" : "Un abrazo";
-  return `<p style="margin-top:24px">${close},<br>Talent Acquisition Team<br>Trading Solutions</p>`;
+  return `<p>${close},<br><strong>${ATS_FROM_NAME}</strong><br>Trading Solutions</p>`;
 }
 
 export function candidateSignatureText(lang: "es" | "en" = "es"): string {

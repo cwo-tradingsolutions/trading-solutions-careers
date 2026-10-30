@@ -16,6 +16,7 @@
  *  - La modalidad remota exige camara activa. Quien no quiera, presencial.
  *  - Un enlace por persona. No se puede retomar despues de cerrar.
  */
+import { candidateSignatureHtml, candidateSignatureText } from '@/lib/ats-from';
 import { stageSla } from '@/lib/stage-labels';
 
 export type DatosCorreo = {
@@ -100,8 +101,7 @@ export function textoBateria(d: DatosCorreo): string {
     '',
     'Cualquier duda, responde este mismo correo.',
     '',
-    d.firma ?? FIRMA,
-    'Trading Solutions',
+    candidateSignatureText('es'),
   ].join('\n');
 }
 
@@ -114,7 +114,6 @@ export function htmlBateria(d: DatosCorreo): string {
     : 'El siguiente paso del proceso de selección en Trading Solutions es la batería TS.';
   const plazo = esc(fechaLimiteBateria(d.fechaLimite, 'es'));
   const url = esc(d.url);
-  const firma = esc(d.firma ?? FIRMA);
 
   const punto = (txt: string) =>
     `<li style="margin:0 0 9px;line-height:1.55">${txt}</li>`;
@@ -160,10 +159,7 @@ export function htmlBateria(d: DatosCorreo): string {
         Cualquier duda, responde este mismo correo.
       </p>
 
-      <p style="margin:0;font-size:15px;line-height:1.6;color:${INK}">
-        ${firma}<br>
-        <span style="color:${MUTE};font-size:13.5px">Trading Solutions</span>
-      </p>
+      ${candidateSignatureHtml('es')}
     </div>
 
     <div style="padding:16px 32px 22px;border-top:1px solid rgba(0,0,0,.06)">
@@ -221,8 +217,7 @@ export function textoBateriaEn(d: DatosCorreo): string {
     '',
     'If you have any questions, just reply to this email.',
     '',
-    d.firma ?? FIRMA_EN,
-    'Trading Solutions',
+    candidateSignatureText('en'),
   ].join('\n');
 }
 
@@ -235,7 +230,6 @@ export function htmlBateriaEn(d: DatosCorreo): string {
     : 'The next step in the selection process at Trading Solutions is the TS battery.';
   const plazo = esc(fechaLimiteBateria(d.fechaLimite, 'en'));
   const url = esc(d.url);
-  const firma = esc(d.firma ?? FIRMA_EN);
 
   const punto = (txt: string) =>
     `<li style="margin:0 0 9px;line-height:1.55">${txt}</li>`;
@@ -281,10 +275,7 @@ export function htmlBateriaEn(d: DatosCorreo): string {
         If you have any questions, just reply to this email.
       </p>
 
-      <p style="margin:0;font-size:15px;line-height:1.6;color:${INK}">
-        ${firma}<br>
-        <span style="color:${MUTE};font-size:13.5px">Trading Solutions</span>
-      </p>
+      ${candidateSignatureHtml('en')}
     </div>
 
     <div style="padding:16px 32px 22px;border-top:1px solid rgba(0,0,0,.06)">

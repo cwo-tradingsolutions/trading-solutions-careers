@@ -15,7 +15,7 @@ import { recordStageEvent } from "@/lib/stage-events";
 import { normalizeStage, STAGE_RANK } from "@/lib/stage-labels";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import crypto from "crypto";
-import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { ATS_FROM_NAME, candidateSignatureHtml } from "@/lib/ats-from";
 
 export async function POST(
   req: NextRequest,
@@ -123,7 +123,7 @@ export async function POST(
       <li>Mejor hacela de corrido, sin pausas largas</li>
     </ul>
     <p>Después de la entrevista nos contactamos contigo para los siguientes pasos. Si te queda alguna duda, contestame este correo.</p>
-    <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>
+    ${candidateSignatureHtml("es")}
   </div>
 </body></html>`;
 
@@ -150,7 +150,7 @@ export async function POST(
       <li>Better to do it in one go, without long pauses</li>
     </ul>
     <p>After the interview we will get in touch with you about the next steps. If you have any questions, just reply to this email.</p>
-    <p>Best regards,<br><strong>Talent Acquisition Team</strong> · Trading Solutions</p>
+    ${candidateSignatureHtml("en")}
   </div>
 </body></html>`;
 

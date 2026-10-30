@@ -8,6 +8,8 @@
  * respondio porque se le paso, no porque perdio el interes.
  */
 
+import { candidateSignatureHtml, candidateSignatureText } from "./ats-from";
+
 export type DatosRecordatorio = {
   nombre: string | null;
   vacante: string | null;
@@ -49,8 +51,7 @@ export function textoRecordatorio(d: DatosRecordatorio): string {
     '',
     'Si ya no te interesa la vacante o cambiaste de planes, respóndenos con una línea y cerramos tu proceso sin problema. Saberlo nos ayuda tanto como el cuestionario.',
     '',
-    d.firma ?? FIRMA_RECORDATORIO,
-    'Trading Solutions',
+    candidateSignatureText("es"),
   ].filter((l) => l !== '').join('\n');
 }
 
@@ -95,10 +96,7 @@ export function htmlRecordatorio(d: DatosRecordatorio): string {
         proceso sin problema. Saberlo nos ayuda tanto como el cuestionario.
       </p>
 
-      <p style="margin:0;font-size:15px;line-height:1.6">
-        ${d.firma ?? FIRMA_RECORDATORIO}<br>
-        <span style="color:#6B7280;font-size:13.5px">Trading Solutions</span>
-      </p>
+      ${candidateSignatureHtml("es")}
     </div>
 
     <div style="padding:16px 32px 24px;border-top:1px solid #E5E7EB">
@@ -139,8 +137,7 @@ export function textoRecordatorioEn(d: DatosRecordatorio): string {
     '',
     "If you're no longer interested or your plans changed, just reply with one line and we'll close your process. Knowing helps us as much as the questionnaire does.",
     '',
-    d.firma ?? EN_REMINDER_SIGNATURE,
-    'Trading Solutions',
+    candidateSignatureText("en"),
   ].filter((l) => l !== '').join('\n');
 }
 
@@ -185,10 +182,7 @@ export function htmlRecordatorioEn(d: DatosRecordatorio): string {
         process. Knowing helps us as much as the questionnaire does.
       </p>
 
-      <p style="margin:0;font-size:15px;line-height:1.6">
-        ${d.firma ?? EN_REMINDER_SIGNATURE}<br>
-        <span style="color:#6B7280;font-size:13.5px">Trading Solutions</span>
-      </p>
+      ${candidateSignatureHtml("en")}
     </div>
 
     <div style="padding:16px 32px 24px;border-top:1px solid #E5E7EB">

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ATS_FROM_EMAIL, ATS_FROM_NAME, atsFromHeader, encodeMailboxDisplayName } from "./ats-from";
+import { ATS_FROM_EMAIL, ATS_FROM_NAME, atsFromHeader, candidateSignatureHtml, encodeMailboxDisplayName } from "./ats-from";
 
 const HEADER = `${ATS_FROM_NAME} <${ATS_FROM_EMAIL}>`;
 
@@ -21,4 +21,12 @@ test("From is Talent Acquisition Team at jointheteam, even if the caller passes 
   assert.equal(atsFromHeader(ATS_FROM_EMAIL), HEADER);
   assert.doesNotMatch(HEADER, /Kelly|Casta|Ã|=\?UTF-8/i);
   assert.match(HEADER, /^Talent Acquisition Team <jointheteam@tradingsolutions.com>$/);
+  assert.equal(
+    candidateSignatureHtml("es"),
+    "<p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>",
+  );
+  assert.equal(
+    candidateSignatureHtml("en"),
+    "<p>Best regards,<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>",
+  );
 });
