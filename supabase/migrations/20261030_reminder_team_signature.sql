@@ -1,6 +1,12 @@
 -- NOT APPLIED. This file only rewrites the signature and the WhatsApp
 -- greeting inside ts_reminder_rules.templates. It does not change subjects,
 -- bodies, stages, or on_exhausted_action.
+--
+-- WhatsApp greeting (replaces "Soy Kelly…"):
+--   ES: Te escribe el Talent Acquisition Team de Trading Solutions
+--   EN: The Talent Acquisition Team at Trading Solutions is writing to you
+--   PT: A Talent Acquisition Team da Trading Solutions escreve para você
+-- The 20260507 seed has ES and EN only, so this UPDATE does not invent a PT body.
 -- Idempotent: replace() of a phrase that is already gone is a no-op, and
 -- the WHERE skips rows that no longer contain a Kelly greeting.
 --
@@ -37,12 +43,12 @@ SET templates = (
   replace(
     templates::text,
     'Kelly Castañeda · Trading Solutions', 'Talent Acquisition Team · Trading Solutions'),
-    'Soy Kelly de Trading Solutions', 'Te escribimos del Talent Acquisition Team de Trading Solutions'),
-    'soy Kelly de Trading Solutions', 'te escribimos del Talent Acquisition Team de Trading Solutions'),
-    'This is Kelly from Trading Solutions', 'This is the Talent Acquisition Team at Trading Solutions'),
-    'this is Kelly from Trading Solutions', 'this is the Talent Acquisition Team at Trading Solutions'),
-    'soy Kelly.', 'te escribimos del Talent Acquisition Team.'),
-    'this is Kelly.', 'this is the Talent Acquisition Team.')
+    'Soy Kelly de Trading Solutions', 'Te escribe el Talent Acquisition Team de Trading Solutions'),
+    'soy Kelly de Trading Solutions', 'te escribe el Talent Acquisition Team de Trading Solutions'),
+    'This is Kelly from Trading Solutions', 'The Talent Acquisition Team at Trading Solutions is writing to you'),
+    'this is Kelly from Trading Solutions', 'the Talent Acquisition Team at Trading Solutions is writing to you'),
+    'soy Kelly.', 'te escribe el Talent Acquisition Team de Trading Solutions.'),
+    'this is Kelly.', 'the Talent Acquisition Team at Trading Solutions is writing to you.')
 )::jsonb,
     updated_at = NOW()
 WHERE templates::text LIKE '%Kelly Castañeda%'

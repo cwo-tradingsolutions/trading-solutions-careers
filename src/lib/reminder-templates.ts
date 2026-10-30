@@ -37,14 +37,16 @@ export async function getActiveReminderRules(): Promise<ReminderRule[]> {
   return (data || []) as ReminderRule[];
 }
 
+// WhatsApp speaks as the team writing. PT templates are not in the seed;
+// the equivalent line is "A Talent Acquisition Team da Trading Solutions escreve para você."
 const TEAM_VOICE: [string, string][] = [
   ["Kelly Castañeda · Trading Solutions", "Talent Acquisition Team · Trading Solutions"],
-  ["Soy Kelly de Trading Solutions", "Te escribimos del Talent Acquisition Team de Trading Solutions"],
-  ["soy Kelly de Trading Solutions", "te escribimos del Talent Acquisition Team de Trading Solutions"],
-  ["This is Kelly from Trading Solutions", "This is the Talent Acquisition Team at Trading Solutions"],
-  ["this is Kelly from Trading Solutions", "this is the Talent Acquisition Team at Trading Solutions"],
-  ["soy Kelly.", "te escribimos del Talent Acquisition Team."],
-  ["this is Kelly.", "this is the Talent Acquisition Team."],
+  ["Soy Kelly de Trading Solutions", "Te escribe el Talent Acquisition Team de Trading Solutions"],
+  ["soy Kelly de Trading Solutions", "te escribe el Talent Acquisition Team de Trading Solutions"],
+  ["This is Kelly from Trading Solutions", "The Talent Acquisition Team at Trading Solutions is writing to you"],
+  ["this is Kelly from Trading Solutions", "the Talent Acquisition Team at Trading Solutions is writing to you"],
+  ["soy Kelly.", "te escribe el Talent Acquisition Team de Trading Solutions."],
+  ["this is Kelly.", "the Talent Acquisition Team at Trading Solutions is writing to you."],
 ];
 
 /** Firma y saludo del equipo, aunque la fila en la base todavía diga Kelly. */
