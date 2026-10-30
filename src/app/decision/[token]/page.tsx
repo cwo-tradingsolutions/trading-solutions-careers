@@ -77,8 +77,11 @@ export default function DecisionPage() {
           category_key: categoryKey || undefined,
         }),
       });
-      if (!r.ok) {
-        setError(`No pudimos registrar la decisión. Escríbenos a ${CANDIDATE_MAIL}. We couldn't save this decision. Write to us at ${CANDIDATE_MAIL}.`);
+      if (r.status === 409) {
+        setError("Ya registramos tu respuesta. / We already saved your answer.");
+        setPhase('choose');
+      } else if (!r.ok) {
+        setError(`No pudimos registrar la decisión. Escríbenos a ${CANDIDATE_MAIL}. / We couldn't save this decision. Write to us at ${CANDIDATE_MAIL}.`);
         setPhase('choose');
       } else {
         setPhase('done');

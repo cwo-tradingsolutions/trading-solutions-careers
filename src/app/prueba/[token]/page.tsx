@@ -117,8 +117,8 @@ const T: Record<Lang, Dict> = {
     errNetwork: `No pudimos conectar. Escríbenos a ${CANDIDATE_MAIL} si el enlace no abre.`,
     errInvalidLink: INVALID_LINK_ES,
     errAlreadyTaken: "Esta prueba ya fue presentada",
-    errConsentSave: "No pudimos registrar su autorización. Escríbanos y le enviamos un enlace nuevo.",
-    errConsentNetwork: `No pudimos registrar su autorización. Escríbanos a ${CANDIDATE_MAIL}.`,
+    errConsentSave: "No pudimos registrar tu autorización. Escríbenos y te enviamos un enlace nuevo.",
+    errConsentNetwork: `No pudimos registrar tu autorización. Escríbenos a ${CANDIDATE_MAIL}.`,
 
     consentTitle: "Autorización de tratamiento de datos personales",
     consentIntro:
@@ -190,9 +190,9 @@ const T: Record<Lang, Dict> = {
   en: {
     loading: "Loading…",
     errorTitle: "We could not open the assessment",
-    errorHelp: `Write to us at ${CANDIDATE_MAIL} and we will help.`,
+    errorHelp: `Write to us at ${CANDIDATE_MAIL} and we'll help.`,
     errOpen: "We could not open the assessment.",
-    errNetwork: `We could not connect. Write to us at ${CANDIDATE_MAIL} if this link will not open.`,
+    errNetwork: `We could not connect. Write to us at ${CANDIDATE_MAIL} if this link doesn't open.`,
     errInvalidLink: INVALID_LINK_EN,
     errAlreadyTaken: "This assessment has already been taken",
     errConsentSave: "We could not record your consent. Write to us and we will send you a new link.",

@@ -14,9 +14,16 @@ test("session-expired notice watches the routes closed in hotfix 27", () => {
     "/api/matching",
     "/api/google",
     "/api/assessment-preview",
+    "/api/vacancies",
+    "/api/requisitions",
+    "/api/candidates",
+    "/api/referrals",
+    "/api/ranking",
+    "/api/agents",
+    "/api/bateria",
   ]) {
     assert.equal(HR_ADMIN_SESSION_API_PREFIXES.includes(prefix as never), true);
     assert.equal(isHrAdminSessionApi(`https://careers.example${prefix}/1`), true);
   }
-  assert.equal(isHrAdminSessionApi("https://careers.example/api/referrals"), false);
+  assert.equal(isHrAdminSessionApi("https://careers.example/api/portal/abc"), false);
 });

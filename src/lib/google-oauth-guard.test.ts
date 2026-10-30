@@ -7,6 +7,7 @@ import {
   GOOGLE_OAUTH_STATE_COOKIE,
   createOAuthState,
   oauthStateKey,
+  openOAuthState,
   sealOAuthState,
 } from "./google-oauth-state.ts";
 
@@ -19,6 +20,22 @@ function sessionParts(secret = SECRET) {
   const token = `${ts}.${sig}`;
   return { token, cookie: `hr_admin_session=${token}` };
 }
+
+test("the mailbox state seal expires on its own", () => {
+  const state = createOAuthState();
+  const expired = sealOAuthState(state, "session-key", Date.now() - 11 * 60 * 1000);
+  assert.equal(openOAuthState(expired, "session-key"), null);
+  assert.equal(openOAuthState(sealOAuthState(state, "session-key"), "session-key"), state);
+});
+
+test("GET /api/vacancies admin mode without a session is 401", async () => {
+  const { GET } = await import("../app/api/vacancies/route.ts");
+  const res = await GET(new NextRequest("https://careers.example/api/vacancies", {
+    headers: { "x-hr-admin": "1" },
+  }));
+  assert.equal(res.status, 401);
+  assert.deepEqual(await res.json(), { error: "Unauthorized" });
+});
 
 test("GET /api/google/auth and callback without a session return 401", async () => {
   const auth = await import("../app/api/google/auth/route.ts");

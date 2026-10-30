@@ -10,6 +10,13 @@ export const HR_ADMIN_SESSION_API_PREFIXES = [
   "/api/matching",
   "/api/google",
   "/api/assessment-preview",
+  "/api/vacancies",
+  "/api/requisitions",
+  "/api/candidates",
+  "/api/referrals",
+  "/api/ranking",
+  "/api/agents",
+  "/api/bateria",
 ] as const;
 
 export function isHrAdminSessionApi(url: string): boolean {

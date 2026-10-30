@@ -72,7 +72,6 @@ export async function GET(
         client_name: client?.name || "Trading Solutions",
         recruiter_name: "Talent Acquisition Team",
         interview_token: token,
-        interview_id: String(interview.id),
       };
 
       // Request signed URL from ElevenLabs. include_conversation_id stores the
@@ -84,7 +83,12 @@ export async function GET(
       if (r.ok) {
         const j = await r.json();
         signedUrl = j.signed_url;
-        if (typeof j.conversation_id === "string" && j.conversation_id && !isPreviewTestMode()) {
+        if (
+          typeof j.conversation_id === "string" &&
+          j.conversation_id &&
+          !interview.conversation_id &&
+          !isPreviewTestMode()
+        ) {
           const { error: bindError } = await supabaseAdmin
             .from("ht_ai_interviews")
             .update({ conversation_id: j.conversation_id })

@@ -20,7 +20,6 @@ import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 import { publicStepBody } from "@/lib/candidate-public-error";
 import {
   fetchElevenConversation,
-  listElevenConversationIds,
   runCandidateFinalize,
 } from "@/lib/ai-interview-finalize";
 
@@ -260,7 +259,6 @@ export async function POST(
       },
       body,
       fetchConversation: (id) => (apiKey ? fetchElevenConversation(id, apiKey) : Promise.resolve(null)),
-      listConversationIds: (agentId) => (apiKey ? listElevenConversationIds(agentId, apiKey) : Promise.resolve([])),
       markManualReview: async () => {
         await supabaseAdmin
           .from("ht_ai_interviews")
@@ -269,7 +267,9 @@ export async function POST(
             completed_at: new Date().toISOString(),
             ai_recommendation: "REVISION_MANUAL",
           })
-          .eq("id", interview.id);
+          .eq("id", interview.id)
+          .neq("status", "completed")
+          .select("id");
       },
       scoreServerTranscript: async (conversationId, transcript) => {
         const transcriptText = buildTranscriptText(transcript);
@@ -300,7 +300,7 @@ export async function POST(
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://trading-solutions-careers.vercel.app";
         const finalAudioUrl = `${baseUrl}/api/headhunting/ai-interview/${token}/audio?cid=${conversationId}`;
 
-        await supabaseAdmin
+        const { error: writeError } = await supabaseAdmin
           .from("ht_ai_interviews")
           .update({
             status: "completed",
@@ -321,7 +321,11 @@ export async function POST(
             english_score: englishAnalysis.overall_score ?? null,
             english_detail: englishAnalysis,
           })
-          .eq("id", interview.id);
+          .eq("id", interview.id)
+          .neq("status", "completed")
+          .select("id");
+        if (writeError) throw writeError;
+        return true;
       },
     });
 

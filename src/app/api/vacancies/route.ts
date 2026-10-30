@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from 'next/server';
 import { validarFechasWeb, columnaCierreWebExiste } from "@/lib/vacancy-web-dates";
 import { publicStepBody } from "@/lib/candidate-public-error";
-import { presentVacancyList, vacancyListQuery } from "@/lib/public-vacancy";
+import { VACANCY_ADMIN_HEADER, presentVacancyList, vacancyAdminRequested, vacancyListQuery } from "@/lib/public-vacancy";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,9 +19,16 @@ export async function OPTIONS() {
 
 export async function GET(request: NextRequest) {
   try {
-    const sql = neon(process.env.DATABASE_URL!);
     const searchParams = request.nextUrl.searchParams;
-    const admin = requireAdmin(request) === null;
+    const admin = vacancyAdminRequested(
+      request.headers.get(VACANCY_ADMIN_HEADER),
+      searchParams.get("admin"),
+    );
+    if (admin) {
+      const authError = requireAdmin(request);
+      if (authError) return authError;
+    }
+    const sql = neon(process.env.DATABASE_URL!);
     const query = vacancyListQuery({
       admin,
       status: searchParams.get('status'),

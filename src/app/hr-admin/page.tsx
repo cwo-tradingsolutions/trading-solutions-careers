@@ -6,6 +6,7 @@ import NueveBoxPanel from "@/components/NueveBoxPanel";
 import BateriaDashboard from "@/components/BateriaDashboard";
 import { LOGO_TS_SIMBOLO, LOGO_TS_CLASE_EN_OSCURO } from "@/lib/brand";
 import { isHrAdminSessionApi } from "@/lib/hr-admin-session-notice";
+import { VACANCY_ADMIN_HEADER } from "@/lib/public-vacancy";
 import { CanalSelect, errorCanal, FechasVacanteFields, errorFechas } from "@/components/CamposObligatorios";
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
@@ -3036,7 +3037,7 @@ function Vacantes() {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch('/api/vacancies', { cache: 'no-store' });
+        const r = await fetch('/api/vacancies', { cache: 'no-store', headers: { [VACANCY_ADMIN_HEADER]: '1' } });
         const j = await r.json();
         if (!cancelled) {
           const list = (Array.isArray(j) ? j : j.data ?? []) as LiveVacancy[];
@@ -4461,7 +4462,7 @@ function Pipeline() {
   // 1. Cargar vacantes y seleccionar la primera por defecto
   useEffect(() => {
     (async () => {
-      const r = await fetch("/api/vacancies", { cache: "no-store" });
+      const r = await fetch("/api/vacancies", { cache: "no-store", headers: { [VACANCY_ADMIN_HEADER]: "1" } });
       const j = await r.json();
       const list = (Array.isArray(j) ? j : j.data ?? []) as LiveVacancy[];
       setVacs(list);
@@ -4683,7 +4684,7 @@ function Entrevistas() {
     (async () => {
       const [appR, vacR] = await Promise.all([
         fetch('/api/applications?limit=500', { cache: 'no-store' }).then((r) => r.json()),
-        fetch('/api/vacancies', { cache: 'no-store' }).then((r) => r.json()),
+        fetch('/api/vacancies', { cache: 'no-store', headers: { [VACANCY_ADMIN_HEADER]: '1' } }).then((r) => r.json()),
       ]);
       const arr = (appR.applications ?? appR.data ?? []) as typeof apps;
       setApps(arr.filter((a) => ['reviewing', 'interview'].includes(a.status)));
@@ -4991,7 +4992,7 @@ function Pruebas() {
     try {
       const [tr, vr] = await Promise.all([
         fetch("/api/assessments", { cache: "no-store" }).then((r) => r.json()),
-        fetch("/api/vacancies", { cache: "no-store" }).then((r) => r.json()),
+        fetch("/api/vacancies", { cache: "no-store", headers: { [VACANCY_ADMIN_HEADER]: "1" } }).then((r) => r.json()),
       ]);
       setTokens(tr.data ?? []);
       setVacs(Array.isArray(vr) ? vr : vr.data ?? []);
@@ -7366,7 +7367,7 @@ function Analytics() {
       const [asR, tpR, vacR] = await Promise.all([
         fetch("/api/assessments?limit=500", { cache: "no-store" }).then((r) => r.json()),
         fetch("/api/talent-pool?limit=1000", { cache: "no-store" }).then((r) => r.json()),
-        fetch("/api/vacancies", { cache: "no-store" }).then((r) => r.json()),
+        fetch("/api/vacancies", { cache: "no-store", headers: { [VACANCY_ADMIN_HEADER]: "1" } }).then((r) => r.json()),
       ]);
       setData({
         tokens: (asR.data ?? []) as LiveToken[],
@@ -7581,7 +7582,7 @@ function LinkedInTS() {
   useEffect(() => {
     (async () => {
       const [vacR, tpR] = await Promise.all([
-        fetch("/api/vacancies", { cache: "no-store" }).then((r) => r.json()),
+        fetch("/api/vacancies", { cache: "no-store", headers: { [VACANCY_ADMIN_HEADER]: "1" } }).then((r) => r.json()),
         fetch("/api/talent-pool?limit=1000", { cache: "no-store" }).then((r) => r.json()),
       ]);
       setVacs((Array.isArray(vacR) ? vacR : vacR.data ?? []) as LiveVacancy[]);
@@ -7729,7 +7730,7 @@ function Datos() {
   useEffect(() => {
     (async () => {
       const [vacR, appR, tpR, asR] = await Promise.all([
-        fetch("/api/vacancies", { cache: "no-store" }).then((r) => r.json()),
+        fetch("/api/vacancies", { cache: "no-store", headers: { [VACANCY_ADMIN_HEADER]: "1" } }).then((r) => r.json()),
         fetch("/api/applications", { cache: "no-store" }).then((r) => r.json()),
         fetch("/api/talent-pool?limit=1000", { cache: "no-store" }).then((r) => r.json()),
         fetch("/api/assessments?limit=500", { cache: "no-store" }).then((r) => r.json()),

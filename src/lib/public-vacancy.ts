@@ -7,6 +7,13 @@
  * salary_range and salary_range_en.
  */
 
+/** Sent by HR Admin when it needs the full vacancy list. Absent on the public careers site. */
+export const VACANCY_ADMIN_HEADER = "x-hr-admin";
+
+export function vacancyAdminRequested(header: string | null, adminParam: string | null): boolean {
+  return header === "1" || adminParam === "1";
+}
+
 const SALARY_KEYS = ["salary_range", "salary_range_en"] as const;
 
 export function vacancyPublishesSalary(row: Record<string, unknown>): boolean {

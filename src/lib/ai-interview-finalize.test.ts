@@ -44,10 +44,6 @@ test("finalize twice is idempotent and the response has no score", async () => {
         calls += 1;
         return null;
       },
-      listConversationIds: async () => {
-        calls += 1;
-        return [];
-      },
       markManualReview: async () => {
         calls += 1;
       },
@@ -77,9 +73,6 @@ test("a client transcript is ignored when the conversation is bound on the serve
       fetched = id;
       return server;
     },
-    listConversationIds: async () => {
-      throw new Error("list should not run when the interview already has a conversation id");
-    },
     markManualReview: async () => {
       throw new Error("manual review");
     },
@@ -107,7 +100,6 @@ test("a nearby conversation without this candidate metadata is not used", async 
     interview,
     body: { transcript: [{ role: "user", message: "CLIENT" }], conversation_id: "conv_other" },
     fetchConversation: async () => other,
-    listConversationIds: async () => ["conv_other"],
     markManualReview: async () => {
       reviewed = true;
     },
@@ -126,9 +118,8 @@ test("an exact agent and interview_token match is fetched from ElevenLabs", asyn
   let scored: unknown = null;
   const result = await runCandidateFinalize({
     interview,
-    body: { transcript: "ignore me" },
+    body: { transcript: "ignore me", conversation_id: "conv_match" },
     fetchConversation: async (id) => (id === "conv_match" ? match : null),
-    listConversationIds: async () => ["conv_match"],
     markManualReview: async () => {
       throw new Error("should match");
     },
@@ -149,4 +140,73 @@ test("finalize route no longer uses the ten minute conversation window", () => {
   assert.equal(src.includes("TOLERANCE"), false);
   assert.equal(src.includes("body.transcript"), false);
   assert.equal(src.includes("10 * 60"), false);
+  assert.equal(src.includes("page_size=20"), false);
+  assert.equal(src.includes('.neq("status", "completed")'), true);
+});
+
+test("a conversation that is not done is left untouched", async () => {
+  let writes = 0;
+  const live = detail({ status: "in-progress", transcript: [{ role: "user", message: "partial" }] });
+  const result = await runCandidateFinalize({
+    interview: { ...interview, conversation_id: "conv_server", token: "tok-live" },
+    body: { transcript: "client" },
+    fetchConversation: async () => live,
+    markManualReview: async () => {
+      writes += 1;
+    },
+    scoreServerTranscript: async () => {
+      writes += 1;
+      return true;
+    },
+  });
+  assert.equal(writes, 0);
+  assert.deepEqual(result.body, { status: "in_progress" });
+});
+
+test("an empty done transcript is not completed", async () => {
+  let writes = 0;
+  const empty = detail({ transcript: [] });
+  const result = await runCandidateFinalize({
+    interview: { ...interview, conversation_id: "conv_server", token: "tok-empty" },
+    body: {},
+    fetchConversation: async () => empty,
+    markManualReview: async () => {
+      writes += 1;
+    },
+    scoreServerTranscript: async () => {
+      writes += 1;
+      return true;
+    },
+  });
+  assert.equal(writes, 0);
+  assert.deepEqual(result.body, { status: "in_progress" });
+});
+
+test("interview_id alone does not bind a conversation", () => {
+  const byIdOnly = detail({
+    dynamic_variables: { interview_id: "iv-1" },
+  });
+  assert.equal(conversationMatchesInterview(byIdOnly, interview), false);
+  const byToken = detail({ dynamic_variables: { interview_token: "tok-ana" } });
+  assert.equal(conversationMatchesInterview(byToken, interview), true);
+});
+
+test("unbound finalize does not scan a page of conversations and is rate limited", async () => {
+  let fetches = 0;
+  const calls = async () =>
+    runCandidateFinalize({
+      interview: { ...interview, token: "tok-rate", conversation_id: null },
+      body: {},
+      fetchConversation: async () => {
+        fetches += 1;
+        return null;
+      },
+      markManualReview: async () => {},
+      scoreServerTranscript: async () => true,
+    });
+  for (let i = 0; i < 8; i++) await calls();
+  const blocked = await calls();
+  assert.equal(fetches, 0);
+  assert.equal(blocked.status, 429);
+  assert.deepEqual(blocked.body, { status: "in_progress" });
 });

@@ -22,9 +22,9 @@ export type ConversationDetail = {
   transcript?: unknown;
 };
 
-export function publicFinalizeBody(state: "completed" | "needs_review"): {
-  status: "completed" | "needs_review";
-} {
+export type PublicFinalizeStatus = "completed" | "needs_review" | "in_progress";
+
+export function publicFinalizeBody(state: PublicFinalizeStatus): { status: PublicFinalizeStatus } {
   return { status: state };
 }
 
@@ -46,7 +46,41 @@ export function conversationMatchesInterview(
   if (!detail.agent_id || detail.agent_id !== interview.agent_id) return false;
   if (!detail.conversation_id) return false;
   const vars = dynamicVariables(detail);
-  return vars.interview_token === interview.token || vars.interview_id === interview.id;
+  return vars.interview_token === interview.token;
+}
+
+/** A finished ElevenLabs transcript has spoken text. An empty or wrapper-only payload does not. */
+export function transcriptHasContent(transcript: unknown): boolean {
+  if (typeof transcript === "string") return transcript.trim().length > 0;
+  if (Array.isArray(transcript)) {
+    return transcript.some((turn) => {
+      if (!turn || typeof turn !== "object") return false;
+      const row = turn as { message?: unknown; text?: unknown; content?: unknown };
+      const text = row.message ?? row.text ?? row.content ?? "";
+      return String(text).trim().length > 0;
+    });
+  }
+  if (transcript && typeof transcript === "object") {
+    const inner = (transcript as { transcript?: unknown }).transcript;
+    if (inner != null && inner !== transcript) return transcriptHasContent(inner);
+  }
+  return false;
+}
+
+const LOOKUP_WINDOW_MS = 60_000;
+const LOOKUP_MAX = 8;
+const lookupHits = new Map<string, number[]>();
+
+/** Caps unbound ElevenLabs reads from the public finalize POST. */
+export function allowFinalizeLookup(token: string, now = Date.now()): boolean {
+  const recent = (lookupHits.get(token) ?? []).filter((at) => now - at < LOOKUP_WINDOW_MS);
+  if (recent.length >= LOOKUP_MAX) {
+    lookupHits.set(token, recent);
+    return false;
+  }
+  recent.push(now);
+  lookupHits.set(token, recent);
+  return true;
 }
 
 export function normalizeElevenConversation(raw: unknown): ConversationDetail | null {
@@ -85,43 +119,29 @@ function hintedConversationId(body: unknown): string | null {
   return typeof id === "string" && id.trim() ? id.trim() : null;
 }
 
-function pickLatest(matches: ConversationDetail[]): ConversationDetail {
-  return [...matches].sort(
-    (a, b) => (b.start_time_unix_secs ?? 0) - (a.start_time_unix_secs ?? 0),
-  )[0];
-}
-
 async function resolveUnboundConversation(
   interview: InterviewBind,
   body: unknown,
   fetchConversation: (id: string) => Promise<ConversationDetail | null>,
-  listConversationIds: (agentId: string) => Promise<string[]>,
 ): Promise<ConversationDetail | null> {
   const hinted = hintedConversationId(body);
-  if (hinted) {
-    const detail = await fetchConversation(hinted);
-    if (detail && conversationMatchesInterview(detail, interview)) return detail;
-  }
-  if (!interview.agent_id) return null;
-  const ids = await listConversationIds(interview.agent_id);
-  const matches: ConversationDetail[] = [];
-  for (const id of ids) {
-    if (hinted && id === hinted) continue;
-    const detail = await fetchConversation(id);
-    if (detail && conversationMatchesInterview(detail, interview)) matches.push(detail);
-  }
-  if (matches.length === 0) return null;
-  return pickLatest(matches);
+  if (!hinted) return null;
+  const detail = await fetchConversation(hinted);
+  if (detail && conversationMatchesInterview(detail, interview)) return detail;
+  return null;
+}
+
+function readyToScore(detail: ConversationDetail | null): detail is ConversationDetail {
+  return Boolean(detail && detail.status === "done" && transcriptHasContent(detail.transcript));
 }
 
 export async function runCandidateFinalize(input: {
   interview: InterviewBind;
   body: unknown;
   fetchConversation: (id: string) => Promise<ConversationDetail | null>;
-  listConversationIds: (agentId: string) => Promise<string[]>;
   markManualReview: () => Promise<void>;
-  scoreServerTranscript: (conversationId: string, transcript: unknown) => Promise<void>;
-}): Promise<{ status: number; body: { status: "completed" | "needs_review" } }> {
+  scoreServerTranscript: (conversationId: string, transcript: unknown) => Promise<boolean>;
+}): Promise<{ status: number; body: { status: PublicFinalizeStatus } }> {
   if (input.interview.status === "completed") {
     return { status: 200, body: publicFinalizeBody("completed") };
   }
@@ -133,21 +153,22 @@ export async function runCandidateFinalize(input: {
       detail = null;
     }
   } else {
-    detail = await resolveUnboundConversation(
-      input.interview,
-      input.body,
-      input.fetchConversation,
-      input.listConversationIds,
-    );
+    if (!allowFinalizeLookup(input.interview.token)) {
+      return { status: 429, body: publicFinalizeBody("in_progress") };
+    }
+    detail = await resolveUnboundConversation(input.interview, input.body, input.fetchConversation);
   }
 
-  const serverTranscript = detail?.transcript;
-  if (!detail || serverTranscript == null) {
+  if (!detail) {
     await input.markManualReview();
     return { status: 200, body: publicFinalizeBody("needs_review") };
   }
 
-  await input.scoreServerTranscript(detail.conversation_id, serverTranscript);
+  if (!readyToScore(detail)) {
+    return { status: 200, body: publicFinalizeBody("in_progress") };
+  }
+
+  await input.scoreServerTranscript(detail.conversation_id, detail.transcript);
   return { status: 200, body: publicFinalizeBody("completed") };
 }
 
@@ -161,22 +182,4 @@ export async function fetchElevenConversation(
   });
   if (!response.ok) return null;
   return normalizeElevenConversation(await response.json());
-}
-
-export async function listElevenConversationIds(
-  agentId: string,
-  apiKey: string,
-  fetchImpl: typeof fetch = fetch,
-): Promise<string[]> {
-  const response = await fetchImpl(
-    `https://api.elevenlabs.io/v1/convai/conversations?agent_id=${encodeURIComponent(agentId)}&page_size=20`,
-    { headers: { "xi-api-key": apiKey } },
-  );
-  if (!response.ok) return [];
-  const payload = (await response.json()) as { conversations?: Array<{ conversation_id?: string }>; history?: Array<{ conversation_id?: string }> };
-  const list = payload.conversations || payload.history || [];
-  return list
-    .map((item) => item.conversation_id)
-    .filter((id): id is string => typeof id === "string" && id.length > 0)
-    .slice(0, 20);
 }

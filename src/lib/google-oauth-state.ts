@@ -14,18 +14,21 @@ export function oauthStateKey(sessionToken: string | undefined, adminSecret: str
   return adminSecret;
 }
 
-export function sealOAuthState(state: string, key: string): string {
-  const mac = crypto.createHmac("sha256", key).update(state).digest("base64url");
-  return `${state}.${mac}`;
+export function sealOAuthState(state: string, key: string, now = Date.now()): string {
+  const exp = String(now + GOOGLE_OAUTH_STATE_TTL_SECONDS * 1000);
+  const payload = `${state}.${exp}`;
+  const mac = crypto.createHmac("sha256", key).update(payload).digest("base64url");
+  return `${payload}.${mac}`;
 }
 
-export function openOAuthState(sealed: string | undefined, key: string): string | null {
+export function openOAuthState(sealed: string | undefined, key: string, now = Date.now()): string | null {
   if (!sealed || !key) return null;
-  const dot = sealed.lastIndexOf(".");
-  if (dot <= 0) return null;
-  const state = sealed.slice(0, dot);
-  const mac = sealed.slice(dot + 1);
-  const expected = crypto.createHmac("sha256", key).update(state).digest("base64url");
+  const parts = sealed.split(".");
+  if (parts.length !== 3) return null;
+  const [state, exp, mac] = parts;
+  const expiresAt = Number(exp);
+  if (!state || !Number.isFinite(expiresAt) || now >= expiresAt) return null;
+  const expected = crypto.createHmac("sha256", key).update(`${state}.${exp}`).digest("base64url");
   if (!secretsEqual(mac, expected)) return null;
   return state;
 }

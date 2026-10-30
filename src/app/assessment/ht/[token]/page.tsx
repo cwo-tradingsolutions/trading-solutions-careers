@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { TS_SCENARIOS } from '@/lib/headhunting/scenarios-ts';
 import { TS_BENCHMARK_STATS, TS_DNA_PATTERNS } from '@/lib/headhunting/calibration-data';
-import { expiredLinkBoth, invalidLinkBoth } from '@/lib/candidate-invalid-link';
+import { expiredLinkBoth, invalidLinkBoth, loadFailBoth } from '@/lib/candidate-invalid-link';
 
 type Phase = 'loading' | 'welcome' | 'habeas_data' | 'camera_setup' | 'assessment' | 'review' | 'complete' | 'error' | 'expired' | 'unavailable';
 
@@ -202,9 +202,15 @@ export default function AssessmentPage() {
           return;
         }
 
-        if (res.status === 401 || res.status === 403 || res.status === 404 || !res.ok) {
+        if (res.status === 401 || res.status === 403 || res.status === 404) {
           setErrorMsg(invalidLinkBoth());
           setPhase('unavailable');
+          return;
+        }
+
+        if (!res.ok) {
+          setErrorMsg(loadFailBoth());
+          setPhase('error');
           return;
         }
 
@@ -252,8 +258,8 @@ export default function AssessmentPage() {
         setPhase('welcome');
       } catch (err) {
         console.error('Error loading assessment:', err);
-        setErrorMsg(invalidLinkBoth());
-        setPhase('unavailable');
+        setErrorMsg(loadFailBoth());
+        setPhase('error');
       }
     }
 
