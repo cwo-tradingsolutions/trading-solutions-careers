@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { INVALID_LINK_EN, INVALID_LINK_ES, LOAD_FAIL_ES, invalidLinkBoth } from "./candidate-invalid-link.ts";
+import { INVALID_LINK_EN, INVALID_LINK_ES, LOAD_FAIL_ES, LOAD_RETRY_EN, LOAD_RETRY_ES, invalidLinkBoth } from "./candidate-invalid-link.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -19,6 +19,9 @@ test("invalid-link copy names the mailbox and stays friendly", () => {
   assert.match(invalidLinkBoth(), / \/ /);
   assert.match(LOAD_FAIL_ES, /No pudimos cargar/);
   assert.doesNotMatch(LOAD_FAIL_ES, /no está disponible/);
+  assert.doesNotMatch(LOAD_RETRY_ES, /intenta de nuevo/i);
+  assert.doesNotMatch(LOAD_RETRY_EN, /try again/i);
+  assert.match(LOAD_RETRY_ES, /jointheteam@tradingsolutions\.com/);
 });
 
 test("candidate link pages use the friendly invalid-link copy", () => {

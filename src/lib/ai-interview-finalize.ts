@@ -148,9 +148,16 @@ export async function runCandidateFinalize(input: {
   /** Server rescore of a completed row that never received a score. */
   rescoreNullScore?: boolean;
   lookupBucket?: "candidate" | "server";
+  /** True when scoring_claimed_at is still inside the claim TTL. */
+  scoringClaimActive?: boolean;
 }): Promise<{ status: number; body: { status: PublicFinalizeStatus; rescored?: true } }> {
   if (input.interview.status === "completed" && !input.rescoreNullScore) {
     return { status: 200, body: publicFinalizeBody("completed") };
+  }
+
+  // A cron claim is already scoring this row. The candidate path must not start a second one.
+  if (input.scoringClaimActive && input.lookupBucket !== "server") {
+    return { status: 200, body: publicFinalizeBody("in_progress") };
   }
 
   if (!allowFinalizeLookup(input.interview.token, Date.now(), input.lookupBucket ?? "candidate")) {
@@ -158,20 +165,19 @@ export async function runCandidateFinalize(input: {
   }
 
   let detail: ConversationDetail | null = null;
+  const stored = input.interview.conversation_id;
   const hinted = hintedConversationId(input.body);
-  if (hinted) {
+  if (stored) {
+    // Same rule as bind: a stored conversation id is never replaced by a hint.
+    detail = await input.fetchConversation(stored);
+    if (detail?.agent_id && input.interview.agent_id && detail.agent_id !== input.interview.agent_id) {
+      detail = null;
+    }
+  } else if (hinted) {
     const hintedDetail = await input.fetchConversation(hinted);
     if (hintedDetail && conversationMatchesInterview(hintedDetail, input.interview)) {
       detail = hintedDetail;
-      if (hinted !== input.interview.conversation_id) {
-        await input.rememberConversation?.(hinted);
-      }
-    }
-  }
-  if (!detail && input.interview.conversation_id) {
-    detail = await input.fetchConversation(input.interview.conversation_id);
-    if (detail?.agent_id && input.interview.agent_id && detail.agent_id !== input.interview.agent_id) {
-      detail = null;
+      await input.rememberConversation?.(hinted);
     }
   }
 

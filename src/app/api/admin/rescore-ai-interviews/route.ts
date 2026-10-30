@@ -22,10 +22,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const interviewIds: string[] | null = Array.isArray(body.interview_ids) ? body.interview_ids : null;
-    const { pending, results, disabled } = await runInProgressRescore({
-      interviewIds,
-      cronSecret: process.env.CRON_SECRET,
-    });
+    const { pending, results, disabled } = await runInProgressRescore({ interviewIds });
     if (disabled) {
       return NextResponse.json({ status: "disabled" }, { status: 503 });
     }

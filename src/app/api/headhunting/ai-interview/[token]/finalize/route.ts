@@ -22,7 +22,8 @@ import {
   fetchElevenConversation,
   runCandidateFinalize,
 } from "@/lib/ai-interview-finalize";
-import { cronAuthorized, cronPresentedSecret } from "@/lib/cron-auth";
+import { cronAuthorized, cronPresentedSecret, readCronSecret } from "@/lib/cron-auth";
+import { scoringClaimTtlMs } from "@/lib/ai-interview-rescore";
 
 // Permitir hasta 90s — los 3 agentes Claude en paralelo con transcripts de
 // 14K chars pueden tardar 40-60s. Vercel Pro permite hasta 90s.
@@ -250,10 +251,21 @@ export async function POST(
     }
 
     const apiKey = process.env.ELEVENLABS_API_KEY || "";
-    const serverRescore = req.headers.get("x-ats-rescore") === "1" && cronAuthorized(
+    const wantsRescore = req.headers.get("x-ats-rescore") === "1";
+    const cronSecret = readCronSecret();
+    const serverRescore = wantsRescore && cronAuthorized(
       cronPresentedSecret(req.headers.get("authorization"), req.headers.get("x-cron-secret")),
-      process.env.CRON_SECRET,
+      cronSecret,
     );
+    const claimAt = interview.scoring_claimed_at ? new Date(interview.scoring_claimed_at).getTime() : NaN;
+    const scoringClaimActive = Number.isFinite(claimAt) && Date.now() - claimAt < scoringClaimTtlMs();
+    if (wantsRescore && !cronSecret && interview.status === "completed" && interview.ai_score == null) {
+      await supabaseAdmin
+        .from("ht_ai_interviews")
+        .update({ scoring_claimed_at: null })
+        .eq("id", interview.id);
+      return NextResponse.json({ status: "in_progress" });
+    }
     const rescoreNullScore = serverRescore && interview.status === "completed" && interview.ai_score == null;
     const result = await runCandidateFinalize({
       interview: {
@@ -264,6 +276,7 @@ export async function POST(
         conversation_id: interview.conversation_id,
       },
       rescoreNullScore,
+      scoringClaimActive,
       lookupBucket: serverRescore ? "server" : "candidate",
       body,
       fetchConversation: (id) => (apiKey ? fetchElevenConversation(id, apiKey) : Promise.resolve(null)),

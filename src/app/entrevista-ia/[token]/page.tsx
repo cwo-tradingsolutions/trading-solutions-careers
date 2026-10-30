@@ -21,7 +21,7 @@ import Script from "next/script";
 import { invalidLinkBoth, loadRetryBoth } from "@/lib/candidate-invalid-link";
 import { CANDIDATE_MAIL } from "@/lib/candidate-public-error";
 
-type Phase = "loading" | "welcome" | "consent" | "live" | "processing" | "timeout" | "ended" | "error";
+type Phase = "loading" | "welcome" | "consent" | "live" | "processing" | "timeout" | "disabled" | "ended" | "error";
 
 type Config = {
   interview_id: string;
@@ -221,7 +221,11 @@ export default function AiInterviewPage() {
           body: JSON.stringify({ conversation_id: finalId }),
         });
         if (!mountedRef.current) return;
-        if (r.status === 503 || r.status === 429) {
+        if (r.status === 503) {
+          if (mountedRef.current) setPhase("disabled");
+          return;
+        }
+        if (r.status === 429) {
           stop();
           return;
         }
@@ -286,12 +290,31 @@ export default function AiInterviewPage() {
     );
   }
 
+  if (phase === "disabled") {
+    return (
+      <div style={shell}>
+        <div style={card}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>La entrevista por voz no está disponible / The voice interview is not available</h1>
+          <p style={{ color: "#374151", lineHeight: 1.6 }}>
+            Talent Acquisition te contactará. / Talent Acquisition will contact you.
+          </p>
+          <p style={{ marginTop: 12, color: "#374151", lineHeight: 1.6 }}>
+            Puedes cerrar esta ventana. / You can close this window.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (phase === "timeout") {
     return (
       <div style={shell}>
         <div style={card}>
           <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>Seguimos procesando tu entrevista / We're still processing your interview</h1>
           <p style={{ color: "#374151", lineHeight: 1.6 }}>
+            Talent Acquisition te contactará. / Talent Acquisition will contact you.
+          </p>
+          <p style={{ marginTop: 12, color: "#374151", lineHeight: 1.6 }}>
             Puedes cerrar esta ventana. / You can close this window.
           </p>
         </div>

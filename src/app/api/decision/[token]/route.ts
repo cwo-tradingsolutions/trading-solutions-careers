@@ -5,6 +5,7 @@
  * Endpoint público (sin auth) — el token es la credencial.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { visibleRecommendation } from "@/lib/ai-recommendation";
 import { supabaseAdmin } from "@/lib/supabase";
 import { recordStageEvent } from "@/lib/stage-events";
 import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
@@ -95,7 +96,7 @@ export async function GET(
     ai_insights: ai ? {
       summary: ai.ai_summary,
       score: ai.ai_score ?? ai.overall_score,
-      recommendation: ai.ai_recommendation,
+      recommendation: visibleRecommendation(ai.ai_recommendation),
     } : null,
     open_vacancies: (openVacs || []).map(v => ({ id: v.id, title: v.title, area: v.area })),
   });

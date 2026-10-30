@@ -14,9 +14,10 @@ import {
   type ConversationDetail,
   type InterviewBind,
 } from "./ai-interview-finalize.ts";
-import { rescoreAction, rescoreBaseUrl, validConversationId } from "./ai-interview-rescore.ts";
+import { rescoreAction, rescoreBaseUrl, rescoreRowEligible, validConversationId } from "./ai-interview-rescore.ts";
 import { aiInterviewEnabled } from "./ai-interview-flag.ts";
-import { cronAuthorized } from "./cron-auth.ts";
+import { cronAuthorized, readCronSecret } from "./cron-auth.ts";
+import { visibleRecommendation } from "./ai-recommendation.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -231,7 +232,7 @@ test("finalize lookups expire and the bound path is limited too", async () => {
   assert.equal(blocked.status, 429);
 });
 
-test("a verified hint replaces the conversation stored from an earlier page load", async () => {
+test("a verified hint does not replace a conversation id that is already stored", async () => {
   let remembered: string | null = null;
   let scoredId: string | null = null;
   const live = detail({
@@ -258,9 +259,51 @@ test("a verified hint replaces the conversation stored from an earlier page load
       return true;
     },
   });
-  assert.equal(remembered, "conv_live");
-  assert.equal(scoredId, "conv_live");
+  assert.equal(remembered, null);
+  assert.equal(scoredId, "conv_abandoned");
   assert.deepEqual(result.body, { status: "completed" });
+});
+
+test("a fresh scoring claim blocks a second candidate score", async () => {
+  let fetches = 0;
+  const result = await runCandidateFinalize({
+    interview: { ...interview, token: "tok-claimed", conversation_id: "conv_server" },
+    body: { conversation_id: "conv_server" },
+    scoringClaimActive: true,
+    fetchConversation: async () => {
+      fetches += 1;
+      return detail({ conversation_id: "conv_server" });
+    },
+    markManualReview: async () => {
+      fetches += 1;
+    },
+    scoreServerTranscript: async () => {
+      fetches += 1;
+      return true;
+    },
+  });
+  assert.equal(fetches, 0);
+  assert.deepEqual(result.body, { status: "in_progress" });
+});
+
+test("server rescore still scores a row that holds the claim", async () => {
+  let scored = false;
+  const result = await runCandidateFinalize({
+    interview: { ...interview, token: "tok-server-claim", conversation_id: "conv_server" },
+    body: {},
+    scoringClaimActive: true,
+    lookupBucket: "server",
+    fetchConversation: async () => detail({ conversation_id: "conv_server", dynamic_variables: { interview_token: "tok-server-claim" } }),
+    markManualReview: async () => {
+      throw new Error("review");
+    },
+    scoreServerTranscript: async () => {
+      scored = true;
+      return true;
+    },
+  });
+  assert.equal(scored, true);
+  assert.deepEqual(result.body, { status: "completed", rescored: true });
 });
 
 test("the AI interview flag, cron secret, and rescore url stay closed", () => {
@@ -270,7 +313,20 @@ test("the AI interview flag, cron secret, and rescore url stay closed", () => {
   assert.equal(cronAuthorized("a".repeat(16), "b".repeat(16)), false);
   assert.equal(cronAuthorized("a".repeat(16), "a".repeat(16)), true);
   assert.equal(rescoreBaseUrl({ APP_URL: "https://careers.example/" }), "https://careers.example");
-  assert.equal(rescoreBaseUrl({ NEXT_PUBLIC_APP_URL: "careers.example" }), "https://trading-solutions-careers.vercel.app");
+  assert.equal(rescoreBaseUrl({ NEXT_PUBLIC_APP_URL: "careers.example" }), null);
+  assert.equal(rescoreBaseUrl({ APP_URL: "http://careers.example" }), null);
+  assert.equal(rescoreBaseUrl({}), null);
+  assert.equal(readCronSecret({ CRON_SECRET: "short" }), null);
+  assert.equal(readCronSecret({ CRON_SECRET: "a".repeat(16), ADMIN_SECRET: "a".repeat(16) }), null);
+  assert.equal(readCronSecret({ CRON_SECRET: "c".repeat(16), ADMIN_SECRET: "a".repeat(16) }), "c".repeat(16));
+  assert.equal(visibleRecommendation("SCORING:1"), null);
+  assert.equal(visibleRecommendation("  SCORING:99"), null);
+  assert.equal(visibleRecommendation("AVANZA"), "AVANZA");
+  assert.equal(rescoreRowEligible({ scoring_attempts: 5 }), "exhausted");
+  assert.equal(rescoreRowEligible({ scoring_claimed_at: new Date(0).toISOString(), scoring_attempts: 1 }, 60_000, 2_000), "eligible");
+  assert.equal(rescoreRowEligible({ scoring_claimed_at: new Date(50_000).toISOString(), scoring_attempts: 1 }, 60_000, 30_000), "claimed");
+  assert.equal(aiInterviewEnabled({ AI_INTERVIEW_ENABLED: "on", ELEVENLABS_API_KEY: "" }), false);
+  assert.equal(aiInterviewEnabled({ AI_INTERVIEW_ENABLED: "on", ELEVENLABS_API_KEY: "sk" }), true);
   assert.equal(validConversationId(""), false);
   assert.equal(validConversationId("conv_" + "a".repeat(10)), true);
   assert.equal(validConversationId("not-a-conversation"), false);
@@ -278,6 +334,26 @@ test("the AI interview flag, cron secret, and rescore url stay closed", () => {
   for (let i = 1; i < FINALIZE_LOOKUP_MAX; i++) allowFinalizeLookup("tok-bucket", 5_000, "candidate");
   assert.equal(allowFinalizeLookup("tok-bucket", 5_000, "candidate"), false);
   assert.equal(allowFinalizeLookup("tok-bucket", 5_000, "server"), true);
+});
+
+test("cron GET does not accept the admin cookie", () => {
+  const src = readFileSync(join(root, "src/app/api/cron/rescore-ai-interviews/route.ts"), "utf8");
+  const getFn = src.split("export async function GET")[1]?.split("export async function POST")[0] ?? "";
+  const postFn = src.split("export async function POST")[1] ?? "";
+  assert.doesNotMatch(getFn, /requireAdmin/);
+  assert.match(getFn, /cronOk/);
+  assert.match(postFn, /requireAdmin/);
+});
+
+test("the disabled interview screen does not say we are still processing", () => {
+  const src = readFileSync(join(root, "src/app/entrevista-ia/[token]/page.tsx"), "utf8");
+  const disabled = src.split('phase === "disabled"')[1]?.split('phase === "timeout"')[0] ?? "";
+  const timeout = src.split('phase === "timeout"')[1]?.split('phase === "ended"')[0] ?? "";
+  assert.match(disabled, /Talent Acquisition te contactará/);
+  assert.match(disabled, /Talent Acquisition will contact you/);
+  assert.doesNotMatch(disabled, /seguimos procesando/i);
+  assert.match(timeout, /Talent Acquisition te contactará/);
+  assert.match(timeout, /Talent Acquisition will contact you/);
 });
 
 test("rescore scores an in-progress interview only after ElevenLabs is done", () => {

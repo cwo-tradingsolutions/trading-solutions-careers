@@ -6,6 +6,7 @@ import { CheckCircle2, XCircle, ArrowRight, HelpCircle, AlertTriangle } from "lu
 import { stageLabel } from "@/lib/stage-labels";
 import { REJECTION_CATEGORIES } from "@/lib/rejection-rules";
 import { invalidLinkBoth, loadRetryBoth } from "@/lib/candidate-invalid-link";
+import { visibleRecommendation } from "@/lib/ai-recommendation";
 import { CANDIDATE_MAIL } from "@/lib/candidate-public-error";
 
 const TS_HERO = "https://cdn.prod.website-files.com/68fb7b9474bf8f90808cd50f/691645b652c1e9091b25f59c_FotosWeb_TradingSolutions-14_4_11zon.webp";
@@ -20,7 +21,7 @@ type DecisionState = {
   recipient_name: string;
   candidate: { name: string; current_role: string | null; current_company: string | null; headline: string | null; stage: string } | null;
   vacancy: { id: string; title: string; area: string } | null;
-  ai_insights: { summary: string; score: number | null; recommendation: string } | null;
+  ai_insights: { summary: string; score: number | null; recommendation: string | null } | null;
   open_vacancies: { id: string; title: string; area: string }[];
 };
 
@@ -162,6 +163,8 @@ export default function DecisionPage() {
 
   if (!state) return null;
 
+  const aiRecommendation = visibleRecommendation(state.ai_insights?.recommendation);
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       <div className="max-w-2xl mx-auto p-6 sm:p-10">
@@ -188,7 +191,10 @@ export default function DecisionPage() {
               <div className="flex items-baseline gap-2 mb-1">
                 <div className="text-[10px] uppercase tracking-wider font-bold text-purple-700">Resumen IA</div>
                 {state.ai_insights.score && (
-                  <span className="text-[10px] font-bold text-purple-700">Score {state.ai_insights.score}/100 · {state.ai_insights.recommendation}</span>
+                  <span className="text-[10px] font-bold text-purple-700">
+                    Score {state.ai_insights.score}/100
+                    {aiRecommendation ? ` · ${aiRecommendation}` : ""}
+                  </span>
                 )}
               </div>
               <p className="text-xs text-gray-700 italic">"{state.ai_insights.summary}"</p>

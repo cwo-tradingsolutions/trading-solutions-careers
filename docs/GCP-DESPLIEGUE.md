@@ -101,9 +101,13 @@ Repetir para los otros tres cambiando nombre, `--schedule` y `--uri`.
 
 ### AI interview rescore (do not create yet)
 
-Automatic rescore needs a Cloud Scheduler job on Cloud Run. It is not a Vercel Cron, and this hotfix does not create the job. The route accepts GET and POST. The AI interview stays off until `AI_INTERVIEW_ENABLED` is set; the route then returns 503 and does not call ElevenLabs.
+Automatic rescore needs a Cloud Scheduler job on Cloud Run. It is not a Vercel Cron, and this hotfix does not create the job. GET accepts only `CRON_SECRET` (the admin cookie is not enough, because GET has side effects). POST also accepts an HR Admin session. The AI interview stays off until `AI_INTERVIEW_ENABLED` is set; the route then returns 503 and does not call ElevenLabs.
 
-Use OIDC so Cloud Run IAM accepts the call. If IAP is in front and replaces `Authorization`, send the cron secret in `X-Cron-Secret` instead. `CRON_SECRET` must be at least 16 characters. At integration time it should be added to `AUTH_SECRET_NAMES` in `hr-admin-secrets.ts` (that file belongs to #29 and is not edited here).
+`APP_URL` or `NEXT_PUBLIC_APP_URL` must be `https`. If either is missing or not https, the run is skipped and the cron secret is not sent. There is no `vercel.app` default.
+
+The scoring lock is `scoring_claimed_at` and `scoring_attempts` (`supabase/migrations/20261030_ai_interview_scoring_claim.sql`, not applied here). The default claim TTL is 2 minutes. `SCORING_CLAIM_TTL_MS` can set it between 30 seconds and 10 minutes. After 5 attempts the row is marked `needs_review` and leaves the queue.
+
+Use OIDC so Cloud Run IAM accepts the call. If IAP is in front and replaces `Authorization`, send the cron secret in `X-Cron-Secret` instead. `CRON_SECRET` must be at least 16 characters and distinct from the other auth secrets (`readCronSecret` in `src/lib/cron-auth.ts`). At integration time it should be added to `AUTH_SECRET_NAMES` in `hr-admin-secrets.ts` (that file belongs to #29 and is not edited here).
 
 ```bash
 gcloud scheduler jobs create http careers-rescore-ai-interviews --location us-west1 --schedule "*/10 * * * *" --time-zone "America/Bogota" --uri "https://CAREERS_URL/api/cron/rescore-ai-interviews" --http-method POST --headers "X-Cron-Secret=EL_CRON_SECRET" --oidc-service-account-email SCHEDULER_SA --oidc-token-audience "https://CAREERS_URL"

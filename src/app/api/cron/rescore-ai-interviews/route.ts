@@ -9,33 +9,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { aiInterviewEnabled } from "@/lib/ai-interview-flag";
-import { cronAuthorized, cronPresentedSecret } from "@/lib/cron-auth";
+import { cronAuthorized, cronPresentedSecret, readCronSecret } from "@/lib/cron-auth";
 import { runInProgressRescore } from "@/lib/ai-interview-rescore";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-function allowed(req: NextRequest): boolean {
+function cronOk(req: NextRequest): boolean {
   const presented = cronPresentedSecret(
     req.headers.get("authorization"),
     req.headers.get("x-cron-secret"),
   );
-  return cronAuthorized(presented, process.env.CRON_SECRET);
+  return cronAuthorized(presented, readCronSecret());
 }
 
-async function handle(req: NextRequest) {
-  if (!allowed(req)) {
-    const authError = requireAdmin(req);
-    if (authError) return authError;
-  }
+async function run() {
   if (!aiInterviewEnabled()) {
     return NextResponse.json({ status: "disabled" }, { status: 503 });
   }
 
   try {
-    const { pending, results, disabled } = await runInProgressRescore({
-      cronSecret: process.env.CRON_SECRET,
-    });
+    const { pending, results, disabled } = await runInProgressRescore();
     if (disabled) {
       return NextResponse.json({ status: "disabled" }, { status: 503 });
     }
@@ -51,10 +45,19 @@ async function handle(req: NextRequest) {
   }
 }
 
+/** GET has side effects, so only the cron secret is accepted. No admin cookie. */
 export async function GET(req: NextRequest) {
-  return handle(req);
+  if (!cronOk(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return run();
 }
 
+/** POST also accepts an HR Admin session, for the button in the funnel. */
 export async function POST(req: NextRequest) {
-  return handle(req);
+  if (!cronOk(req)) {
+    const authError = requireAdmin(req);
+    if (authError) return authError;
+  }
+  return run();
 }
