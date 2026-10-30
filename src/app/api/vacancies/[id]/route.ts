@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from 'next/server';
 import { columnaCierreWebExiste, validarFechasWeb } from "@/lib/vacancy-web-dates";
 import { publicStepBody } from "@/lib/candidate-public-error";
+import { presentVacancyDetail } from "@/lib/public-vacancy";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,14 +37,16 @@ export async function GET(
       [vacancyId]
     );
 
-    if (vacancy.length === 0) {
+    const admin = requireAdmin(request) === null;
+    const presented = presentVacancyDetail(vacancy[0], admin);
+    if (presented.status === 404) {
       return NextResponse.json(
         { error: 'Vacancy not found' },
         { status: 404, headers: corsHeaders }
       );
     }
 
-    return NextResponse.json(vacancy[0], { headers: corsHeaders });
+    return NextResponse.json(presented.body, { headers: corsHeaders });
   } catch (error) {
     console.error('GET /api/vacancies/[id] error:', error);
     return NextResponse.json(publicStepBody(), { status: 500, headers: corsHeaders });

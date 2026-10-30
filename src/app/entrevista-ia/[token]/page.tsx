@@ -18,6 +18,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Script from "next/script";
+import { invalidLinkBoth } from "@/lib/candidate-invalid-link";
+import { CANDIDATE_MAIL } from "@/lib/candidate-public-error";
 
 type Phase = "loading" | "welcome" | "consent" | "live" | "ended" | "error";
 
@@ -66,10 +68,9 @@ export default function AiInterviewPage() {
           const j = await r.json().catch(() => ({}));
           if (!cancelled) {
             setError(
-              j.error === "expired_token" ? "Este enlace expiró. Contacta a jointheteam@tradingsolutions.com" :
-              j.error === "already_completed" ? "Ya completaste esta entrevista. Te contactaremos pronto." :
-              j.error === "invalid_token" ? "Enlace inválido. Verifica que copiaste la URL completa." :
-              "Error: " + (j.error || r.status)
+              j.error === "already_completed"
+                ? `Ya completaste esta entrevista. Si necesitas ayuda, escríbenos a ${CANDIDATE_MAIL}. You already completed this interview. If you need help, write to us at ${CANDIDATE_MAIL}.`
+                : invalidLinkBoth()
             );
             setPhase("error");
           }
@@ -87,7 +88,7 @@ export default function AiInterviewPage() {
         }
       } catch (e) {
         if (!cancelled) {
-          setError((e as Error).message);
+          setError(invalidLinkBoth());
           setPhase("error");
         }
       }

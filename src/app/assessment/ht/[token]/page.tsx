@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { TS_SCENARIOS } from '@/lib/headhunting/scenarios-ts';
 import { TS_BENCHMARK_STATS, TS_DNA_PATTERNS } from '@/lib/headhunting/calibration-data';
+import { expiredLinkBoth, invalidLinkBoth } from '@/lib/candidate-invalid-link';
 
-type Phase = 'loading' | 'welcome' | 'habeas_data' | 'camera_setup' | 'assessment' | 'review' | 'complete' | 'error' | 'expired';
+type Phase = 'loading' | 'welcome' | 'habeas_data' | 'camera_setup' | 'assessment' | 'review' | 'complete' | 'error' | 'expired' | 'unavailable';
 
 interface Scenario {
   id: string;
@@ -195,19 +196,15 @@ export default function AssessmentPage() {
           `/api/headhunting/assessment/validate?token=${encodeURIComponent(token)}`
         );
 
-        if (res.status === 401 || res.status === 410) {
-          setErrorMsg(
-            res.status === 410
-              ? 'Este enlace ha expirado. Por favor, solicita uno nuevo.'
-              : 'Token inválido o expirado.'
-          );
+        if (res.status === 410) {
+          setErrorMsg(expiredLinkBoth());
           setPhase('expired');
           return;
         }
 
-        if (!res.ok) {
-          setErrorMsg('Error al cargar la evaluación. Por favor, intenta de nuevo.');
-          setPhase('error');
+        if (res.status === 401 || res.status === 403 || res.status === 404 || !res.ok) {
+          setErrorMsg(invalidLinkBoth());
+          setPhase('unavailable');
           return;
         }
 
@@ -255,8 +252,8 @@ export default function AssessmentPage() {
         setPhase('welcome');
       } catch (err) {
         console.error('Error loading assessment:', err);
-        setErrorMsg('Error de conexión. Por favor, recarga la página.');
-        setPhase('error');
+        setErrorMsg(invalidLinkBoth());
+        setPhase('unavailable');
       }
     }
 
@@ -766,7 +763,7 @@ export default function AssessmentPage() {
   }
 
   // Render error/expired phases
-  if (phase === 'error' || phase === 'expired') {
+  if (phase === 'error' || phase === 'expired' || phase === 'unavailable') {
     const isExpired = phase === 'expired';
 
     return (
@@ -788,7 +785,7 @@ export default function AssessmentPage() {
               )}
             </div>
             <h1 className="text-3xl font-semibold mb-3" style={{ color: TS_COLORS.black }}>
-              {isExpired ? 'Enlace Expirado' : 'Error'}
+              {isExpired ? 'Enlace vencido' : 'No pudimos abrir tu evaluación'}
             </h1>
             <p className="mb-8 leading-relaxed" style={{ color: TS_COLORS.mediumGray, fontSize: '15px' }}>{errorMsg}</p>
             <a

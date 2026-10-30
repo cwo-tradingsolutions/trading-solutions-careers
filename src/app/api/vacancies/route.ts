@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from 'next/server';
 import { validarFechasWeb, columnaCierreWebExiste } from "@/lib/vacancy-web-dates";
 import { publicStepBody } from "@/lib/candidate-public-error";
+import { presentVacancyList, vacancyListQuery } from "@/lib/public-vacancy";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,27 +21,16 @@ export async function GET(request: NextRequest) {
   try {
     const sql = neon(process.env.DATABASE_URL!);
     const searchParams = request.nextUrl.searchParams;
-    const status = searchParams.get('status');
-    const department = searchParams.get('department');
+    const admin = requireAdmin(request) === null;
+    const query = vacancyListQuery({
+      admin,
+      status: searchParams.get('status'),
+      department: searchParams.get('department'),
+    });
 
-    let query = 'SELECT * FROM vacancies WHERE 1=1';
-    const params: any[] = [];
+    const vacancies = await sql(query.text, query.params);
 
-    if (status) {
-      query += ' AND status = $' + (params.length + 1);
-      params.push(status);
-    }
-
-    if (department) {
-      query += ' AND department = $' + (params.length + 1);
-      params.push(department);
-    }
-
-    query += ' ORDER BY created_at DESC';
-
-    const vacancies = await sql(query, params);
-
-    return NextResponse.json(vacancies, { headers: corsHeaders });
+    return NextResponse.json(presentVacancyList(vacancies, admin), { headers: corsHeaders });
   } catch (error) {
     console.error('GET /api/vacancies error:', error);
     return NextResponse.json(publicStepBody(), { status: 500, headers: corsHeaders });

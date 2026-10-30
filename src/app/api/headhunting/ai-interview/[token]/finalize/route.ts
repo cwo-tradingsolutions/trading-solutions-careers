@@ -7,7 +7,10 @@
  *   2. COMPETENCIES agent → 8-10 competencias del rol con score 1-10 + evidencia
  *   3. ENGLISH agent → CEFR level + breakdown (fluidez, pronunciación, gramática, vocab, comprensión)
  *
- * Body: { conversation_id?: string, transcript?: any, audio_url?: string }
+ * The candidate body is not a transcript. The conversation id has to be the one
+ * stored for this interview, or an ElevenLabs conversation whose agent and
+ * metadata name this interview. A finished interview returns
+ * { status: "completed" } and is not scored again. The response has no score.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -15,6 +18,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { crearAnthropic } from "@/lib/anthropic";
 import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 import { publicStepBody } from "@/lib/candidate-public-error";
+import {
+  fetchElevenConversation,
+  listElevenConversationIds,
+  runCandidateFinalize,
+} from "@/lib/ai-interview-finalize";
 
 // Permitir hasta 90s — los 3 agentes Claude en paralelo con transcripts de
 // 14K chars pueden tardar 40-60s. Vercel Pro permite hasta 90s.
@@ -226,9 +234,6 @@ export async function POST(
 
   try {
     const body = await req.json().catch(() => ({}));
-    const conversationId = body.conversation_id || null;
-    let transcript = body.transcript || null;
-    const audioUrl = body.audio_url || null;
 
     const { data: interview, error } = await supabaseAdmin
       .from("ht_ai_interviews")
@@ -244,147 +249,85 @@ export async function POST(
       return previewTestJson("POST /api/headhunting/ai-interview/[token]/finalize");
     }
 
-    // ─── Optimización: si la BD ya tiene transcript cacheado, usarlo ───
-    // Evita refetch a ElevenLabs cuando se invoca /finalize otra vez para
-    // correr scoring que falló antes (caso típico: rescore-ai-interviews).
-    if (!transcript && interview.transcript) {
-      transcript = interview.transcript;
-      console.log(`[finalize] using cached transcript from BD (${JSON.stringify(transcript).length} chars)`);
-    }
+    const apiKey = process.env.ELEVENLABS_API_KEY || "";
+    const result = await runCandidateFinalize({
+      interview: {
+        id: interview.id,
+        token,
+        status: interview.status,
+        agent_id: interview.agent_id,
+        conversation_id: interview.conversation_id,
+      },
+      body,
+      fetchConversation: (id) => (apiKey ? fetchElevenConversation(id, apiKey) : Promise.resolve(null)),
+      listConversationIds: (agentId) => (apiKey ? listElevenConversationIds(agentId, apiKey) : Promise.resolve([])),
+      markManualReview: async () => {
+        await supabaseAdmin
+          .from("ht_ai_interviews")
+          .update({
+            status: "needs_review",
+            completed_at: new Date().toISOString(),
+            ai_recommendation: "REVISION_MANUAL",
+          })
+          .eq("id", interview.id);
+      },
+      scoreServerTranscript: async (conversationId, transcript) => {
+        const transcriptText = buildTranscriptText(transcript);
+        const candidate = (interview as any).ht_candidates;
+        const vacancy = candidate?.ht_vacancies;
+        const area = vacancy?.area || "—";
+        const roleComps = COMP_BY_AREA[area] ||
+          COMP_BY_AREA[vacancy?.title || ""] ||
+          ["Conocimiento del rol", "Adaptabilidad"];
 
-    // ─── Fallback: si no llega conversation_id, buscarlo en ElevenLabs ───
-    // Si el frontend no logró capturarlo del widget, buscamos la conversación más
-    // reciente del agente que esté después del started_at de esta entrevista.
-    let convoId = conversationId || interview.conversation_id;
-    if (!convoId && interview.agent_id && process.env.ELEVENLABS_API_KEY) {
-      try {
-        const startedAt = interview.started_at ? new Date(interview.started_at).getTime() : (Date.now() - 60 * 60 * 1000);
-        const startedAtUnix = Math.floor(startedAt / 1000);
-        const r = await fetch(
-          `https://api.elevenlabs.io/v1/convai/conversations?agent_id=${interview.agent_id}&page_size=20`,
-          { headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY } }
-        );
-        if (r.ok) {
-          const j = await r.json();
-          const list = j.conversations || j.history || [];
-          // Buscar la conversación que comenzó cerca del started_at de la entrevista
-          // y está completada. Tolerancia: ±10 min.
-          const TOLERANCE = 10 * 60; // segundos
-          const match = list.find((c: any) => {
-            const cStart = c.start_time_unix_secs || 0;
-            return Math.abs(cStart - startedAtUnix) < TOLERANCE && (c.status === 'done' || c.status === 'completed' || c.status === 'success');
-          });
-          if (match?.conversation_id) {
-            convoId = match.conversation_id;
-            console.log(`[finalize] recovered conversation_id from ElevenLabs: ${convoId}`);
-          }
-        }
-      } catch (e) {
-        console.error("ElevenLabs fallback lookup failed:", e);
-      }
-    }
+        const fillCommon = (p: string) =>
+          p
+            .replace("{candidate_name}", candidate?.name || "—")
+            .replace("{vacancy_title}", vacancy?.title || "—")
+            .replace("{vacancy_area}", area)
+            .replace("{transcript}", transcriptText.slice(0, 14000));
 
-    // If we have conversation_id but no transcript, fetch transcript from ElevenLabs
-    if (!transcript && convoId && process.env.ELEVENLABS_API_KEY) {
-      try {
-        const r = await fetch(
-          `https://api.elevenlabs.io/v1/convai/conversations/${convoId}`,
-          { headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY } }
-        );
-        if (r.ok) {
-          transcript = await r.json();
-        } else {
-          console.error("ElevenLabs fetch transcript failed:", r.status);
-        }
-      } catch (e) {
-        console.error("ElevenLabs transcript fetch error:", e);
-      }
-    }
+        const competencyPrompt = fillCommon(COMPETENCY_PROMPT)
+          .replace(/\{role_specific_competency_1\}/g, roleComps[0])
+          .replace(/\{role_specific_competency_2\}/g, roleComps[1]);
 
-    if (!transcript) {
-      await supabaseAdmin
-        .from("ht_ai_interviews")
-        .update({
-          status: "completed",
-          completed_at: new Date().toISOString(),
-          conversation_id: convoId,
-          audio_url: audioUrl,
-          ai_recommendation: "PENDIENTE",
-          ai_summary: "Transcripción no disponible. Revisar manualmente.",
-        })
-        .eq("id", interview.id);
-      return NextResponse.json({ success: true, scored: false, note: "No transcript available" });
-    }
+        const [generalAnalysis, competencyAnalysis, englishAnalysis] = await Promise.all([
+          runPrompt(fillCommon(SCORING_PROMPT)).catch((e) => ({ error: String(e) })),
+          runPrompt(competencyPrompt).catch((e) => ({ error: String(e) })),
+          runPrompt(fillCommon(ENGLISH_PROMPT)).catch((e) => ({ error: String(e) })),
+        ]);
 
-    const transcriptText = buildTranscriptText(transcript);
-    const candidate = (interview as any).ht_candidates;
-    const vacancy = candidate?.ht_vacancies;
-    const area = vacancy?.area || "—";
-    const roleComps = COMP_BY_AREA[area] ||
-      COMP_BY_AREA[vacancy?.title || ""] ||
-      ["Conocimiento del rol", "Adaptabilidad"];
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://trading-solutions-careers.vercel.app";
+        const finalAudioUrl = `${baseUrl}/api/headhunting/ai-interview/${token}/audio?cid=${conversationId}`;
 
-    const fillCommon = (p: string) =>
-      p
-        .replace("{candidate_name}", candidate?.name || "—")
-        .replace("{vacancy_title}", vacancy?.title || "—")
-        .replace("{vacancy_area}", area)
-        .replace("{transcript}", transcriptText.slice(0, 14000));
-
-    const competencyPrompt = fillCommon(COMPETENCY_PROMPT)
-      .replace(/\{role_specific_competency_1\}/g, roleComps[0])
-      .replace(/\{role_specific_competency_2\}/g, roleComps[1]);
-
-    // Run 3 agents in parallel
-    const [generalAnalysis, competencyAnalysis, englishAnalysis] = await Promise.all([
-      runPrompt(fillCommon(SCORING_PROMPT)).catch((e) => ({ error: String(e) })),
-      runPrompt(competencyPrompt).catch((e) => ({ error: String(e) })),
-      runPrompt(fillCommon(ENGLISH_PROMPT)).catch((e) => ({ error: String(e) })),
-    ]);
-
-    // Build audio_url proxy if conversation_id available
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://trading-solutions-careers.vercel.app";
-    const finalAudioUrl = audioUrl ||
-      (convoId ? `${baseUrl}/api/headhunting/ai-interview/${token}/audio?cid=${convoId}` : null);
-
-    await supabaseAdmin
-      .from("ht_ai_interviews")
-      .update({
-        status: "completed",
-        completed_at: new Date().toISOString(),
-        conversation_id: convoId,
-        transcript: transcript,
-        audio_url: finalAudioUrl,
-        // General analysis
-        ai_score: generalAnalysis.score ?? null,
-        overall_score: generalAnalysis.score ?? null,
-        ai_recommendation: generalAnalysis.recommendation ?? "PENDIENTE",
-        ai_summary: generalAnalysis.summary ?? null,
-        ai_strengths: generalAnalysis.strengths ?? [],
-        ai_gaps: generalAnalysis.gaps ?? [],
-        ai_red_flags: generalAnalysis.red_flags ?? [],
-        // Competencies
-        competencies_scores: competencyAnalysis.competencies ?? null,
-        competency_score: competencyAnalysis.average_score ?? null,
-        // English
-        english_level: englishAnalysis.cefr_level ?? "no_evaluated",
-        english_score: englishAnalysis.overall_score ?? null,
-        english_detail: englishAnalysis,
-      })
-      .eq("id", interview.id);
-
-    return NextResponse.json({
-      success: true,
-      scored: true,
-      score: generalAnalysis.score,
-      competency_score: competencyAnalysis.average_score,
-      english_score: englishAnalysis.overall_score,
-      english_level: englishAnalysis.cefr_level,
-      recommendation: generalAnalysis.recommendation,
-      summary: generalAnalysis.summary,
+        await supabaseAdmin
+          .from("ht_ai_interviews")
+          .update({
+            status: "completed",
+            completed_at: new Date().toISOString(),
+            conversation_id: conversationId,
+            transcript,
+            audio_url: finalAudioUrl,
+            ai_score: generalAnalysis.score ?? null,
+            overall_score: generalAnalysis.score ?? null,
+            ai_recommendation: generalAnalysis.recommendation ?? "PENDIENTE",
+            ai_summary: generalAnalysis.summary ?? null,
+            ai_strengths: generalAnalysis.strengths ?? [],
+            ai_gaps: generalAnalysis.gaps ?? [],
+            ai_red_flags: generalAnalysis.red_flags ?? [],
+            competencies_scores: competencyAnalysis.competencies ?? null,
+            competency_score: competencyAnalysis.average_score ?? null,
+            english_level: englishAnalysis.cefr_level ?? "no_evaluated",
+            english_score: englishAnalysis.overall_score ?? null,
+            english_detail: englishAnalysis,
+          })
+          .eq("id", interview.id);
+      },
     });
+
+    return NextResponse.json(result.body, { status: result.status });
   } catch (err) {
-    console.error("ai-interview finalize error:", err);
+    console.error("ai-interview finalize error");
     return NextResponse.json(publicStepBody(), { status: 500 });
   }
 }

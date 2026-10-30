@@ -17,6 +17,7 @@ import {
   type AssessmentMeta,
   type AssessmentId,
 } from "@/data/assessments";
+import { expiredLinkBoth, invalidLinkBoth } from "@/lib/candidate-invalid-link";
 
 type TokenData = {
   token: string;
@@ -106,17 +107,10 @@ export default function AssessmentLanding() {
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center max-w-md p-8">
           <h1 className="text-2xl font-bold mb-3">
-            {loadErr === "expired" ? "Enlace expirado" : "Token inválido"}
+            {loadErr === "expired" ? "Enlace vencido" : "No pudimos abrir tu evaluación"}
           </h1>
           <p className="text-gray-500">
-            El enlace de evaluación no existe o ha expirado. Contacta a{" "}
-            <a
-              className="underline"
-              href="mailto:jointheteam@tradingsolutions.com"
-            >
-              jointheteam@tradingsolutions.com
-            </a>
-            .
+            {loadErr === "expired" ? expiredLinkBoth() : invalidLinkBoth()}
           </p>
         </div>
       </div>

@@ -2,6 +2,8 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import { INVALID_LINK_EN, INVALID_LINK_ES } from "@/lib/candidate-invalid-link";
+import { CANDIDATE_MAIL } from "@/lib/candidate-public-error";
 
 const TS_BLACK = "#0A0A0A";
 const TS_BLUE = "#2C64ED";
@@ -110,13 +112,13 @@ const T: Record<Lang, Dict> = {
   es: {
     loading: "Cargando…",
     errorTitle: "No pudimos abrir la prueba",
-    errorHelp: "Si el problema sigue, responda el correo con el que recibió este enlace y lo revisamos.",
+    errorHelp: `Escríbenos a ${CANDIDATE_MAIL} y te ayudamos.`,
     errOpen: "No pudimos abrir la prueba.",
-    errNetwork: "No pudimos conectar. Revise su conexión e intente de nuevo.",
-    errInvalidLink: "Enlace no válido",
+    errNetwork: `No pudimos conectar. Escríbenos a ${CANDIDATE_MAIL} si el enlace no abre.`,
+    errInvalidLink: INVALID_LINK_ES,
     errAlreadyTaken: "Esta prueba ya fue presentada",
     errConsentSave: "No pudimos registrar su autorización. Escríbanos y le enviamos un enlace nuevo.",
-    errConsentNetwork: "No pudimos conectar para registrar su autorización. Revise su internet e intente de nuevo.",
+    errConsentNetwork: `No pudimos registrar su autorización. Escríbanos a ${CANDIDATE_MAIL}.`,
 
     consentTitle: "Autorización de tratamiento de datos personales",
     consentIntro:
@@ -188,13 +190,13 @@ const T: Record<Lang, Dict> = {
   en: {
     loading: "Loading…",
     errorTitle: "We could not open the assessment",
-    errorHelp: "If the problem continues, reply to the email that sent you this link and we will look into it.",
+    errorHelp: `Write to us at ${CANDIDATE_MAIL} and we will help.`,
     errOpen: "We could not open the assessment.",
-    errNetwork: "We could not connect. Check your connection and try again.",
-    errInvalidLink: "This link is not valid",
+    errNetwork: `We could not connect. Write to us at ${CANDIDATE_MAIL} if this link will not open.`,
+    errInvalidLink: INVALID_LINK_EN,
     errAlreadyTaken: "This assessment has already been taken",
     errConsentSave: "We could not record your consent. Write to us and we will send you a new link.",
-    errConsentNetwork: "We could not connect to record your consent. Check your internet and try again.",
+    errConsentNetwork: `We could not record your consent. Write to us at ${CANDIDATE_MAIL}.`,
 
     consentTitle: "Consent to the processing of your personal information",
     consentIntro:
@@ -279,9 +281,7 @@ function apiError(j: any, lang: Lang): string {
   const t = T[lang];
   const raw = String(j?.error ?? "");
   if (j?.status === "completed" || raw === "Esta prueba ya fue presentada") return t.errAlreadyTaken;
-  if (raw === "Enlace no válido") return t.errInvalidLink;
-  if (lang === "es") return raw || t.errOpen;
-  return t.errOpen;
+  return t.errInvalidLink;
 }
 
 /** Los cinco puntos de la escala Likert. Las etiquetas salen del diccionario. */

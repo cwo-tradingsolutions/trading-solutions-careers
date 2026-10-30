@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import test from "node:test";
-import { requireAdmin } from "./admin-auth.ts";
+import { adminAuthResponse, adminSessionDecision, requireAdmin } from "./admin-auth.ts";
 
 process.env.ADMIN_SECRET = "test-admin-secret-for-401";
 
@@ -86,6 +86,32 @@ test("hr_admin_session is the same cookie requireAdmin already accepts", () => {
   const sig = crypto.createHmac("sha256", secret).update(ts).digest("hex");
   const req = request("http://localhost/api/applications", `hr_admin_session=${ts}.${sig}`);
   assert.equal(requireAdmin(req as never), null);
+});
+
+test("a missing ADMIN_SECRET is a 500 and an expired cookie is rejected", () => {
+  assert.equal(
+    adminSessionDecision({ secret: "", authorizationHeader: null, sessionToken: undefined }),
+    "missing_secret",
+  );
+  assert.equal(adminAuthResponse("missing_secret")?.status, 500);
+
+  const secret = process.env.ADMIN_SECRET as string;
+  const ts = String(Date.now() - 13 * 60 * 60 * 1000);
+  const sig = crypto.createHmac("sha256", secret).update(ts).digest("hex");
+  assert.equal(
+    adminSessionDecision({
+      secret,
+      authorizationHeader: null,
+      sessionToken: `${ts}.${sig}`,
+      now: Date.now(),
+    }),
+    "unauthorized",
+  );
+  const res = requireAdmin(
+    request("http://localhost/api/applications", `hr_admin_session=${ts}.${sig}`) as never,
+  );
+  assert.equal(res?.status, 401);
+  assert.equal(adminAuthResponse("unauthorized")?.status, 401);
 });
 
 test("unauthenticated GETs of candidate or config data return 401", async () => {

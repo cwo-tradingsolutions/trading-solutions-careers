@@ -71,18 +71,28 @@ export async function GET(
         vacancy_area: vacancy?.area || "—",
         client_name: client?.name || "Trading Solutions",
         recruiter_name: "Talent Acquisition Team",
+        interview_token: token,
+        interview_id: String(interview.id),
       };
 
-      // Request signed URL from ElevenLabs
-      const url = `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${interview.agent_id}`;
+      // Request signed URL from ElevenLabs. include_conversation_id stores the
+      // id on this interview before the candidate can send one.
+      const url = `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${encodeURIComponent(interview.agent_id)}&include_conversation_id=true`;
       const r = await fetch(url, {
         headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY },
       });
       if (r.ok) {
         const j = await r.json();
         signedUrl = j.signed_url;
+        if (typeof j.conversation_id === "string" && j.conversation_id && !isPreviewTestMode()) {
+          const { error: bindError } = await supabaseAdmin
+            .from("ht_ai_interviews")
+            .update({ conversation_id: j.conversation_id })
+            .eq("id", interview.id);
+          if (bindError) console.error("ai-interview bind conversation failed");
+        }
       } else {
-        console.error("ElevenLabs signed URL failed:", r.status, await r.text());
+        console.error("ElevenLabs signed URL failed:", r.status);
       }
     } catch (e) {
       console.error("ElevenLabs signed URL error:", e);

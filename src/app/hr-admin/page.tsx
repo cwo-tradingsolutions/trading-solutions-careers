@@ -5,6 +5,7 @@ import RubricasPanel from "@/components/RubricasPanel";
 import NueveBoxPanel from "@/components/NueveBoxPanel";
 import BateriaDashboard from "@/components/BateriaDashboard";
 import { LOGO_TS_SIMBOLO, LOGO_TS_CLASE_EN_OSCURO } from "@/lib/brand";
+import { isHrAdminSessionApi } from "@/lib/hr-admin-session-notice";
 import { CanalSelect, errorCanal, FechasVacanteFields, errorFechas } from "@/components/CamposObligatorios";
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
@@ -140,8 +141,7 @@ export default function HRAdminPage() {
   }, []);
   const [sessionExpired, setSessionExpired] = useState(false);
 
-  // Detector global de sesión expirada — interceptamos fetch para detectar 401
-  // en cualquier endpoint /api/headhunting/* o /api/admin/* y mostrar banner.
+  // Detector global de sesión expirada — 401 en las APIs de HR muestra el aviso.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const originalFetch = window.fetch;
@@ -149,7 +149,7 @@ export default function HRAdminPage() {
       const r = await originalFetch.apply(window, args as any);
       try {
         const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request).url;
-        if (r.status === 401 && (url.includes('/api/headhunting') || url.includes('/api/admin') || url.includes('/api/dashboard'))) {
+        if (r.status === 401 && isHrAdminSessionApi(url)) {
           setSessionExpired(true);
         }
       } catch {}
