@@ -15,7 +15,10 @@ export default function AgendaConjuntaClosedPage() {
           </a>
         </p>
         <p className="mt-6 text-sm leading-relaxed text-neutral-600">
-          This link is no longer active. Write to us at jointheteam@tradingsolutions.com
+          This link is no longer active. Write to us at{" "}
+          <a className="underline" href="mailto:jointheteam@tradingsolutions.com">
+            jointheteam@tradingsolutions.com
+          </a>
         </p>
       </div>
     </main>
