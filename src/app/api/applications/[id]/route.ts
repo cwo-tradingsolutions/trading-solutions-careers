@@ -4,6 +4,9 @@ import { sql, initDB } from "@/lib/db";
 import { generatePortalToken } from "@/lib/portal-token";
 import { getResend, EMAIL_FROM } from "@/lib/resend";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
+import { candidateSignatureHtml } from "@/lib/ats-from";
+import { batteryAutoSendEnabled } from "@/lib/battery-auto-send";
+import { buildRejectionHtml, rejectionEmailsEnabled, rejectionSubject } from "@/lib/rejection-email";
 
 let dbInitialized = false;
 
@@ -58,18 +61,11 @@ async function sendStatusTransitionEmail(
       </div>
       ${bookingButton}
       <p style="text-align:center;margin-top:16px"><a href="${portalLink}" style="font-size:13px;color:#666;text-decoration:underline">Ver mi proceso</a></p>
-      <p style="margin-top:24px">Un abrazo,<br><strong>Equipo Trading Solutions</strong></p>
+      ${candidateSignatureHtml("es")}
     `);
   } else if (newStatus === "rejected") {
-    subject = `Trading Solutions · Sobre tu aplicación a ${appRow.job_title}`;
-    html = wrap(`
-      <p>Hola ${firstName},</p>
-      <p>Gracias por tu tiempo y por considerarnos para <strong>${appRow.job_title}</strong>. Te escribimos para cerrar este proceso contigo.</p>
-      <p>Después de revisar tu perfil con cuidado, hemos decidido seguir adelante con otros candidatos cuya experiencia se ajusta más a las necesidades específicas de esta vacante.</p>
-      <p>Esto NO refleja un juicio sobre tu valor profesional — el match con un rol es siempre contextual. De hecho guardamos tu información para considerarte en futuras vacantes que se abran. Si quieres, puedes seguir nuestras nuevas publicaciones en <a href="https://www.linkedin.com/company/trading-solutions" style="color:#2C64ED">LinkedIn</a>.</p>
-      <p style="font-size:13px;color:#666">Si tienes alguna duda específica sobre el proceso, simplemente responde este correo.</p>
-      <p style="margin-top:24px">Un abrazo y mucho éxito en lo que viene,<br><strong>Equipo Trading Solutions</strong></p>
-    `);
+    subject = rejectionSubject(appRow.job_title, "es");
+    html = buildRejectionHtml(firstName, appRow.job_title, "es");
   } else if (newStatus === "hired") {
     subject = `Trading Solutions · ¡Bienvenido al equipo! 🎉`;
     html = wrap(`
@@ -77,7 +73,7 @@ async function sendStatusTransitionEmail(
       <p>¡Bienvenido oficialmente al equipo de Trading Solutions!</p>
       <p>Estamos emocionados de tenerte como parte del equipo de <strong>${appRow.job_title}</strong>. En las próximas horas te contactaremos para coordinar tu onboarding y los primeros pasos.</p>
       <p>Mientras tanto, si tienes preguntas o necesitas algo, simplemente responde este correo.</p>
-      <p>Un abrazo y nos vemos pronto,<br><strong>Equipo Trading Solutions</strong></p>
+      ${candidateSignatureHtml("es")}
     `);
   } else if (newStatus === "offer") {
     subject = `Trading Solutions · Tenemos una oferta para ti`;
@@ -85,7 +81,7 @@ async function sendStatusTransitionEmail(
       <p>Hola ${firstName},</p>
       <p>Después de evaluarte cuidadosamente, queremos ofrecerte la posición de <strong>${appRow.job_title}</strong> en Trading Solutions.</p>
       <p>Te contactaremos en las próximas horas con los detalles formales de la oferta. Mientras tanto, si tienes preguntas, responde este correo.</p>
-      <p>Un abrazo,<br><strong>Equipo Trading Solutions</strong></p>
+      ${candidateSignatureHtml("es")}
     `);
   } else {
     return; // No envío auto para new/reviewing
@@ -161,12 +157,17 @@ export async function PATCH(
       RETURNING id, status, updated_at
     `;
 
-    // Trigger email automático SOLO si cambió status y no se pidió saltar
-    if (!skipEmail && prev.status !== status) {
+    // Status mail is automatic. Rejection uses its own flag. The other
+    // transitions use the battery auto-send flag so they stay off by default.
+    const wantsEmail = !skipEmail && prev.status !== status;
+    const emailTriggered = wantsEmail && (
+      status === "rejected" ? rejectionEmailsEnabled() : batteryAutoSendEnabled()
+    );
+    if (emailTriggered) {
       await sendStatusTransitionEmail(prev, status);
     }
 
-    return NextResponse.json({ success: true, application: result[0], emailTriggered: !skipEmail && prev.status !== status });
+    return NextResponse.json({ success: true, application: result[0], emailTriggered });
   } catch (error: unknown) {
     console.error("Error updating application:", error);
     const message = error instanceof Error ? error.message : "Internal server error";

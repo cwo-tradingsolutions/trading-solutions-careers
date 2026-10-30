@@ -16,6 +16,9 @@ import { isGmailConnected, sendViaGmail } from '@/lib/gmail';
 import { getResend, EMAIL_FROM } from '@/lib/resend';
 import { recordStageEvent } from '@/lib/stage-events';
 import { normalizeStage, STAGE_RANK } from '@/lib/stage-labels';
+import { batteryAutoSendEnabled, NOTA_BATERIA_PENDIENTE } from '@/lib/battery-auto-send';
+
+export { NOTA_BATERIA_PENDIENTE };
 
 /** Las respuestas van a la cuenta de reclutamiento, no al remitente tecnico. */
 export const RESPONDER_A = 'jointheteam@tradingsolutions.com';
@@ -100,7 +103,23 @@ export async function sesionDe(c: CandBateria, perfil: string | null, origin: st
 
 export type ResultadoAuto =
   | { enviado: true; canal: 'gmail' | 'resend'; url: string }
-  | { enviado: false; motivo: string; url?: string };
+  | { enviado: false; motivo: string; url?: string; pendiente?: boolean };
+
+async function marcarBateriaPendiente(candidatoId: string) {
+  const { data } = await supabaseAdmin.from('ht_candidates').select('notes').eq('id', candidatoId).maybeSingle();
+  const notes = String((data as { notes?: string | null } | null)?.notes || '');
+  if (notes.includes(NOTA_BATERIA_PENDIENTE)) return;
+  const next = notes.trim() ? `${notes.trim()}\n${NOTA_BATERIA_PENDIENTE}` : NOTA_BATERIA_PENDIENTE;
+  await supabaseAdmin.from('ht_candidates').update({ notes: next, updated_at: new Date().toISOString() }).eq('id', candidatoId);
+}
+
+export async function limpiarBateriaPendiente(candidatoId: string) {
+  const { data } = await supabaseAdmin.from('ht_candidates').select('notes').eq('id', candidatoId).maybeSingle();
+  const notes = String((data as { notes?: string | null } | null)?.notes || '');
+  if (!notes.includes(NOTA_BATERIA_PENDIENTE)) return;
+  const next = notes.split(NOTA_BATERIA_PENDIENTE).join('').replace(/\n{2,}/g, '\n').trim();
+  await supabaseAdmin.from('ht_candidates').update({ notes: next || null, updated_at: new Date().toISOString() }).eq('id', candidatoId);
+}
 
 /**
  * Envío automático de la Batería TS (prefiltro pasado / listo para batería).
@@ -112,6 +131,10 @@ export type ResultadoAuto =
  * Prefiltro y se devuelve el motivo: moverlo sin invitación sería mentir.
  */
 export async function enviarBateriaAuto(candidatoId: string, origin: string): Promise<ResultadoAuto> {
+  if (!batteryAutoSendEnabled()) {
+    await marcarBateriaPendiente(candidatoId);
+    return { enviado: false, motivo: NOTA_BATERIA_PENDIENTE, pendiente: true };
+  }
   try {
     const { data: c } = await supabaseAdmin
       .from('ht_candidates')
@@ -159,6 +182,7 @@ export async function enviarBateriaAuto(candidatoId: string, origin: string): Pr
       .from('ts_bat_sessions')
       .update({ invited_at: new Date().toISOString(), invite_channel: `auto-${canal}`, invite_count: ses.invite_count + 1, updated_at: new Date().toISOString() })
       .eq('id', ses.id);
+    await limpiarBateriaPendiente(candidatoId);
     await moverABateria(candidatoId, `Batería enviada automáticamente (${canal}) al pasar el prefiltro`);
     return { enviado: true, canal, url: ses.url };
   } catch (e: any) {

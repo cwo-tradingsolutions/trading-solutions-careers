@@ -24,6 +24,7 @@ import {
 } from "@/lib/panama-ops-prefilter";
 import { recordStageEvent } from "@/lib/stage-events";
 import { enviarBateriaAuto } from "@/lib/bateria/invitar";
+import { batteryAutoSendEnabled, NOTA_BATERIA_PENDIENTE } from "@/lib/battery-auto-send";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { TEMPLATE_ENGLISH_MIN_RANK, TEMPLATE_SALARY_CAP, type TemplateKey } from "@/lib/prefilter-templates";
 import { etiquetaAvisoPrefiltro, textoSalarioAviso } from "@/lib/prefilter-salary";
@@ -245,6 +246,25 @@ function parseSalaryRangeUsd(raw: unknown): { min: number; max: number } | null 
     return m ? Number(m[1].replace(/[.,]/g, "")) : Number(t.replace(",", "."));
   }).filter((n) => Number.isFinite(n) && n > 0).slice(0, 2);
   return nums.length ? { min: Math.min(...nums), max: Math.max(...nums) } : null;
+}
+
+function panamaCandidateMailLine(
+  decision: string,
+  battery: { enviado: boolean; canal?: string; motivo?: string; pendiente?: boolean } | null,
+): string {
+  if (battery?.enviado) {
+    return `A Batería TS email was sent to the candidate (${battery.canal}).`;
+  }
+  if (battery?.pendiente || battery?.motivo === NOTA_BATERIA_PENDIENTE) {
+    return "No email was sent to the candidate. Automatic battery email is off (BATTERY_AUTO_SEND_ENABLED). batería pendiente de envío — send it from the manual button.";
+  }
+  if (decision === "pass" && battery && !battery.enviado) {
+    return `No email was sent to the candidate. The battery email did not go out: ${battery.motivo}.`;
+  }
+  if (decision === "reject") {
+    return "No email was sent to the candidate (knock-out). The decision is recorded for the recruiter.";
+  }
+  return "No email was sent to the candidate.";
 }
 
 export async function GET(
@@ -770,14 +790,16 @@ export async function POST(
   // El submit del prefiltro decide la etapa por sí solo. Sin registrar el
   // evento, el candidato que pasa a revisión arranca el contador de días
   // desde cero cada vez que alguien lo edita.
+  const batteryPending = decision === "pass" && !batteryAutoSendEnabled();
   if (updates.stage) {
+    const baseNote = panama ? panamaOpsNoticeLines(panama).join(" · ") : `prefiltro: ${decision}`;
     await recordStageEvent({
       candidateId: candidate.id as string,
       fromStage: (candidate.stage as string) ?? null,
       toStage: updates.stage as string,
       vacancyId: (candidate.vacancy_id as string) ?? null,
       source: "system",
-      note: panama ? panamaOpsNoticeLines(panama).join(" · ") : `prefiltro: ${decision}`,
+      note: batteryPending ? `${baseNote} · ${NOTA_BATERIA_PENDIENTE}` : baseNote,
     });
   }
 
@@ -810,7 +832,7 @@ export async function POST(
             <p><strong>${candidate.name}</strong> completed the Panama Operations prefilter.</p>
             <p>Recorded decision: <strong>${lines[0]}</strong></p>
             ${lines.slice(1).length ? `<ul>${lines.slice(1).map((line) => `<li>${line}</li>`).join("")}</ul>` : "<p>No flags.</p>"}
-            <p>No email was sent to the candidate${panama.decision === "reject" ? " (knock-out)." : "."}</p>
+            <p>${panamaCandidateMailLine(panama.decision, bateriaAuto)}</p>
             <p><a href="${baseUrl}/hr-admin?tab=prefiltros">Open HR Admin</a></p>
           </body></html>`,
           fromName: ATS_FROM_NAME,

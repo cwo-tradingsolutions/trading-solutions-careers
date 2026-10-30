@@ -21,7 +21,8 @@ import { VALID_STAGES, KELLY_GATES, normalizeStage, STAGE_RANK } from "@/lib/sta
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { recordStageEvent } from "@/lib/stage-events";
 import { enviarBateriaAuto } from "@/lib/bateria/invitar";
-import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { batteryAutoSendEnabled, NOTA_BATERIA_PENDIENTE } from "@/lib/battery-auto-send";
+import { ATS_FROM_NAME, candidateSignatureHtml } from "@/lib/ats-from";
 import { validarRechazo, MSG_RECHAZO_SILENCIOSO } from "@/lib/rejection-rules";
 import {
   buildRejectionHtml,
@@ -111,7 +112,7 @@ export async function POST(
 
       try {
         const gmail = await isGmailConnected();
-        if (gmail.connected) {
+        if (gmail.connected && batteryAutoSendEnabled()) {
           // @ts-expect-error supabase relation
           const vacancyTitle = candidate.ht_vacancies?.title || "la vacante";
           const firstName = (candidate.name as string).split(" ")[0] || "candidato";
@@ -138,7 +139,7 @@ export async function POST(
       <li>Tus respuestas se guardan automáticamente</li>
     </ul>
     <p>Si te queda alguna duda, contestame este correo.</p>
-    <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>
+    ${candidateSignatureHtml("es")}
   </div>
 </body></html>`;
           const draftRes = await createDraftViaGmail({
@@ -202,12 +203,19 @@ export async function POST(
     // updated_at, que se pisa con cualquier edición del candidato.
     // Es best-effort: si falla, el movimiento igual quedó guardado.
     // recordStageEvent también emite candidate.stage_changed para los agentes.
+    const veniaDeAntes = (STAGE_RANK[normalizeStage(candidate.stage)] ?? 0) < (STAGE_RANK["pruebas"] ?? 0);
+    const batteryPending =
+      targetStage === "prefiltro_pasado" &&
+      veniaDeAntes &&
+      body.auto_bateria !== false &&
+      !batteryAutoSendEnabled();
     await recordStageEvent({
       candidateId,
       fromStage: candidate.stage ?? null,
       toStage: targetStage,
       vacancyId: candidate.vacancy_id ?? null,
       source: "ui",
+      note: batteryPending ? NOTA_BATERIA_PENDIENTE : undefined,
     });
 
     // ─── Listo para batería → Batería TS automática ───────────────
@@ -218,7 +226,6 @@ export async function POST(
     let finalStage = targetStage;
     // Solo desde antes de la batería: a quien se devuelve a Prefiltro desde
     // más adelante no se le reenvía nada ni se le vuelve a mover.
-    const veniaDeAntes = (STAGE_RANK[normalizeStage(candidate.stage)] ?? 0) < (STAGE_RANK["pruebas"] ?? 0);
     if (targetStage === "prefiltro_pasado" && veniaDeAntes && body.auto_bateria !== false) {
       const origin = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
       bateriaAuto = await enviarBateriaAuto(candidateId, origin);
@@ -233,7 +240,7 @@ export async function POST(
       // Welcome email · primer contacto post-oferta firmada
       try {
         const gmail = await isGmailConnected();
-        if (gmail.connected && candidate.email) {
+        if (gmail.connected && candidate.email && batteryAutoSendEnabled()) {
           const firstName = (candidate.name as string).split(" ")[0] || "";
           // @ts-expect-error supabase relation
           const vacancyTitle = candidate.ht_vacancies?.title || "tu nuevo rol";
@@ -260,7 +267,7 @@ export async function POST(
     </ul>
     <p>Si tenés alguna duda mientras tanto · sobre tu fecha de inicio, lo logístico, lo que sea · contestame este correo y resolvemos.</p>
     <p>Nos vemos muy pronto.</p>
-    <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>
+    ${candidateSignatureHtml("es")}
   </div>
 </body></html>`;
           const welcomeRes = await createDraftViaGmail({

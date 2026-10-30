@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import RejectionModal from "./RejectionModal";
 import { resolveCandidateLang, type CandidateLang } from "@/lib/candidate-lang";
+import { NOTA_BATERIA_PENDIENTE } from "@/lib/battery-auto-send";
 import RecruiterAssessmentCard from "./RecruiterAssessmentCard";
 import JointSchedulingModal from "./JointSchedulingModal";
 import CandidateFilesBlock from "./CandidateFilesBlock";
@@ -62,6 +63,7 @@ type Cand = {
    *  banco o de una búsqueda previa, no aplicó por la web. */
   source?: string | null;
   preferred_language?: string | null;
+  notes?: string | null;
   ht_vacancies?: { title: string; form_template_key?: string | null; country?: string | null };
   // Rejection metadata · llenado al rechazar con motivo
   rejection_category?: string | null;
@@ -1358,6 +1360,9 @@ function JourneyCard({
               Espera respuesta
             </span>
           )}
+          {cand.notes?.includes(NOTA_BATERIA_PENDIENTE) && (
+            <span style={{ ...pill, background: "#FEF3C7" }}>{NOTA_BATERIA_PENDIENTE}</span>
+          )}
           {sem && <span style={{ ...pill, color: "#6e6e73" }}>{sem}</span>}
           {aging && (
             <span style={{ ...pill, color: "#6e6e73" }} title={stageSla(cand.stage) ? `Plazo de la etapa: ${stageSla(cand.stage)} días` : undefined}>
@@ -2614,6 +2619,9 @@ function CandDetailPanel({ cand, onClose, onChanged, hiringLeadEmail }: { cand: 
             )}
             {cand.prefilter_completed_at && (
               <Row k="Completó prefiltro" v={new Date(cand.prefilter_completed_at).toLocaleString("es-CO")} />
+            )}
+            {cand.notes?.includes(NOTA_BATERIA_PENDIENTE) && (
+              <Row k="Batería TS" v={NOTA_BATERIA_PENDIENTE} />
             )}
           </Section>
 

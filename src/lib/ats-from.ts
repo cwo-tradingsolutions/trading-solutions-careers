@@ -39,3 +39,14 @@ export function atsFromHeader(mailbox: string = ATS_FROM_EMAIL): string {
   const addr = (mailbox || ATS_FROM_EMAIL).trim() || ATS_FROM_EMAIL;
   return `${encodeMailboxDisplayName()} <${addr}>`;
 }
+
+/** Same closing block on every candidate email. */
+export function candidateSignatureHtml(lang: "es" | "en" = "es"): string {
+  const close = lang === "en" ? "Best regards" : "Un abrazo";
+  return `<p style="margin-top:24px">${close},<br>Talent Acquisition Team<br>Trading Solutions</p>`;
+}
+
+export function candidateSignatureText(lang: "es" | "en" = "es"): string {
+  const close = lang === "en" ? "Best regards" : "Un abrazo";
+  return `${close},\nTalent Acquisition Team\nTrading Solutions`;
+}

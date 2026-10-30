@@ -7,7 +7,7 @@ import { ATS_FROM_NAME } from '@/lib/ats-from';
 import { resolveCandidateLang, type CandidateLang } from '@/lib/candidate-lang';
 import { createDraftViaGmail, isGmailConnected } from '@/lib/gmail';
 import { getResend, EMAIL_FROM } from '@/lib/resend';
-import { moverABateria, sesionDe, RESPONDER_A, type CandBateria } from '@/lib/bateria/invitar';
+import { moverABateria, sesionDe, limpiarBateriaPendiente, RESPONDER_A, type CandBateria } from '@/lib/bateria/invitar';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -154,6 +154,7 @@ export async function POST(req: NextRequest) {
           .update({ invited_at: new Date().toISOString(), invite_channel: canal, invite_count: ses.invite_count + 1, updated_at: new Date().toISOString() })
           .eq('id', ses.id);
         if (c.id && body?.moverEtapa !== false) await moverABateria(c.id);
+        if (c.id) await limpiarBateriaPendiente(c.id);
       }
 
       resultado.push({ id: c.id, nombre: c.nombre, email: c.email, url: ses.url, reusada: ses.reusada, canal, idioma: lang, error: fallo });
