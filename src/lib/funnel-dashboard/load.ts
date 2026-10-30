@@ -1,5 +1,4 @@
 import { supabaseAdmin } from "@/lib/supabase";
-import { PREFILTER_SALARY_CAPS_COP } from "@/lib/prefilter-salary-caps";
 import { VACANCY_MAP } from "@/lib/vacancy-map";
 import {
   buildDashboard,
@@ -118,7 +117,7 @@ export async function loadDashboardInput(clientId: string, filters: DashFilters)
     agingTargetDays,
     recruiters,
     vacancies: vacancies.map((v) => {
-      const pay = salaries.get(String(v.id));
+      const pay = salaries.map.get(String(v.id));
       return {
         id: String(v.id),
         title: String(v.title ?? "Sin título"),
@@ -126,12 +125,12 @@ export async function loadDashboardInput(clientId: string, filters: DashFilters)
         country: str(v.country),
         status: str(v.status),
         owner_recruiter_id: str(v.owner_recruiter_id),
-        closed_at: str(v.closed_at),
         salary_cap_amount: pay?.amount ?? null,
         salary_cap_currency: pay?.currency ?? null,
         salary_texts: pay?.texts ?? [],
       };
     }),
+    salarySourceErrors: salaries.errors,
     milestones: milestones.map((m) => ({
       vacancy_id: String(m.vacancy_id),
       hr_request_date: str(m.hr_request_date),
@@ -156,8 +155,8 @@ export async function loadDashboardInput(clientId: string, filters: DashFilters)
 }
 
 async function loadVacancyRows(clientId: string): Promise<Record<string, unknown>[]> {
+  // ht_vacancies no tiene closed_at. No se pide ni se inventa.
   const attempts = [
-    "id, title, area, country, status, owner_recruiter_id, requisition_id, closed_at",
     "id, title, area, country, status, owner_recruiter_id, requisition_id",
     "id, title, area, country, status, owner_recruiter_id",
   ];
@@ -186,16 +185,20 @@ function positiveAmount(value: unknown): number | null {
 /**
  * Salario de la vacante, en este orden, sin columnas nuevas:
  * 1. ht_requisitions.salary_cap_cop (tope interno, COP), por requisition_id o vacancy_id
- * 2. el tope que el prefiltro ya tiene por vacancy_id (PREFILTER_SALARY_CAPS_COP)
- * 3. textos: salary_public y, si hay DATABASE_URL, vacancies.salary_range de Neon
- *    vía VACANCY_MAP. El punto medio solo entra si el texto tiene dos extremos
- *    y moneda COP o USD. Si nada de eso se puede leer, el cálculo dice sin dato.
+ * 2. punto medio de salary_public y, si hay DATABASE_URL, de vacancies.salary_range
+ *    (Neon, vía VACANCY_MAP), solo con dos extremos y moneda COP o USD
+ * 3. sin dato
+ *
+ * PREFILTER_SALARY_CAPS_COP queda fuera: es el umbral del prefiltro contra
+ * la aspiración del candidato, no el salario de la vacante. Puede volver
+ * solo etiquetado «umbral prefiltro», después de que Justina lo valide.
  */
 async function loadSalaries(
   clientId: string,
   vacancies: Record<string, unknown>[],
-): Promise<Map<string, { amount: number | null; currency: SalaryCurrency | null; texts: string[] }>> {
+): Promise<{ map: Map<string, { amount: number | null; currency: SalaryCurrency | null; texts: string[] }>; errors: string[] }> {
   const out = new Map<string, { amount: number | null; currency: SalaryCurrency | null; texts: string[] }>();
+  const errors: string[] = [];
   let reqs: Record<string, unknown>[] = [];
   try {
     reqs = await pages((from, to) =>
@@ -206,6 +209,7 @@ async function loadSalaries(
         .range(from, to),
     );
   } catch {
+    errors.push("Error al cargar fuente ht_requisitions");
     reqs = [];
   }
   const byReq = new Map<string, { amount: number | null; text: string | null }>();
@@ -219,24 +223,27 @@ async function loadSalaries(
     if (row.vacancy_id) byVac.set(String(row.vacancy_id), pack);
   }
 
-  const jobText = await loadJobSalaryRanges(vacancies.map((v) => String(v.id)));
+  const jobs = await loadJobSalaryRanges(vacancies.map((v) => String(v.id)));
+  if (jobs.error) errors.push(jobs.error);
   for (const v of vacancies) {
     const id = String(v.id);
     const linked =
       (v.requisition_id ? byReq.get(String(v.requisition_id)) : undefined) || byVac.get(id) || null;
-    const cap = linked?.amount ?? PREFILTER_SALARY_CAPS_COP[id] ?? null;
-    const texts = [linked?.text, jobText.get(id)].filter((t): t is string => Boolean(t));
+    const cap = linked?.amount ?? null;
+    const texts = [linked?.text, jobs.map.get(id)].filter((t): t is string => Boolean(t));
     out.set(id, { amount: cap, currency: cap ? "COP" : null, texts });
   }
-  return out;
+  return { map: out, errors };
 }
 
-async function loadJobSalaryRanges(vacancyIds: string[]): Promise<Map<string, string>> {
+async function loadJobSalaryRanges(
+  vacancyIds: string[],
+): Promise<{ map: Map<string, string>; error: string | null }> {
   const out = new Map<string, string>();
   const pairs = Object.entries(VACANCY_MAP)
     .map(([jobId, vacancyId]) => ({ jobId: Number(jobId), vacancyId }))
     .filter((p) => vacancyIds.includes(p.vacancyId) && Number.isFinite(p.jobId));
-  if (pairs.length === 0 || !process.env.DATABASE_URL) return out;
+  if (pairs.length === 0 || !process.env.DATABASE_URL) return { map: out, error: null };
   try {
     const { neon } = await import("@/lib/sql");
     const sql = neon(process.env.DATABASE_URL);
@@ -252,9 +259,9 @@ async function loadJobSalaryRanges(vacancyIds: string[]): Promise<Map<string, st
       if (text) out.set(pair.vacancyId, text);
     }
   } catch {
-    return out;
+    return { map: out, error: "Error al cargar fuente vacancies.salary_range" };
   }
-  return out;
+  return { map: out, error: null };
 }
 
 export async function dashboardResponse(url: URL): Promise<DashboardPayload> {

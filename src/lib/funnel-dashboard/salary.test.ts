@@ -75,6 +75,40 @@ describe("salario usable", () => {
     assert.equal(parseTwoEndedRange("2.000 USD y 8.000.000 COP"), null);
   });
 
+  it("anual, sufijo k y millones", () => {
+    for (const text of [
+      "USD 60,000-80,000 per year",
+      "USD 60.000-80.000 anual",
+      "2.000 – 3.000 USD al año",
+      "2000-3000 USD per annum",
+      "2,000-3,000 USD yearly",
+      "USD 2000-3000 /yr",
+      "3k-4k USD",
+      "3 k - 4 k USD",
+    ]) {
+      assert.equal(parseTwoEndedRange(text), null, text);
+      const r = resolveSalary({ capAmount: null, capCurrency: null, texts: [text] });
+      assert.equal(r.source, "sin_dato", text);
+      assert.equal(r.monthly, null, text);
+    }
+    const pesos = parseTwoEndedRange("4 y 5 millones de pesos");
+    assert.equal(pesos?.currency, "COP");
+    assert.equal(pesos?.min, 4_000_000);
+    assert.equal(pesos?.max, 5_000_000);
+    const entre = parseTwoEndedRange("Entre 4 y 5 millones de pesos");
+    assert.equal(entre?.min, 4_000_000);
+    assert.equal(entre?.max, 5_000_000);
+    const cop = parseTwoEndedRange("COP 3.5 - 4.5 millones");
+    assert.equal(cop?.min, 3_500_000);
+    assert.equal(cop?.max, 4_500_000);
+    const hasta = parseTwoEndedRange("4 hasta 5 millones COP");
+    assert.equal(hasta?.min, 4_000_000);
+    assert.equal(hasta?.max, 5_000_000);
+    const conA = parseTwoEndedRange("3 a 4 M COP");
+    assert.equal(conA?.min, 3_000_000);
+    assert.equal(conA?.max, 4_000_000);
+  });
+
   it("si el primer texto no sirve, prueba el siguiente", () => {
     const r = resolveSalary({
       capAmount: null,

@@ -376,9 +376,13 @@ describe("costo salarial base", () => {
     assert.equal(d.kpis.cost.placeholder, true);
     assert.ok(Math.abs((cop.openAvgDaily ?? 0) - 4_000_000 / 30) < 1e-6);
     assert.ok(Math.abs((cop.openAccumulated ?? 0) - (4_000_000 / 30) * 10) < 1e-4);
-    assert.equal(cop.closedN, 5);
-    assert.equal(cop.closedInsufficient, false);
-    assert.ok(Math.abs((cop.closedAccumulated ?? 0) - (3_000_000 / 30) * 136) < 1e-2);
+    assert.equal(cop.hiredN, 5);
+    assert.equal(cop.hiredInsufficient, false);
+    assert.ok(Math.abs((cop.hiredAccumulated ?? 0) - (3_000_000 / 30) * 136) < 1e-2);
+    assert.equal(d.kpis.salaryCost.openByCap, 1);
+    assert.equal(d.kpis.salaryCost.openByMidpoint, 1);
+    assert.equal(d.kpis.salaryCost.openSinDato, 4);
+    assert.equal(d.kpis.salaryCost.closedWithoutHire, 0);
     assert.ok(Math.abs((usd.openAccumulated ?? 0) - 1_900) < 1e-6);
     assert.notEqual(cop.openAccumulated, (cop.openAccumulated ?? 0) + (usd.openAccumulated ?? 0));
 
@@ -402,10 +406,16 @@ describe("costo salarial base", () => {
     assert.equal(packed.includes("salary_cap"), false);
     assert.equal(packed.includes("4000000"), false);
     assert.equal(d.vacancies.filter((v) => v.open).length, 6);
-    assert.equal(d.vacancies.filter((v) => !v.open && v.cost.costToDate != null).length, 5);
+    for (const closed of d.vacancies.filter((v) => !v.open)) {
+      assert.equal(closed.cost.dailyCost, null);
+      assert.equal(closed.cost.costToDate, null);
+      assert.equal(closed.cost.daysOpen, null);
+      assert.equal(closed.cost.currency, null);
+      assert.equal(JSON.stringify(closed.cost).includes("3000000"), false);
+    }
   });
 
-  it("sin hr_request_date es sin dato y una cerrada corta en closed_at", () => {
+  it("sin hr_request_date es sin dato y la cerrada sin contratación no lleva monto", () => {
     const input = baseInput();
     input.now = at(40);
     input.vacancies = [
@@ -420,18 +430,8 @@ describe("costo salarial base", () => {
         salary_cap_currency: "COP",
       },
       {
-        id: "corte",
-        title: "Cerrada",
-        area: "A",
-        country: "Colombia",
-        status: "closed",
-        owner_recruiter_id: null,
-        closed_at: at(10),
-        salary_texts: ["2.000.000 – 4.000.000 COP"],
-      },
-      {
-        id: "sin-corte",
-        title: "Sin cierre",
+        id: "sin-hire",
+        title: "Cerrada sin contratación",
         area: "A",
         country: "Colombia",
         status: "closed",
@@ -450,8 +450,7 @@ describe("costo salarial base", () => {
       },
     ];
     input.milestones = [
-      { vacancy_id: "corte", hr_request_date: at(0), hire_date: null },
-      { vacancy_id: "sin-corte", hr_request_date: at(0), hire_date: null },
+      { vacancy_id: "sin-hire", hr_request_date: at(0), hire_date: null },
       { vacancy_id: "un-extremo", hr_request_date: at(0), hire_date: null },
     ];
     const d = buildDashboard(input);
@@ -460,21 +459,43 @@ describe("costo salarial base", () => {
     assert.equal(sinHito.cost.costToDate, null);
     assert.equal(sinHito.cost.daysOpen, null);
     assert.equal(sinHito.cost.salarySource, "tope_interno");
-    const corte = d.vacancies.find((v) => v.id === "corte")!;
-    assert.equal(corte.cost.salarySource, "punto_medio_rango");
-    assert.ok(Math.abs((corte.cost.costToDate ?? 0) - (3_000_000 / 30) * 10) < 1e-4);
-    assert.equal(corte.open, false);
-    const sinCorte = d.vacancies.find((v) => v.id === "sin-corte")!;
-    assert.equal(sinCorte.cost.sinDato, "sin_cierre");
-    assert.equal(sinCorte.cost.costToDate, null);
+    const sinHire = d.vacancies.find((v) => v.id === "sin-hire")!;
+    assert.equal(sinHire.open, false);
+    assert.equal(sinHire.cost.dailyCost, null);
+    assert.equal(sinHire.cost.costToDate, null);
+    assert.equal(d.kpis.salaryCost.closedWithoutHire, 1);
     const unExtremo = d.vacancies.find((v) => v.id === "un-extremo")!;
     assert.equal(unExtremo.cost.salarySource, "sin_dato");
     assert.equal(unExtremo.cost.dailyCost, null);
-    const cop = d.kpis.salaryCost.byCurrency.find((c) => c.currency === "COP")!;
-    assert.equal(cop.closedN, 1);
-    assert.equal(cop.closedAccumulated, null);
+    assert.equal(d.kpis.salaryCost.byCurrency.find((c) => c.hiredN > 0), undefined);
     assert.equal(d.kpis.salaryCost.openWithSalary, 1);
     assert.equal(d.kpis.salaryCost.openTotal, 2);
+    assert.equal(d.kpis.salaryCost.openByCap, 1);
+    assert.equal(d.kpis.salaryCost.openByMidpoint, 0);
+    assert.equal(d.kpis.salaryCost.openSinDato, 1);
+  });
+
+  it("una abierta con hire_date sigue acumulando hasta hoy", () => {
+    const input = baseInput();
+    input.now = at(40);
+    input.vacancies = [
+      {
+        id: "sigue",
+        title: "Abierta con hire",
+        area: "A",
+        country: "Colombia",
+        status: "open",
+        owner_recruiter_id: null,
+        salary_cap_amount: 3_000_000,
+        salary_cap_currency: "COP",
+      },
+    ];
+    input.milestones = [{ vacancy_id: "sigue", hr_request_date: at(0), hire_date: at(10) }];
+    const d = buildDashboard(input);
+    const row = d.vacancies.find((v) => v.id === "sigue")!;
+    assert.equal(row.open, true);
+    assert.ok(Math.abs((row.cost.daysOpen ?? 0) - 40) < 1e-6);
+    assert.ok(Math.abs((row.cost.costToDate ?? 0) - (3_000_000 / 30) * 40) < 1e-2);
   });
 
   it("el canal deja fuera una vacante sin candidatos de ese canal", () => {

@@ -96,10 +96,19 @@ function amount(token: string): number | null {
   return null;
 }
 
+const ANNUAL = /\banual(?:es)?\b|\b(?:yearly|per\s+annum|per\s+year|al\s+año|al\s+ano)\b|\/yr\b/i;
+const KILO = /\d(?:[.,]\d+)?\s*k\b/i;
+const RANGE_SEP = String.raw`[–\-\u2013]|y|a|hasta`;
+
 function extractNumbers(text: string): number[] {
   const tokens = text.match(/\d+(?:[.,]\d+)?/g) ?? [];
+  // «4 y 5 millones», «3 a 4 M», «3.5 hasta 4.5 millones»: el millón
+  // aplica a los dos extremos. «y», «a» y «hasta» separan el rango.
   const rangeMillions = text.match(
-    /(\d+(?:[.,]\d+)?)\s*[–\-\u2013]\s*(\d+(?:[.,]\d+)?)\s*M\b/i,
+    new RegExp(
+      String.raw`(\d+(?:[.,]\d+)?)\s*(?:${RANGE_SEP})\s*(\d+(?:[.,]\d+)?)\s*(?:M|millones|millon(?:es)?|millón(?:es)?)\b`,
+      "i",
+    ),
   );
   if (rangeMillions && tokens.length === 2) {
     const a = Number(rangeMillions[1].replace(",", ".")) * 1_000_000;
@@ -122,12 +131,15 @@ function extractNumbers(text: string): number[] {
   return nums;
 }
 
-/** null si no hay dos extremos distintos en COP o USD explícitos. */
+/**
+ * null si no hay dos extremos distintos en COP o USD explícitos.
+ * Un rango anual, o con sufijo k, no es un salario mensual: sin dato.
+ */
 export function parseTwoEndedRange(
   raw: string | null | undefined,
 ): { min: number; max: number; currency: SalaryCurrency } | null {
   const text = String(raw ?? "").trim();
-  if (!text) return null;
+  if (!text || ANNUAL.test(text) || KILO.test(text)) return null;
   const currency = currencyOf(text);
   if (!currency) return null;
   const nums = extractNumbers(text);

@@ -217,6 +217,12 @@ export default function CommandCenterLayout({
             <b>Datos de ejemplo.</b> No son cifras del ATS. Sirven para revisar la forma del tablero.
           </div>
         )}
+        {(data?.kpis.salaryCost.sourceErrors ?? []).map((msg) => (
+          <div key={msg} role="alert" className="mb-3 rounded-[14px] border border-[color:var(--ts-ink)] bg-white px-3 py-2 text-[13px] text-[var(--ts-ink)]">
+            <AlertTriangle className="inline w-3.5 h-3.5 mr-1.5" aria-hidden />
+            <b>{msg}</b>
+          </div>
+        ))}
 
         {loading && !data && <p className="text-[13px] text-[var(--ts-muted)]">Cargando dashboard…</p>}
         {error && (
@@ -296,7 +302,7 @@ export default function CommandCenterLayout({
                   <table className="w-full text-[12px]">
                     <thead>
                       <tr className="text-left text-[11px] text-[var(--ts-muted)]">
-                        <th className="py-1 font-medium">Estado</th>
+                        <th className="py-1 font-medium">Antigüedad vacante</th>
                         <th className="font-medium">Vacante</th>
                         <th className="font-medium">Dueño</th>
                         <th className="font-medium">Días</th>
@@ -307,7 +313,7 @@ export default function CommandCenterLayout({
                     <tbody>
                       {abiertas.map((v) => (
                         <tr key={v.id} className="border-t border-[color:var(--ts-line)]">
-                          <td className="py-1.5 pr-2"><Estado id={estadoDe(v.semaforo)} /></td>
+                          <td className="py-1.5 pr-2 tabular-nums">{v.agingLabel === SIN_HITO ? "sin dato" : v.agingLabel}</td>
                           <td className="pr-2">
                             <div className="font-medium">{v.title}</div>
                             <div className="text-[10px] text-[var(--ts-muted)]">{fuente(v.cost.salarySource)}</div>
@@ -324,7 +330,7 @@ export default function CommandCenterLayout({
                     </tbody>
                   </table>
                 </div>
-                <Cerradas line={data.kpis.salaryCost.byCurrency} />
+                <Cerradas line={data.kpis.salaryCost.byCurrency} withoutHire={data.kpis.salaryCost.closedWithoutHire} />
                 <p className="text-[11px] text-[var(--ts-muted)] mt-2">
                   La fila no muestra el salario, solo el costo diario y el acumulado. El reparto por dueño de la demora está por construir.
                 </p>
@@ -498,29 +504,36 @@ function fuente(source: VacancyCost["salarySource"]): string {
 }
 
 function SalaryKpi({ data }: { data: DashboardPayload }) {
-  const blocks = data.kpis.salaryCost.byCurrency.filter((b) => b.openWithDaily > 0 || b.openAccumulated != null);
+  const cost = data.kpis.salaryCost;
+  const blocks = cost.byCurrency.filter((b) => b.openWithDaily > 0 || b.openAvgDaily != null);
   const value = blocks.length === 0
     ? "sin dato"
-    : blocks.map((b) => (b.openAccumulated == null ? `${b.currency} sin dato` : fmtMoney(b.openAccumulated, b.currency))).join(" · ");
+    : blocks.map((b) => (b.openAvgDaily == null ? `${b.currency} sin dato` : fmtMoney(b.openAvgDaily, b.currency))).join(" · ");
   const detail = [
-    `${data.kpis.salaryCost.openWithSalary} de ${data.kpis.salaryCost.openTotal} abiertas con salario`,
-    ...blocks.map((b) => b.openAvgDaily == null ? "" : `promedio ${fmtMoney(b.openAvgDaily, b.currency)} / día`),
-    data.kpis.salaryCost.formula,
-    data.kpis.salaryCost.partialCoverage ? "Cobertura parcial" : "",
+    "Costo diario promedio por vacante abierta",
+    `${cost.openByCap} por tope · ${cost.openByMidpoint} por punto medio · ${cost.openSinDato} sin dato`,
+    `${cost.openWithSalary} de ${cost.openTotal} abiertas con salario`,
+    ...blocks.map((b) => b.openAccumulated == null ? "" : `acumulado ${fmtMoney(b.openAccumulated, b.currency)}`),
+    "El tope es un techo y puede sobreestimar.",
+    cost.formula,
+    cost.partialCoverage ? "Cobertura parcial" : "",
   ].filter(Boolean).join(" · ");
   return <Kpi label="Costo salarial base" value={value} detail={detail} />;
 }
 
-function Cerradas({ line }: { line: CurrencyCost[] }) {
-  const rows = line.filter((b) => b.closedN > 0);
-  if (rows.length === 0) return null;
+function Cerradas({ line, withoutHire }: { line: CurrencyCost[]; withoutHire: number }) {
+  const hired = line.filter((b) => b.hiredN > 0);
+  if (hired.length === 0 && withoutHire === 0) return null;
   return (
     <ul className="mt-2 text-[12px] text-[var(--ts-muted)]">
-      {rows.map((b) => (
+      {hired.map((b) => (
         <li key={b.currency}>
-          Cerradas {b.currency} · n={b.closedN} · {b.closedInsufficient || b.closedAccumulated == null ? MUESTRA : fmtMoney(b.closedAccumulated, b.currency)}
+          Cerradas con contratación {b.currency} · n={b.hiredN} · {b.hiredInsufficient || b.hiredAccumulated == null ? MUESTRA : fmtMoney(b.hiredAccumulated, b.currency)}
         </li>
       ))}
+      {withoutHire > 0 && (
+        <li>Cerradas sin contratación · n={withoutHire} · sin fecha de cierre, no se calcula</li>
+      )}
     </ul>
   );
 }

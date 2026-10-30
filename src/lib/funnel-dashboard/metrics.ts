@@ -80,8 +80,6 @@ export type DashVacancy = {
   country: string | null;
   status: string | null;
   owner_recruiter_id: string | null;
-  /** Fecha en que se cerró sin contratación. No se inventa con created_at ni updated_at. */
-  closed_at?: string | null;
   /** Tope mensual numérico ya en una moneda. null si no hay. */
   salary_cap_amount?: number | null;
   salary_cap_currency?: SalaryCurrency | null;
@@ -108,6 +106,8 @@ export type DashboardInput = {
   filters: DashFilters;
   now: string;
   example?: boolean;
+  /** Fallos al leer una fuente de salario. No se esconden como «sin dato». */
+  salarySourceErrors?: string[];
 };
 
 export type Metric = {
@@ -185,11 +185,13 @@ export type VacancyCost = {
 export type CurrencyCost = {
   currency: SalaryCurrency;
   openAccumulated: number | null;
+  /** Promedio del costo diario entre abiertas con salario. No es la suma. */
   openAvgDaily: number | null;
   openWithDaily: number;
-  closedAccumulated: number | null;
-  closedN: number;
-  closedInsufficient: boolean;
+  /** Solo cerradas con hire_date y n≥5. */
+  hiredAccumulated: number | null;
+  hiredN: number;
+  hiredInsufficient: boolean;
 };
 
 export type VacancyRow = {
@@ -247,7 +249,13 @@ export type DashboardPayload = {
       formula: string;
       openWithSalary: number;
       openTotal: number;
+      openByCap: number;
+      openByMidpoint: number;
+      openSinDato: number;
+      /** Cerradas sin hire_date. Sin closed_at no hay monto. */
+      closedWithoutHire: number;
       partialCoverage: boolean;
+      sourceErrors: string[];
       byCurrency: CurrencyCost[];
     };
   };
@@ -583,8 +591,11 @@ function emptyCost(sinDato: VacancyCost["sinDato"]): VacancyCost {
 
 /**
  * Días abiertas: solo desde hr_request_date. Sin ese hito, sin dato
- * (no se usa created_at). El corte es hire_date, o la fecha de cierre
- * si se cerró sin contratación, o hoy si sigue abierta.
+ * (no se usa created_at).
+ * Abierta: hasta hoy, aunque tenga hire_date (el cupo puede seguir abierto).
+ * Cerrada con contratación: corta en hire_date.
+ * Cerrada sin contratación: ht_vacancies no tiene closed_at; no se inventa
+ * y no hay monto.
  */
 function costOfVacancy(v: DashVacancy, milestone: DashMilestone | undefined, asOf: string): VacancyCost {
   const resolved = resolveSalary({
@@ -595,7 +606,7 @@ function costOfVacancy(v: DashVacancy, milestone: DashMilestone | undefined, asO
   const start = milestone?.hr_request_date ?? null;
   const hire = milestone?.hire_date ?? null;
   const open = v.status === "open";
-  const end = hire || (open ? asOf : v.closed_at || null);
+  const end = open ? asOf : hire;
   const days = start && end ? daySpan(start, end) : null;
   if (resolved.source === "sin_dato" || resolved.monthly == null || !resolved.currency) {
     return { ...emptyCost("sin_salario"), daysOpen: days };
@@ -880,19 +891,25 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
 
   const openScoped = vacs.filter((v) => v.status === "open" && costScope.has(v.id));
   const openWithSalary = openScoped.filter((v) => costByVac.get(v.id)?.salarySource !== "sin_dato");
+  const openByCap = openScoped.filter((v) => costByVac.get(v.id)?.salarySource === "tope_interno").length;
+  const openByMidpoint = openScoped.filter((v) => costByVac.get(v.id)?.salarySource === "punto_medio_rango").length;
+  const closedWithoutHire = vacs.filter((v) => {
+    if (!costScope.has(v.id) || v.status === "open") return false;
+    return !prep.milestoneByVac.get(v.id)?.hire_date;
+  }).length;
   type CostBucket = {
     accumulated: number;
     accN: number;
     dailySum: number;
     dailyN: number;
-    closedSum: number;
-    closedN: number;
+    hiredSum: number;
+    hiredN: number;
   };
   const buckets = new Map<SalaryCurrency, CostBucket>();
   const bucket = (currency: SalaryCurrency): CostBucket => {
     let cur = buckets.get(currency);
     if (!cur) {
-      cur = { accumulated: 0, accN: 0, dailySum: 0, dailyN: 0, closedSum: 0, closedN: 0 };
+      cur = { accumulated: 0, accN: 0, dailySum: 0, dailyN: 0, hiredSum: 0, hiredN: 0 };
       buckets.set(currency, cur);
     }
     return cur;
@@ -910,11 +927,12 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
   }
   for (const v of vacs) {
     if (!costScope.has(v.id) || v.status === "open") continue;
+    if (!prep.milestoneByVac.get(v.id)?.hire_date) continue;
     const c = costByVac.get(v.id);
     if (!c?.currency || c.costToDate == null || c.sinDato != null) continue;
     const b = bucket(c.currency);
-    b.closedSum += c.costToDate;
-    b.closedN += 1;
+    b.hiredSum += c.costToDate;
+    b.hiredN += 1;
   }
   const byCurrency: CurrencyCost[] = [...buckets.entries()]
     .map(([currency, b]) => ({
@@ -922,9 +940,9 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
       openAccumulated: b.accN > 0 ? b.accumulated : null,
       openAvgDaily: b.dailyN > 0 ? b.dailySum / b.dailyN : null,
       openWithDaily: b.dailyN,
-      closedAccumulated: b.closedN >= MIN_N ? b.closedSum : null,
-      closedN: b.closedN,
-      closedInsufficient: b.closedN < MIN_N,
+      hiredAccumulated: b.hiredN >= MIN_N ? b.hiredSum : null,
+      hiredN: b.hiredN,
+      hiredInsufficient: b.hiredN < MIN_N,
     }))
     .sort((a, b) => a.currency.localeCompare(b.currency));
 
@@ -985,7 +1003,8 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
       candidates: people.length,
       overSla,
       inCostScope: costScope.has(v.id),
-      cost: costByVac.get(v.id) ?? emptyCost("sin_salario"),
+      // Cerrada: la fila no lleva montos. dailyCost × 30 reconstruiría el salario.
+      cost: open ? (costByVac.get(v.id) ?? emptyCost("sin_salario")) : emptyCost("sin_salario"),
     };
   });
   vacancies.sort((a, b) => {
@@ -1060,7 +1079,12 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
         formula: FORMULA_COSTO,
         openWithSalary: openWithSalary.length,
         openTotal: openScoped.length,
+        openByCap,
+        openByMidpoint,
+        openSinDato: openScoped.length - openWithSalary.length,
+        closedWithoutHire,
         partialCoverage: openScoped.length > 0 && openWithSalary.length / openScoped.length < 0.5,
+        sourceErrors: input.salarySourceErrors ?? [],
         byCurrency,
       },
     },
@@ -1084,7 +1108,7 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
 const GAPS = [
   "Calidad @90d vive en Buk: no hay puente ATS↔Buk.",
   "Costo de reclutamiento: no hay fee por vacante. El costo salarial base es otra cuenta y solo usa un salario que ya esté guardado.",
-  "Costo salarial base: sin hr_request_date es sin dato. Una cerrada sin hire_date corta en closed_at; si esa fecha no existe, también es sin dato.",
+  "Costo salarial base: sin hr_request_date es sin dato. Una abierta con hire_date sigue hasta hoy. Una cerrada sin contratación no tiene fecha de cierre: no se inventa closed_at y no entra al monto.",
   "Gates 6 Psicométricas y 8 Entrevista HM no tienen código de escritura. Se muestran con «sin código aún» y no entran a la conversión.",
   "No existe tabla de ofertas: la aceptación sale de los eventos de etapa (gate ≥10 y gate 12).",
   "Eventos source=backfill no entran al SLA: la fecha es reconstruida.",
@@ -1127,7 +1151,8 @@ export function buildDashboard(input: DashboardInput): DashboardPayload {
     ],
   };
 
-  return { ...curr, example: !!input.example, options, gaps: GAPS };
+  const sourceErrors = input.salarySourceErrors ?? [];
+  return { ...curr, example: !!input.example, options, gaps: [...GAPS, ...sourceErrors] };
 }
 
 function unique(values: string[]): string[] {
