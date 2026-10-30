@@ -23,44 +23,12 @@ import { recordStageEvent } from "@/lib/stage-events";
 import { enviarBateriaAuto } from "@/lib/bateria/invitar";
 import { ATS_FROM_NAME } from "@/lib/ats-from";
 import { validarRechazo, MSG_RECHAZO_SILENCIOSO } from "@/lib/rejection-rules";
-
-const TS_LINKEDIN_URL = "https://www.linkedin.com/company/trading-sol/";
-
-function buildRejectionHtmlEn(name: string, vacancyTitle: string): string {
-  const firstName = (name || "").split(" ")[0] || "candidate";
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-  body { font-family: Inter, -apple-system, sans-serif; line-height: 1.6; color: #1a1a1a; padding: 24px; background: #f9f9f9; }
-  .container { max-width: 600px; margin: 0 auto; background: white; padding: 32px; border-radius: 12px; }
-  a { color: #2C64ED; }
-</style></head><body>
-  <div class="container">
-    <p>Hi <strong>${firstName}</strong>,</p>
-    <p>Thank you for taking the time to apply for the <strong>${vacancyTitle}</strong> position at Trading Solutions. After reviewing your application, we have decided to move forward with other candidates whose profile is a closer match for the position at this time. Trading Solutions keeps growing, and we would love to stay in touch.</p>
-    <p>Your information stays in our database for future opportunities. We also invite you to follow us on LinkedIn to hear about new openings: <a href="${TS_LINKEDIN_URL}">${TS_LINKEDIN_URL}</a></p>
-    <p>We appreciate your interest in Trading Solutions and wish you all the best in your next steps.</p>
-    <p>Best regards,<br><strong>Talent Team</strong><br>Trading Solutions</p>
-  </div>
-</body></html>`;
-}
-
-function buildRejectionHtml(name: string, vacancyTitle: string): string {
-  const firstName = (name || "").split(" ")[0] || "candidato";
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-  body { font-family: Inter, -apple-system, sans-serif; line-height: 1.6; color: #1a1a1a; padding: 24px; background: #f9f9f9; }
-  .container { max-width: 600px; margin: 0 auto; background: white; padding: 32px; border-radius: 12px; }
-  a { color: #2C64ED; }
-</style></head><body>
-  <div class="container">
-    <p>Hola <strong>${firstName}</strong>,</p>
-    <p>Gracias por tomarte el tiempo de aplicar a la posición de <strong>${vacancyTitle}</strong> en Trading Solutions. Después de revisar tu aplicación, hemos decidido avanzar con otros candidatos cuyo perfil se ajusta más a la posición en este momento. Sin embargo, Trading Solutions sigue creciendo y nos encantaría mantenernos en contacto.</p>
-    <p>Tu información queda en nuestra base de datos para futuras oportunidades. También te invitamos a seguirnos en LinkedIn para enterarte de nuevas vacantes: <a href="${TS_LINKEDIN_URL}">${TS_LINKEDIN_URL}</a></p>
-    <p>Apreciamos tu interés en Trading Solutions y te deseamos mucho éxito en tus próximos pasos.</p>
-    <p>Un abrazo,<br><strong>${ATS_FROM_NAME}</strong><br>Trading Solutions</p>
-  </div>
-</body></html>`;
-}
+import {
+  buildRejectionHtml,
+  rejectionEmailsEnabled,
+  rejectionSubject,
+  REJECTION_REPLY_TO,
+} from "@/lib/rejection-email";
 
 export async function POST(
   req: NextRequest,
@@ -189,13 +157,12 @@ export async function POST(
     }
 
     // Crear draft de rechazo si aplica
-    if (targetStage === "rechazado" && createRejectionDraft) {
+    if (targetStage === "rechazado" && createRejectionDraft && rejectionEmailsEnabled()) {
       try {
         const gmail = await isGmailConnected();
         if (gmail.connected) {
           // @ts-expect-error supabase relation
           const rawVacancyTitle = candidate.ht_vacancies?.title as string | undefined;
-          // El proceso de China corre en inglés · también el descarte.
           const rejLang = resolveCandidateLang({
             formTemplateKey: (candidate as any).ht_vacancies?.form_template_key,
             preferredLanguage: (candidate as any).preferred_language,
@@ -203,15 +170,13 @@ export async function POST(
             country: (candidate as any).ht_vacancies?.country,
           });
           const vacancyTitle = rawVacancyTitle || (rejLang === "en" ? "the position" : "la posición");
+          const firstName = ((candidate.name as string) || "").split(" ")[0] || (rejLang === "en" ? "there" : "candidato");
           const draftRes = await createDraftViaGmail({
             to: candidate.email as string,
-            subject: rejLang === "en"
-              ? `Trading Solutions · About your application`
-              : `Trading Solutions · Sobre tu aplicación`,
-            html: rejLang === "en"
-              ? buildRejectionHtmlEn(candidate.name as string, vacancyTitle)
-              : buildRejectionHtml(candidate.name as string, vacancyTitle),
+            subject: rejectionSubject(vacancyTitle, rejLang),
+            html: buildRejectionHtml(firstName, vacancyTitle, rejLang),
             fromName: ATS_FROM_NAME,
+            replyTo: REJECTION_REPLY_TO,
           });
           if (draftRes.ok) {
             draftId = draftRes.draft_id;

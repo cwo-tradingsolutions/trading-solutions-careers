@@ -7,6 +7,7 @@ import {
   CheckCircle2, XCircle, ArrowRight,
 } from "lucide-react";
 import RejectionModal from "./RejectionModal";
+import { resolveCandidateLang, type CandidateLang } from "@/lib/candidate-lang";
 import RecruiterAssessmentCard from "./RecruiterAssessmentCard";
 import JointSchedulingModal from "./JointSchedulingModal";
 import CandidateFilesBlock from "./CandidateFilesBlock";
@@ -60,7 +61,8 @@ type Cand = {
   /** De dónde salió el candidato · 'cv_proceso_anterior' = HV cargada de un
    *  banco o de una búsqueda previa, no aplicó por la web. */
   source?: string | null;
-  ht_vacancies?: { title: string };
+  preferred_language?: string | null;
+  ht_vacancies?: { title: string; form_template_key?: string | null; country?: string | null };
   // Rejection metadata · llenado al rechazar con motivo
   rejection_category?: string | null;
   rejection_sub_detail?: string | null;
@@ -73,6 +75,15 @@ type Cand = {
   created_at?: string | null;
   updated_at?: string | null;
 };
+
+function langDe(c: Pick<Cand, "preferred_language" | "ht_vacancies">): CandidateLang {
+  return resolveCandidateLang({
+    preferredLanguage: c.preferred_language,
+    formTemplateKey: c.ht_vacancies?.form_template_key,
+    jobTitle: c.ht_vacancies?.title,
+    country: c.ht_vacancies?.country,
+  });
+}
 
 type PrefilterData = {
   doc_type?: string;
@@ -1789,6 +1800,7 @@ function BulkActionBar({
         candidateId={selectedCands[0].id}
         candidateName={selectedCands[0].name}
         vacancyTitle={selectedCands[0].ht_vacancies?.title || "la posición"}
+        lang={langDe(selectedCands[0])}
         bulk={selectedCands.map((c) => ({ id: c.id, name: c.name, vacancyTitle: c.ht_vacancies?.title || "la posición" }))}
         onClose={() => setRechazando(false)}
         onRejected={() => { setRechazando(false); onActionComplete(); }}
@@ -2885,6 +2897,7 @@ function CandDetailPanel({ cand, onClose, onChanged, hiringLeadEmail }: { cand: 
         candidateId={cand.id}
         candidateName={cand.name}
         vacancyTitle={cand.ht_vacancies?.title || "la posición"}
+        lang={langDe(cand)}
         onClose={() => setShowRejectModal(false)}
         onRejected={() => {
           setShowRejectModal(false);

@@ -24,10 +24,10 @@ import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
 import { recordStageEvent } from "@/lib/stage-events";
 import {
   buildRejectionHtml,
+  rejectionEmailsEnabled,
+  rejectionPlain,
   rejectionSubject,
   REJECTION_FROM_NAME,
-  REJECTION_FROM_NAME_EN,
-  EN_REJECTION_BODY,
   REJECTION_REPLY_TO,
 } from "@/lib/rejection-email";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
@@ -72,7 +72,7 @@ export async function POST(
     // Validar que category + sub_detail existan en el catálogo
     const { data: category } = await supabaseAdmin
       .from("ts_rejection_categories")
-      .select("category_key, category_label, sub_details, public_message_template")
+      .select("category_key, category_label, sub_details")
       .eq("category_key", categoryKey)
       .eq("active", true)
       .maybeSingle();
@@ -124,7 +124,7 @@ export async function POST(
       rejection_category: categoryKey,
       rejection_sub_detail: subDetailKey,
       rejection_note_private: notePrivate,
-      rejection_note_public: notePublic,
+      rejection_note_public: rejectionPlain(firstName, vacancyTitle, candLang),
       rejection_save_for_future: saveForFuture,
       rejected_by: rejectedBy,
       rejected_at: new Date().toISOString(),
@@ -133,30 +133,21 @@ export async function POST(
 
     let draftId: string | null = null;
 
-    if (createDraft && candidate.email) {
+    if (createDraft && candidate.email && rejectionEmailsEnabled()) {
       try {
         const gmail = await isGmailConnected();
         if (gmail.connected) {
-          // El note_public manda; si no hay, usamos el template de la categoría
-          // En inglés, la plantilla de la categoría está en español: solo sirve
-          // el texto que el reclutador escribió para esta persona. Si no hay,
-          // se usa el cuerpo genérico en inglés en vez de mandarle español.
-          const messageBody = candLang === "en"
-            ? (notePublic || EN_REJECTION_BODY)
-            : (notePublic || category.public_message_template || "");
-          if (messageBody) {
-            const html = buildRejectionHtml(firstName, vacancyTitle, messageBody, candLang);
-            const draftRes = await createDraftViaGmail({
-              to: candidate.email as string,
-              subject: rejectionSubject(vacancyTitle, candLang),
-              html,
-              fromName: candLang === "en" ? REJECTION_FROM_NAME_EN : REJECTION_FROM_NAME,
-              replyTo: REJECTION_REPLY_TO,
-            });
-            if (draftRes.ok) {
-              draftId = draftRes.draft_id;
-              updates.rejection_draft_id = draftRes.draft_id;
-            }
+          const html = buildRejectionHtml(firstName, vacancyTitle, candLang);
+          const draftRes = await createDraftViaGmail({
+            to: candidate.email as string,
+            subject: rejectionSubject(vacancyTitle, candLang),
+            html,
+            fromName: REJECTION_FROM_NAME,
+            replyTo: REJECTION_REPLY_TO,
+          });
+          if (draftRes.ok) {
+            draftId = draftRes.draft_id;
+            updates.rejection_draft_id = draftRes.draft_id;
           }
         }
       } catch (e) {

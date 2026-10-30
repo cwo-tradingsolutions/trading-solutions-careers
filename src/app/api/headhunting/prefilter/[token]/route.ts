@@ -247,56 +247,6 @@ function parseSalaryRangeUsd(raw: unknown): { min: number; max: number } | null 
   return nums.length ? { min: Math.min(...nums), max: Math.max(...nums) } : null;
 }
 
-const TS_LINKEDIN_URL = "https://www.linkedin.com/company/trading-sol/";
-
-// Auto-detección sencilla ES/EN basada en frecuencia de palabras-función.
-function detectLanguage(...texts: (string | null | undefined)[]): "es" | "en" {
-  const blob = texts.filter(Boolean).join(" ").toLowerCase();
-  if (!blob.trim()) return "es";
-  const ES = [" la ", " el ", " de ", " que ", " y ", " es ", " en ", " un ", " una ", " por ", " para ", " con ", " mi ", " soy ", "á", "é", "í", "ó", "ú", "ñ"];
-  const EN = [" the ", " and ", " is ", " of ", " to ", " for ", " with ", " my ", " i ", " you ", " we ", " in ", " on ", " have ", " am "];
-  let es = 0, en = 0;
-  ES.forEach(w => { if (blob.includes(w)) es++; });
-  EN.forEach(w => { if (blob.includes(w)) en++; });
-  return en > es ? "en" : "es";
-}
-
-function buildRejectionHtmlEs(name: string, clientName: string, vacancyTitle: string): string {
-  const firstName = (name || "").split(" ")[0] || "candidato";
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-  body { font-family: Inter, -apple-system, sans-serif; line-height: 1.6; color: #1a1a1a; padding: 24px; background: #f9f9f9; }
-  .container { max-width: 600px; margin: 0 auto; background: white; padding: 32px; border-radius: 12px; }
-  a { color: #2C64ED; }
-</style></head><body>
-  <div class="container">
-    <p>Hola <strong>${firstName}</strong>,</p>
-    <p>Gracias por tomarte el tiempo de aplicar a la posición de <strong>${vacancyTitle}</strong> en ${clientName}. Después de revisar tu aplicación, hemos decidido avanzar con otros candidatos cuyo perfil se ajusta más a la posición en este momento. Sin embargo, ${clientName} sigue creciendo y nos encantaría mantenernos en contacto.</p>
-    <p>Tu información queda en nuestra base de datos para futuras oportunidades. También te invitamos a seguirnos en LinkedIn para enterarte de nuevas vacantes: <a href="${TS_LINKEDIN_URL}">${TS_LINKEDIN_URL}</a></p>
-    <p>Apreciamos tu interés en ${clientName} y te deseamos mucho éxito en tus próximos pasos.</p>
-    <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>${clientName}</p>
-  </div>
-</body></html>`;
-}
-
-function buildRejectionHtmlEn(name: string, clientName: string, vacancyTitle: string): string {
-  const firstName = (name || "").split(" ")[0] || "candidate";
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-  body { font-family: Inter, -apple-system, sans-serif; line-height: 1.6; color: #1a1a1a; padding: 24px; background: #f9f9f9; }
-  .container { max-width: 600px; margin: 0 auto; background: white; padding: 32px; border-radius: 12px; }
-  a { color: #2C64ED; }
-</style></head><body>
-  <div class="container">
-    <p>Hi <strong>${firstName}</strong>,</p>
-    <p>Thank you for taking the time to apply for the <strong>${vacancyTitle}</strong> position at ${clientName}. After reviewing your application, we have decided to move forward with other candidates whose profile is a closer match for the position at this time. However, ${clientName} is always growing and we'd love to keep in touch.</p>
-    <p>Your information stays in our database for future opportunities. We also invite you to follow us on LinkedIn to stay updated on new openings: <a href="${TS_LINKEDIN_URL}">${TS_LINKEDIN_URL}</a></p>
-    <p>We appreciate your interest in ${clientName} and thank you again. We sincerely wish you all the best in your future endeavors.</p>
-    <p>Best regards,<br><strong>Talent Team</strong><br>${clientName}</p>
-  </div>
-</body></html>`;
-}
-
 export async function GET(
   _req: NextRequest,
   { params }: { params: { token: string } }

@@ -1,35 +1,93 @@
 /**
- * El correo de rechazo, en un solo lugar.
+ * Correo de rechazo. Un solo texto por idioma, aprobado por Kelly el 30 oct 2026.
  *
- * POR QUÉ EXISTE ESTE ARCHIVO
- * El cuerpo del correo vivía dentro de la ruta que rechaza al candidato. Eso
- * significaba que el correo solo se podía armar en el instante del rechazo: si
- * Gmail estaba caído, si el permiso de Google había expirado, o si simplemente
- * el borrador nunca se envió, no quedaba forma de volver a generarlo. La única
- * salida era rechazar de nuevo a alguien que ya estaba rechazado.
+ * La categoría y la nota interna no salen en el correo. Ninguna variante
+ * (manual, prefiltro, Ops PA, China, ES) menciona salario, inglés,
+ * autorización de trabajo, presencialidad ni experiencia.
  *
- * Al sacarlo acá, la ruta de rechazo y la de reenvío arman exactamente el mismo
- * correo. Si mañana cambia la firma o el pie, cambia en un solo sitio.
+ * Envío apagado hasta REJECTION_EMAILS_ENABLED=1. Sin la variable no se
+ * crea borrador ni se envía; la decisión en el ATS sí se guarda.
  */
 
-import { ATS_FROM_NAME, ATS_FROM_NAME_EN } from "@/lib/ats-from";
-
-const TS_LINKEDIN_URL = "https://www.linkedin.com/company/trading-sol/";
+import { ATS_FROM_NAME, ATS_FROM_NAME_EN } from "./ats-from";
 
 export type RejectionLang = "es" | "en";
 
+export const REJECTION_SUBJECT: Record<RejectionLang, string> = {
+  es: "Trading Solutions · Sobre tu aplicación a {vacancy}",
+  en: "Trading Solutions · About your application for {vacancy}",
+};
+
+export const REJECTION_BODY: Record<RejectionLang, string> = {
+  es: `Hola {firstName},
+
+Gracias por tu interés en la posición de {vacancy} en Trading Solutions y por el tiempo que dedicaste a tu aplicación.
+
+Después de revisar las aplicaciones, decidimos continuar el proceso con otras personas.
+
+Guardamos tu información en nuestra base de datos y te tendremos en cuenta para futuras oportunidades. Puedes seguirnos en LinkedIn para conocer nuevas vacantes: https://www.linkedin.com/company/trading-sol/
+
+Te deseamos muchos éxitos.
+
+Un abrazo,
+Talent Acquisition Team
+Trading Solutions`,
+  en: `Hi {firstName},
+
+Thank you for your interest in the {vacancy} position at Trading Solutions and for the time you put into your application.
+
+After reviewing the applications, we have decided to continue the process with other candidates.
+
+We will keep your information on file and consider you for future opportunities. You can follow us on LinkedIn to hear about new openings: https://www.linkedin.com/company/trading-sol/
+
+We wish you every success.
+
+Best regards,
+Talent Acquisition Team
+Trading Solutions`,
+};
+
+export const REJECTION_FROM_NAME = ATS_FROM_NAME;
+export const REJECTION_FROM_NAME_EN = ATS_FROM_NAME_EN;
+export const REJECTION_REPLY_TO = "jointheteam@tradingsolutions.com";
+
+/** On only when the flag is 1, true, yes, or on. Missing or empty stays off. */
+export function rejectionEmailsEnabled(flag?: string | null): boolean {
+  const v = (flag ?? process.env.REJECTION_EMAILS_ENABLED ?? "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
+/** Timestamp to store in rejection_sent_at. Null when nothing was sent. */
+export function rejectionSentAt(sent: boolean, now = new Date()): string | null {
+  return sent ? now.toISOString() : null;
+}
+
+export function fillRejection(template: string, firstName: string, vacancy: string): string {
+  return template.replaceAll("{firstName}", firstName).replaceAll("{vacancy}", vacancy);
+}
+
+export function rejectionSubject(vacancyTitle: string, lang: RejectionLang = "es"): string {
+  return fillRejection(REJECTION_SUBJECT[lang], "", vacancyTitle);
+}
+
+export function rejectionPlain(firstName: string, vacancyTitle: string, lang: RejectionLang = "es"): string {
+  return fillRejection(REJECTION_BODY[lang], firstName, vacancyTitle);
+}
+
+/**
+ * HTML of the approved text only. The body already includes the LinkedIn
+ * line and the signature, so this does not append a second footer.
+ */
 export function buildRejectionHtml(
   firstName: string,
   vacancyTitle: string,
-  body: string,
   lang: RejectionLang = "es",
 ): string {
-  const renderedBody = body
-    .replace(/\{firstName\}/g, firstName)
-    .replace(/\{vacancy\}/g, vacancyTitle)
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/\n/g, "<br>");
-
+  const text = rejectionPlain(firstName, vacancyTitle, lang);
+  const inner = text
+    .split(/\n\n/)
+    .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br>")}</p>`)
+    .join("");
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
   body { font-family: 'Open Sauce Sans', -apple-system, sans-serif; line-height: 1.6; color: #0a0a0a; padding: 24px; background: #fafafa; }
@@ -38,32 +96,7 @@ export function buildRejectionHtml(
   p { margin: 0 0 14px; font-size: 14px; }
 </style></head><body>
   <div class="container">
-    <p>${renderedBody}</p>
-    <p>${lang === "en"
-      ? `Your information stays in our database in case a position that fits you better opens up. If you'd like to keep in touch, you can follow us on <a href="${TS_LINKEDIN_URL}">LinkedIn</a>.`
-      : `Tu información queda en nuestra base por si se abre una posición que te calce mejor. Si querés mantenerte cerca, podés seguirnos en <a href="${TS_LINKEDIN_URL}">LinkedIn</a>.`}</p>
-    <p>${lang === "en"
-      ? "Best regards,<br><strong>Talent Team</strong><br>Trading Solutions"
-      : `Un abrazo,<br><strong>${ATS_FROM_NAME}</strong><br>Trading Solutions`}</p>
+    ${inner}
   </div>
 </body></html>`;
 }
-
-export function rejectionSubject(vacancyTitle: string, lang: RejectionLang = "es"): string {
-  return lang === "en"
-    ? `Trading Solutions · About your application for ${vacancyTitle}`
-    : `Trading Solutions · Sobre tu aplicación a ${vacancyTitle}`;
-}
-
-/**
- * Cuerpo genérico en inglés · se usa cuando el proceso corre en inglés y nadie
- * escribió un mensaje para esa persona. Las plantillas de categoría están en
- * español, así que en inglés no sirven: mejor un texto correcto que uno que el
- * candidato no puede leer.
- */
-export const EN_REJECTION_BODY =
-  "Hi {firstName},\n\nThank you for taking the time to apply for the {vacancy} position at Trading Solutions. After reviewing your application, we have decided to move forward with other candidates whose profile is a closer match at this time.";
-
-export const REJECTION_FROM_NAME = ATS_FROM_NAME;
-export const REJECTION_FROM_NAME_EN = ATS_FROM_NAME_EN;
-export const REJECTION_REPLY_TO = "jointheteam@tradingsolutions.com";
