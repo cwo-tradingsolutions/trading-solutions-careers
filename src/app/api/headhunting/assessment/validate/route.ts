@@ -3,6 +3,14 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { TS_SCENARIOS } from '@/lib/headhunting/scenarios-ts';
 import { recordStageEvent } from '@/lib/stage-events';
 import { isPreviewTestMode } from '@/lib/preview-mode';
+import {
+  VALIDATE_CANDIDATE_COLUMNS,
+  VALIDATE_CLIENT_COLUMNS,
+  VALIDATE_RESPONSE_COLUMNS,
+  VALIDATE_SCENARIO_COLUMNS,
+  VALIDATE_VACANCY_COLUMNS,
+  assessmentValidateBody,
+} from '@/lib/assessment-validate-payload';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +24,7 @@ export async function GET(req: NextRequest) {
     // Look up candidate by assessment token
     const { data: candidate, error } = await supabaseAdmin
       .from('ht_candidates')
-      .select('*')
+      .select(VALIDATE_CANDIDATE_COLUMNS)
       .eq('assessment_token', token)
       .single();
 
@@ -62,29 +70,26 @@ export async function GET(req: NextRequest) {
     // Get vacancy info
     const { data: vacancy } = await supabaseAdmin
       .from('ht_vacancies')
-      .select('*')
+      .select(VALIDATE_VACANCY_COLUMNS)
       .eq('id', candidate.vacancy_id)
       .single();
 
-    // Get client branding
     const { data: client } = await supabaseAdmin
       .from('ht_clients')
-      .select('name, logo_url, primary_color')
+      .select(VALIDATE_CLIENT_COLUMNS)
       .eq('id', candidate.client_id)
       .single();
 
-    // Get scenarios for this competency model
     const modelId = vacancy?.model_id;
     const { data: scenarios } = await supabaseAdmin
       .from('ht_scenarios')
-      .select('*')
+      .select(VALIDATE_SCENARIO_COLUMNS)
       .eq('model_id', modelId)
       .order('order_index');
 
-    // Get any existing responses (for session resume)
     const { data: existingResponses } = await supabaseAdmin
       .from('ht_responses')
-      .select('scenario_id, response_text, response_data, time_spent_seconds, is_final')
+      .select(VALIDATE_RESPONSE_COLUMNS)
       .eq('candidate_id', candidate.id);
 
     // If status is 'invited', transition to 'in_progress'
@@ -112,36 +117,28 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Enrich scenarios with options and correct scenario_type from TS source
-    // (Supabase table doesn't have 'options' column yet)
-    const enrichedScenarios = (scenarios || []).map((s: any) => {
+    const enrichedScenarios = (scenarios || []).map((s) => {
       const tsMatch = TS_SCENARIOS.find(
         (ts) => ts.competency_key === s.competency_key && ts.order_index === s.order_index
       );
-      if (tsMatch && tsMatch.options?.length) {
-        return {
-          ...s,
-          scenario_type: tsMatch.scenario_type, // 'role_play_mc'
-          options: tsMatch.options,
-          scenario_text: tsMatch.scenario_text, // Use latest text from TS
-        };
-      }
-      return s;
+      return {
+        id: s.id,
+        block: s.block,
+        scenario_type: tsMatch?.scenario_type || s.scenario_type,
+        scenario_text: tsMatch?.scenario_text || s.scenario_text,
+        options: tsMatch?.options ?? [],
+        time_limit_seconds: tsMatch?.time_limit_seconds ?? s.time_limit_seconds ?? null,
+      };
     });
 
-    return NextResponse.json({
-      candidate: {
-        id: candidate.id,
-        name: candidate.name,
-        email: candidate.email,
-      },
-      vacancy: vacancy
-        ? { id: vacancy.id, title: vacancy.title, area: vacancy.area, description: vacancy.description }
-        : null,
-      client: client || { name: 'Trading Solutions', logo_url: null, primary_color: '#2C64ED' },
+    return NextResponse.json(assessmentValidateBody({
+      candidateName: candidate.name,
+      vacancyTitle: vacancy?.title ?? null,
+      clientName: client?.name ?? null,
+      clientLogoUrl: client?.logo_url ?? null,
       scenarios: enrichedScenarios,
-      existing_responses: existingResponses || [],
-    });
+      existingResponses: existingResponses || [],
+    }));
   } catch (err) {
     console.error('Assessment validate error:', err);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
