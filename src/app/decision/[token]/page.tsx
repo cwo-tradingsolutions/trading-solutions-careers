@@ -5,6 +5,9 @@ import { useParams, useSearchParams } from "next/navigation";
 import { CheckCircle2, XCircle, ArrowRight, HelpCircle, AlertTriangle } from "lucide-react";
 import { stageLabel } from "@/lib/stage-labels";
 import { REJECTION_CATEGORIES } from "@/lib/rejection-rules";
+import { invalidLinkBoth, loadRetryBoth } from "@/lib/candidate-invalid-link";
+import { visibleRecommendation } from "@/lib/ai-recommendation";
+import { CANDIDATE_MAIL } from "@/lib/candidate-public-error";
 
 const TS_HERO = "https://cdn.prod.website-files.com/68fb7b9474bf8f90808cd50f/691645b652c1e9091b25f59c_FotosWeb_TradingSolutions-14_4_11zon.webp";
 const TS_LOGO = "https://cdn.prod.website-files.com/68fb7b9474bf8f90808cd50f/6913594489519813fe9e620e_logo%20web-03.png";
@@ -18,7 +21,7 @@ type DecisionState = {
   recipient_name: string;
   candidate: { name: string; current_role: string | null; current_company: string | null; headline: string | null; stage: string } | null;
   vacancy: { id: string; title: string; area: string } | null;
-  ai_insights: { summary: string; score: number | null; recommendation: string } | null;
+  ai_insights: { summary: string; score: number | null; recommendation: string | null } | null;
   open_vacancies: { id: string; title: string; area: string }[];
 };
 
@@ -29,7 +32,7 @@ export default function DecisionPage() {
   const presetDecision = searchParams?.get('d');
 
   const [state, setState] = useState<DecisionState | null>(null);
-  const [phase, setPhase] = useState<'loading' | 'choose' | 'confirm' | 'submitting' | 'done' | 'error'>('loading');
+  const [phase, setPhase] = useState<'loading' | 'choose' | 'confirm' | 'submitting' | 'done' | 'saved' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
 
   // Form state
@@ -45,7 +48,7 @@ export default function DecisionPage() {
       .then(async r => {
         const j = await r.json();
         if (!r.ok) {
-          setError(j.error_en ? `${j.error} ${j.error_en}` : (j.error || "No pudimos completar este paso. Escríbenos a jointheteam@tradingsolutions.com"));
+          setError(r.status >= 500 ? loadRetryBoth() : invalidLinkBoth());
           setPhase('error');
         } else {
           setState(j);
@@ -57,7 +60,7 @@ export default function DecisionPage() {
           }
         }
       })
-      .catch(() => { setError('Error de red'); setPhase('error'); });
+      .catch(() => { setError(loadRetryBoth()); setPhase('error'); });
   }, [token]);
 
   const submit = async () => {
@@ -75,21 +78,33 @@ export default function DecisionPage() {
           category_key: categoryKey || undefined,
         }),
       });
-      const j = await r.json();
-      if (!r.ok) {
-        setError(j.error_en ? `${j.error} ${j.error_en}` : (j.error || "No pudimos completar este paso. Escríbenos a jointheteam@tradingsolutions.com"));
+      if (r.status === 409) {
+        setPhase('saved');
+      } else if (!r.ok) {
+        setError(`No pudimos registrar la decisión. Escríbenos a ${CANDIDATE_MAIL}. / We couldn't save this decision. Write to us at ${CANDIDATE_MAIL}.`);
         setPhase('choose');
       } else {
         setPhase('done');
       }
     } catch {
-      setError("No pudimos completar este paso. Escríbenos a jointheteam@tradingsolutions.com We couldn't complete this step. Write to us at jointheteam@tradingsolutions.com");
+      setError(`No pudimos registrar la decisión. Escríbenos a ${CANDIDATE_MAIL}. We couldn't save this decision. Write to us at ${CANDIDATE_MAIL}.`);
       setPhase('choose');
     }
   };
 
   if (phase === 'loading') {
     return <div className="min-h-screen flex items-center justify-center text-sm text-gray-400">Cargando…</div>;
+  }
+
+  if (phase === 'saved') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
+        <div className="bg-white border border-gray-200 rounded-xl p-8 max-w-md text-center">
+          <h2 className="text-xl font-bold mb-2">Ya registramos tu respuesta</h2>
+          <p className="text-sm text-gray-600">We already saved your answer.</p>
+        </div>
+      </div>
+    );
   }
 
   if (phase === 'error') {
@@ -99,7 +114,7 @@ export default function DecisionPage() {
           <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-red-100 flex items-center justify-center">
             <AlertTriangle className="w-6 h-6 text-red-600" />
           </div>
-          <h2 className="text-xl font-bold mb-2">Algo salió mal</h2>
+          <h2 className="text-xl font-bold mb-2">No pudimos abrir este enlace</h2>
           <p className="text-sm text-gray-600">{error}</p>
         </div>
       </div>
@@ -148,6 +163,8 @@ export default function DecisionPage() {
 
   if (!state) return null;
 
+  const aiRecommendation = visibleRecommendation(state.ai_insights?.recommendation);
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       <div className="max-w-2xl mx-auto p-6 sm:p-10">
@@ -174,7 +191,10 @@ export default function DecisionPage() {
               <div className="flex items-baseline gap-2 mb-1">
                 <div className="text-[10px] uppercase tracking-wider font-bold text-purple-700">Resumen IA</div>
                 {state.ai_insights.score && (
-                  <span className="text-[10px] font-bold text-purple-700">Score {state.ai_insights.score}/100 · {state.ai_insights.recommendation}</span>
+                  <span className="text-[10px] font-bold text-purple-700">
+                    Score {state.ai_insights.score}/100
+                    {aiRecommendation ? ` · ${aiRecommendation}` : ""}
+                  </span>
                 )}
               </div>
               <p className="text-xs text-gray-700 italic">"{state.ai_insights.summary}"</p>

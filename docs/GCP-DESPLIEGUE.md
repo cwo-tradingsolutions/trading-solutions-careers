@@ -53,7 +53,9 @@ printf '%s' 'VALOR' | gcloud secrets create SUPABASE_SERVICE_ROLE_KEY --data-fil
 
 Inventario por app, sacado del código:
 
-**ATS / Careers** — `ADMIN_SECRET`, `ANTHROPIC_API_KEY`, `CRON_SECRET`, `DATABASE_URL`, `DIGEST_RECIPIENT`, `ELEVENLABS_AGENT_ID`, `ELEVENLABS_API_KEY`, `EMAIL_BCC`, `EMAIL_FROM`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `HANDOFF_EMAIL`, `INTERNAL_NEWSLETTER_EMAIL`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, `LINKEDIN_COMPANY_ID`, `MARY_PSICO_EMAIL`, `NEXT_PUBLIC_APP_URL`, `RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `VACANCY_ID_FULLSTACK_JUNIOR`, `WXM_SERVICE_SECRET`
+**ATS / Careers** — `ADMIN_SECRET`, `ANTHROPIC_API_KEY`, `CRON_SECRET`, `DATABASE_URL`, `DIGEST_RECIPIENT`, `ELEVENLABS_AGENT_ID`, `ELEVENLABS_API_KEY`, `EMAIL_BCC`, `EMAIL_FROM`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_MAILBOX_ALLOWED_EMAILS`, `HANDOFF_EMAIL`, `INTERNAL_NEWSLETTER_EMAIL`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, `LINKEDIN_COMPANY_ID`, `MARY_PSICO_EMAIL`, `NEXT_PUBLIC_APP_URL`, `RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `VACANCY_ID_FULLSTACK_JUNIOR`, `WXM_SERVICE_SECRET`
+
+`GOOGLE_MAILBOX_ALLOWED_EMAILS` is the comma-separated allowlist for the ATS Google mailbox. The OAuth callback stores tokens only when the verified Google account is on this list. Unset or empty fails closed and does not overwrite the production token (row id = 1). Expected value: `jointheteam@tradingsolutions.com`. Comparison is case-insensitive. This hotfix does not set the variable in Vercel or GCP; ops adds it before anyone reconnects Gmail.
 Build-args: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
 **WXM** — `ATS_BASE_URL`, `ENCUESTA_BCC`, `ENCUESTA_FROM`, `RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TALLY_WEBHOOK_SECRET`, `WXM_SERVICE_SECRET`
@@ -96,6 +98,20 @@ gcloud scheduler jobs create http careers-run-reminders --location us-west1 --sc
 Repetir para los otros tres cambiando nombre, `--schedule` y `--uri`.
 
 **Importante:** no crear los jobs hasta que Cloud Run esté sirviendo y verificado. Si quedan activos en los dos lados al mismo tiempo, el digest y el morning-brief salen duplicados al correo.
+
+### AI interview rescore (do not create yet)
+
+Automatic rescore needs a Cloud Scheduler job on Cloud Run. It is not a Vercel Cron, and this hotfix does not create the job. GET accepts only `CRON_SECRET` (the admin cookie is not enough, because GET has side effects). POST also accepts an HR Admin session. The AI interview stays off until `AI_INTERVIEW_ENABLED` is set; the route then returns 503 and does not call ElevenLabs.
+
+`APP_URL` or `NEXT_PUBLIC_APP_URL` must be `https`. If either is missing or not https, the run is skipped, a warning is logged, and the response is `success: false`. The cron secret is not sent. There is no `vercel.app` default. Production sets `APP_URL=https://careers.tradingsolutions.com` on the Cloud Run service. Staging must set `APP_URL` to the service's https URL; the localhost proxy is http.
+
+Apply `supabase/migrations/20261030_ai_interview_scoring_claim.sql` before this app. It adds nullable `scoring_claimed_at` and `scoring_attempts`, plus an index on `(scoring_claimed_at, started_at)`. It does not rewrite rows. `ht_ai_interviews.status` only allows `invited`, `in_progress`, `completed`, `expired`, and `failed`, so a row that stops scoring is `failed` (HR shows «requiere revisión» and does not offer a resend). The claim TTL defaults to 2 minutes. `SCORING_CLAIM_TTL_MS` accepts an integer between 30000 and 600000; any other value is logged and ignored.
+
+Use OIDC so Cloud Run IAM accepts the call. If IAP is in front and replaces `Authorization`, send the cron secret in `X-Cron-Secret` instead. `CRON_SECRET` must be at least 16 characters. On this branch `readCronSecret` in `src/lib/cron-auth.ts` rejects a value equal to `ADMIN_SECRET`, `ADMIN_SCRIPTS_SECRET`, `HR_ADMIN_SESSION_SECRET`, `PORTAL_TOKEN_SECRET`, or `WXM_SERVICE_SECRET`. Request parsing lives in `src/lib/cron-request-auth.ts` and does not import `next/server`. #29 will not add `cron-auth.ts`. At integration, import `readCronSecret` from `hr-admin-secrets.ts` and add `WXM_SERVICE_SECRET` to `AUTH_SECRET_NAMES` (portal, admin, scripts, and session are already on that list). This PR does not edit `hr-admin-secrets.ts`.
+
+```bash
+gcloud scheduler jobs create http careers-rescore-ai-interviews --location us-west1 --schedule "*/10 * * * *" --time-zone "America/Bogota" --uri "https://CAREERS_URL/api/cron/rescore-ai-interviews" --http-method POST --headers "X-Cron-Secret=EL_CRON_SECRET" --oidc-service-account-email SCHEDULER_SA --oidc-token-audience "https://CAREERS_URL"
+```
 
 ## 4. Verificación antes de cortar
 

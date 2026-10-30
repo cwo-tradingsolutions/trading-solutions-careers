@@ -5,12 +5,14 @@
  * Endpoint público (sin auth) — el token es la credencial.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { visibleRecommendation } from "@/lib/ai-recommendation";
 import { supabaseAdmin } from "@/lib/supabase";
 import { recordStageEvent } from "@/lib/stage-events";
 import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 import { validarRechazo } from "@/lib/rejection-rules";
 import { normalizeStage } from "@/lib/stage-labels";
 import { publicStepBody } from "@/lib/candidate-public-error";
+import { expiredLinkBoth, invalidLinkBoth } from "@/lib/candidate-invalid-link";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -44,9 +46,9 @@ export async function GET(
     console.error("decision GET", error);
     return NextResponse.json(publicStepBody(), { status: 500 });
   }
-  if (!data) return NextResponse.json({ error: "Token inválido" }, { status: 404 });
+  if (!data) return NextResponse.json({ error: invalidLinkBoth() }, { status: 404 });
   if (data.expires_at && new Date(data.expires_at) < new Date()) {
-    return NextResponse.json({ error: "Esta decisión ya expiró" }, { status: 410 });
+    return NextResponse.json({ error: expiredLinkBoth() }, { status: 410 });
   }
 
   // Get candidate + vacancy info
@@ -94,7 +96,7 @@ export async function GET(
     ai_insights: ai ? {
       summary: ai.ai_summary,
       score: ai.ai_score ?? ai.overall_score,
-      recommendation: ai.ai_recommendation,
+      recommendation: visibleRecommendation(ai.ai_recommendation),
     } : null,
     open_vacancies: (openVacs || []).map(v => ({ id: v.id, title: v.title, area: v.area })),
   });
@@ -114,12 +116,12 @@ export async function POST(
       .eq("token", token)
       .maybeSingle();
 
-    if (!existing) return NextResponse.json({ error: "Token inválido" }, { status: 404 });
+    if (!existing) return NextResponse.json({ error: invalidLinkBoth() }, { status: 404 });
     if (existing.responded_at) {
       return NextResponse.json({ error: "Esta decisión ya fue registrada" }, { status: 409 });
     }
     if (existing.expires_at && new Date(existing.expires_at) < new Date()) {
-      return NextResponse.json({ error: "Esta decisión expiró" }, { status: 410 });
+      return NextResponse.json({ error: expiredLinkBoth() }, { status: 410 });
     }
 
     // Validate decision

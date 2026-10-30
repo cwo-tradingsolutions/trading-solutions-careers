@@ -21,6 +21,7 @@ import SeguimientoVacante from "@/components/SeguimientoVacante";
 import { CanalSelect, errorCanal } from "@/components/CamposObligatorios";
 import { etiquetaCanal } from "@/lib/candidate-source";
 import { InvitarEntrevistaModal } from "@/components/InvitarEntrevistaModal";
+import { visibleRecommendation } from "@/lib/ai-recommendation";
 
 // Map de stage → icono Lucide. Centralizado para reutilizar en cualquier render.
 const STAGE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -3125,10 +3126,11 @@ function AIInterviewBlock({ candidateId, candidateEmail }: { candidateId: string
 
   if (loading) return null;
 
+  const recommendation = visibleRecommendation(interview?.ai_recommendation);
   const recoColor =
-    interview?.ai_recommendation === "AVANZA" ? "#10B981" :
-    interview?.ai_recommendation === "EN ESPERA" ? "#F59E0B" :
-    interview?.ai_recommendation === "NO AVANZA" ? "#EF4444" : "#6B7280";
+    recommendation === "AVANZA" ? "#10B981" :
+    recommendation === "EN ESPERA" ? "#F59E0B" :
+    recommendation === "NO AVANZA" ? "#EF4444" : "#6B7280";
 
   return (
     <Section title="🎙️ Entrevista IA por voz">
@@ -3136,9 +3138,11 @@ function AIInterviewBlock({ candidateId, candidateEmail }: { candidateId: string
         <>
           <div className="bg-gradient-to-br from-pink-50 to-purple-50 border border-pink-100 rounded-lg p-3 mb-3">
             <div className="flex items-center gap-3 mb-2 flex-wrap">
-              <span className="px-2.5 py-1 rounded-full text-xs font-bold text-white" style={{ background: recoColor }}>
-                {interview.ai_recommendation}
-              </span>
+              {recommendation && (
+                <span className="px-2.5 py-1 rounded-full text-xs font-bold text-white" style={{ background: recoColor }}>
+                  {recommendation}
+                </span>
+              )}
               <div className="flex items-baseline gap-1"><span className="text-xl font-extrabold">{Math.round(interview.ai_score)}</span><span className="text-[10px] text-gray-500">global</span></div>
               {interview.competency_score != null && (
                 <div className="flex items-baseline gap-1"><span className="text-xl font-extrabold text-purple-700">{Math.round(interview.competency_score)}</span><span className="text-[10px] text-gray-500">competencias</span></div>
@@ -3250,6 +3254,10 @@ function AIInterviewBlock({ candidateId, candidateEmail }: { candidateId: string
         </>
       ) : interview && interview.status === "completed" && interview.conversation_id && interview.ai_score == null ? (
         <PendingScoringPanel interview={interview} onScored={() => load()} candidateEmail={candidateEmail} />
+      ) : interview && interview.status === "failed" ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 text-xs text-amber-950">
+          Requiere revisión. No se reenvía sola.
+        </div>
       ) : interview && interview.status === "in_progress" ? (
         <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-3 text-xs text-blue-900">
           ⏳ Candidato en entrevista — esperando que termine. Iniciada: {new Date(interview.started_at).toLocaleString("es-CO")}
@@ -3265,17 +3273,19 @@ function AIInterviewBlock({ candidateId, candidateEmail }: { candidateId: string
       )}
 
       <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={sendInterview}
-          disabled={sending || (interview && interview.status === "in_progress")}
-          className="text-xs font-semibold px-3 py-1.5 rounded-full bg-pink-600 text-white hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {sending ? "…" :
-            interview && interview.status === "completed" ? "🔄 Reenviar entrevista" :
-            interview && interview.status === "invited" ? "🔄 Reenviar enlace" :
-            "🎙️ Enviar entrevista IA"}
-        </button>
-        {interview?.token && (
+        {interview?.status !== "failed" && (
+          <button
+            onClick={sendInterview}
+            disabled={sending || (interview && interview.status === "in_progress")}
+            className="text-xs font-semibold px-3 py-1.5 rounded-full bg-pink-600 text-white hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {sending ? "…" :
+              interview && interview.status === "completed" ? "🔄 Reenviar entrevista" :
+              interview && interview.status === "invited" ? "🔄 Reenviar enlace" :
+              "🎙️ Enviar entrevista IA"}
+          </button>
+        )}
+        {interview?.token && interview.status !== "failed" && (
           <a
             href={`/entrevista-ia/${interview.token}`}
             target="_blank"

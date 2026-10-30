@@ -21,6 +21,7 @@ import {
   normalizeStage,
   stageLabel,
 } from "@/lib/stage-labels";
+import { visibleRecommendation } from "@/lib/ai-recommendation";
 
 export async function GET(req: NextRequest) {
   const authError = requireAdmin(req);
@@ -137,7 +138,7 @@ export async function GET(req: NextRequest) {
         if (!aiScoresByCandId[ai.candidate_id]) {
           aiScoresByCandId[ai.candidate_id] = {
             score: ai.ai_score ?? ai.overall_score ?? null,
-            recommendation: ai.ai_recommendation ?? null,
+            recommendation: visibleRecommendation(ai.ai_recommendation),
           };
         }
       });

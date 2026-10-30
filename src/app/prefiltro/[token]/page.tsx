@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { invalidLinkBoth, loadRetryBoth } from "@/lib/candidate-invalid-link";
+import { CANDIDATE_MAIL } from "@/lib/candidate-public-error";
 import "./submit.css";
 
 const TS_BLACK = "#111111";
@@ -223,11 +225,11 @@ export default function PrefiltroForm() {
         if (!r.ok) {
           const j = await r.json();
           setErrorMsg(
-            j.error === "expired_token"
-              ? "Este enlace ya expiró. Por favor escríbele a Talent Acquisition Team para que te genere uno nuevo."
+            r.status >= 500
+              ? loadRetryBoth()
               : j.error === "already_completed"
-              ? "Ya completaste este cuestionario. Si necesitas modificar algo, escríbele a Talent Acquisition Team."
-              : "Este enlace no es válido. Verifica que copiaste el enlace completo."
+              ? `Ya enviaste este cuestionario. Si necesitas ayuda, escríbenos a ${CANDIDATE_MAIL}. You already sent this questionnaire. If you need help, write to us at ${CANDIDATE_MAIL}.`
+              : invalidLinkBoth()
           );
           setPhase("error");
           return;
@@ -237,7 +239,7 @@ export default function PrefiltroForm() {
         setPhase("habeas");
       })
       .catch(() => {
-        setErrorMsg("Error de conexión. Intenta de nuevo en un momento.");
+        setErrorMsg(loadRetryBoth());
         setPhase("error");
       });
   }, [token]);

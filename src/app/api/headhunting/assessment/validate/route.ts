@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { TS_SCENARIOS } from '@/lib/headhunting/scenarios-ts';
 import { recordStageEvent } from '@/lib/stage-events';
 import { isPreviewTestMode } from '@/lib/preview-mode';
+import { invalidLinkBoth } from '@/lib/candidate-invalid-link';
 import {
   VALIDATE_CANDIDATE_COLUMNS,
   VALIDATE_CLIENT_COLUMNS,
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
       .single();
 
     if (error || !candidate) {
-      return NextResponse.json({ error: 'Token inválido' }, { status: 404 });
+      return NextResponse.json({ error: invalidLinkBoth() }, { status: 404 });
     }
 
     // Token evergreen · si el candidato hace click, extendemos 7 días más.
@@ -62,7 +63,7 @@ export async function GET(req: NextRequest) {
     }
     if (!['invited', 'in_progress'].includes(candidate.status)) {
       return NextResponse.json(
-        { error: 'Evaluación no disponible', status: candidate.status },
+        { error: invalidLinkBoth() },
         { status: 403 }
       );
     }

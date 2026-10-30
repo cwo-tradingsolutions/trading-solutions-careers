@@ -16,6 +16,7 @@ import { candidateMailBcc } from "@/lib/candidate-bcc";
 import { requireAdmin } from "@/lib/admin-auth";
 import { canalPostulacionPublica } from "@/lib/candidate-source";
 import { publicStepBody } from "@/lib/candidate-public-error";
+import { publicApplicationCreated } from "@/lib/public-application";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -305,15 +306,16 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      {
-        success: true,
-        id: newId,
-        created_at: result[0].created_at,
-        status: result[0].status,
-        score: result[0].score,
-        prefilter: prefilterPayload,
-        portal_token: generatePortalToken(newId, email),
-      },
+      publicApplicationCreated(
+        {
+          id: newId,
+          created_at: result[0].created_at,
+          status: result[0].status,
+          score: result[0].score,
+          prefilter: prefilterPayload,
+        },
+        generatePortalToken(newId, email),
+      ),
       { status: 201 }
     );
   } catch (error: unknown) {

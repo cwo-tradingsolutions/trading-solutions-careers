@@ -14,6 +14,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { isPreviewTestMode } from "@/lib/preview-mode";
+import {
+  allowFinalizeLookup,
+  conversationMatchesInterview,
+  fetchElevenConversation,
+} from "@/lib/ai-interview-finalize";
+import { aiInterviewEnabled } from "@/lib/ai-interview-flag";
+import { conversationIsStale, validConversationId } from "@/lib/ai-interview-rescore";
 
 export async function GET(
   _req: NextRequest,
@@ -33,6 +40,23 @@ export async function GET(
 
   if (interview.status === "completed") {
     return NextResponse.json({ error: "already_completed" }, { status: 409 });
+  }
+
+  if (interview.status === "failed") {
+    return NextResponse.json({ error: "needs_review" }, { status: 409 });
+  }
+
+  if (
+    !isPreviewTestMode()
+    && interview.status === "in_progress"
+    && conversationIsStale(interview)
+  ) {
+    await supabaseAdmin
+      .from("ht_ai_interviews")
+      .update({ conversation_id: null, scoring_claimed_at: null, scoring_attempts: null })
+      .eq("id", interview.id)
+      .eq("conversation_id", interview.conversation_id);
+    interview.conversation_id = null;
   }
 
   // Token evergreen · si el candidato hace click, extendemos 7 días más.
@@ -71,10 +95,12 @@ export async function GET(
         vacancy_area: vacancy?.area || "—",
         client_name: client?.name || "Trading Solutions",
         recruiter_name: "Talent Acquisition Team",
+        interview_token: token,
       };
 
-      // Request signed URL from ElevenLabs
-      const url = `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${interview.agent_id}`;
+      // A new signed URL can belong to a new call. The conversation id is stored
+      // when that call actually starts (POST), not from this preload.
+      const url = `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${encodeURIComponent(interview.agent_id)}`;
       const r = await fetch(url, {
         headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY },
       });
@@ -82,7 +108,7 @@ export async function GET(
         const j = await r.json();
         signedUrl = j.signed_url;
       } else {
-        console.error("ElevenLabs signed URL failed:", r.status, await r.text());
+        console.error("ElevenLabs signed URL failed:", r.status);
       }
     } catch (e) {
       console.error("ElevenLabs signed URL error:", e);
@@ -106,4 +132,80 @@ export async function GET(
     signed_url: signedUrl,
     dynamic_variables: dynamicVars,
   });
+}
+
+/**
+ * POST stores the conversation that just started. A reload gets a new signed
+ * URL; this replaces the previous id only after ElevenLabs shows this token.
+ */
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { token: string } },
+) {
+  if (!aiInterviewEnabled()) {
+    return NextResponse.json({ status: "disabled" }, { status: 503 });
+  }
+  if (isPreviewTestMode()) {
+    return NextResponse.json({ ok: true });
+  }
+
+  const { token } = params;
+  const body = await req.json().catch(() => ({}));
+  const conversationId = typeof body.conversation_id === "string" ? body.conversation_id.trim() : "";
+  if (!validConversationId(conversationId)) {
+    return NextResponse.json({ error: "invalid_conversation" }, { status: 400 });
+  }
+
+  const { data: interview, error } = await supabaseAdmin
+    .from("ht_ai_interviews")
+    .select("id, token, status, agent_id, conversation_id")
+    .eq("token", token)
+    .single();
+
+  if (error || !interview) {
+    return NextResponse.json({ error: "invalid_token" }, { status: 401 });
+  }
+  if (interview.status === "completed") {
+    return NextResponse.json({ status: "completed" });
+  }
+  if (interview.status === "failed") {
+    return NextResponse.json({ error: "needs_review" }, { status: 409 });
+  }
+  if (interview.conversation_id && interview.conversation_id !== conversationId) {
+    return NextResponse.json({ ok: false }, { status: 409 });
+  }
+  if (interview.conversation_id === conversationId) {
+    return NextResponse.json({ ok: true });
+  }
+  if (!allowFinalizeLookup(token)) {
+    return NextResponse.json({ status: "in_progress" }, { status: 429 });
+  }
+
+  const apiKey = process.env.ELEVENLABS_API_KEY || "";
+  if (!apiKey) {
+    return NextResponse.json({ status: "in_progress" });
+  }
+
+  const detail = await fetchElevenConversation(conversationId, apiKey);
+  const matches = detail && conversationMatchesInterview(detail, {
+    id: interview.id,
+    token,
+    status: interview.status,
+    agent_id: interview.agent_id,
+    conversation_id: interview.conversation_id,
+  });
+  if (!matches) {
+    return NextResponse.json({ ok: false }, { status: 409 });
+  }
+
+  const { error: writeError } = await supabaseAdmin
+    .from("ht_ai_interviews")
+    .update({ conversation_id: conversationId })
+    .eq("id", interview.id)
+    .neq("status", "completed");
+  if (writeError) {
+    console.error("ai-interview bind failed");
+    return NextResponse.json({ error: "Error" }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true });
 }

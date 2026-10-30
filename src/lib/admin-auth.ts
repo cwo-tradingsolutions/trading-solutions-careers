@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { secretsEqual } from './secret-compare';
 
 /**
  * Admin auth — acepta DOS modos:
@@ -11,34 +12,48 @@ import crypto from 'crypto';
 const SESSION_COOKIE = 'hr_admin_session';
 const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 12;
 
-function isValidSessionCookie(token: string | undefined, secret: string): boolean {
+export type AdminAuthDecision = 'ok' | 'missing_secret' | 'unauthorized';
+
+function isValidSessionCookie(token: string | undefined, secret: string, now: number): boolean {
   if (!token) return false;
   const parts = token.split('.');
   if (parts.length !== 2) return false;
   const [ts, sig] = parts;
-  const ageMs = Date.now() - parseInt(ts, 10);
+  const issued = parseInt(ts, 10);
+  const ageMs = now - issued;
   if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > SESSION_MAX_AGE_MS) return false;
   const expected = crypto.createHmac('sha256', secret).update(ts).digest('hex');
-  if (expected.length !== sig.length) return false;
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ sig.charCodeAt(i);
-  return diff === 0;
+  return secretsEqual(expected, sig);
+}
+
+export function adminSessionDecision(input: {
+  secret: string;
+  authorizationHeader: string | null;
+  sessionToken: string | undefined;
+  now?: number;
+}): AdminAuthDecision {
+  const secret = input.secret.trim();
+  if (!secret) return 'missing_secret';
+  const now = input.now ?? Date.now();
+  const auth = input.authorizationHeader;
+  const bearer = auth?.startsWith('Bearer ') ? auth.slice('Bearer '.length).trim() : '';
+  if (bearer && secretsEqual(bearer, secret)) return 'ok';
+  if (isValidSessionCookie(input.sessionToken, secret, now)) return 'ok';
+  return 'unauthorized';
+}
+
+export function adminAuthResponse(decision: AdminAuthDecision): NextResponse | null {
+  if (decision === 'ok') return null;
+  if (decision === 'missing_secret') {
+    return NextResponse.json({ error: 'ADMIN_SECRET not configured' }, { status: 500 });
+  }
+  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }
 
 export function requireAdmin(req: NextRequest): NextResponse | null {
-  const secret = (process.env.ADMIN_SECRET ?? '').trim();
-  if (!secret) {
-    return NextResponse.json({ error: 'ADMIN_SECRET not configured' }, { status: 500 });
-  }
-
-  // (a) Bearer token
-  const auth = req.headers.get('authorization');
-  const bearer = auth?.startsWith('Bearer ') ? auth.slice('Bearer '.length).trim() : '';
-  if (bearer && bearer === secret) return null;
-
-  // (b) HR Admin session cookie
-  const sessionToken = req.cookies.get(SESSION_COOKIE)?.value;
-  if (isValidSessionCookie(sessionToken, secret)) return null;
-
-  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  return adminAuthResponse(adminSessionDecision({
+    secret: process.env.ADMIN_SECRET ?? '',
+    authorizationHeader: req.headers.get('authorization'),
+    sessionToken: req.cookies.get(SESSION_COOKIE)?.value,
+  }));
 }

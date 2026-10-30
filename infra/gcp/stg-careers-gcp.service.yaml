@@ -63,6 +63,11 @@ spec:
               valueFrom: { secretKeyRef: { name: stg-careers-gcp-CRON_SECRET, key: latest } }
             - name: WXM_SERVICE_SECRET
               valueFrom: { secretKeyRef: { name: stg-careers-gcp-WXM_SERVICE_SECRET, key: latest } }
+            # Runtime origin for rescore. The image bakes NEXT_PUBLIC_APP_URL as
+            # http://localhost:8081 for the proxy, which must not receive the
+            # cron secret. Set APP_URL to this service's https Cloud Run URL
+            # (https://stg-careers-gcp-<project-number>.us-west1.run.app).
+            # The project number is not in this repo, so the value is not guessed.
 
         - name: postgrest
           image: docker.io/postgrest/postgrest:v16.5

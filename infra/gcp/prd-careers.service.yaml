@@ -83,6 +83,9 @@ spec:
               valueFrom: { secretKeyRef: { name: prd-careers-GOOGLE_CLIENT_ID, key: latest } }
             - name: GOOGLE_CLIENT_SECRET
               valueFrom: { secretKeyRef: { name: prd-careers-GOOGLE_CLIENT_SECRET, key: latest } }
+            # Runtime origin for rescore. NEXT_PUBLIC_APP_URL is baked at image
+            # build and is not a Cloud Run env var.
+            - { name: APP_URL, value: "https://careers.tradingsolutions.com" }
 
         - name: postgrest
           image: docker.io/postgrest/postgrest:v16.5
