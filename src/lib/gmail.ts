@@ -14,7 +14,7 @@
  * Sin paquete `googleapis` — usamos fetch directo. Más liviano, sin deps extra.
  */
 import { neon } from "@/lib/sql";
-import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { ATS_FROM_EMAIL, atsFromHeader } from "@/lib/ats-from";
 import { googleOAuthEnvironment, PREVIEW_GOOGLE_CONNECT_LABEL } from "@/lib/google-oauth-env";
 import {
   deleteStoredTokens,
@@ -26,28 +26,14 @@ import {
 export type { GoogleTokens };
 export { PREVIEW_GOOGLE_CONNECT_LABEL };
 
-export { ATS_FROM_NAME, ATS_FROM_NAME_EN } from "@/lib/ats-from";
+export { ATS_FROM_NAME, ATS_FROM_NAME_EN, atsFromHeader, encodeMailboxDisplayName } from "@/lib/ats-from";
 
 /**
- * RFC 2047 para el display name. Solo si hay caracteres fuera de ASCII:
- * «Talent Acquisition Team» se manda literal. Un nombre con ñ sin este
- * encoding se ve como mojibake (CastaÃ±eda).
- *
- * Si algún caller todavía pasa Kelly, se reemplaza: el From de jointheteam@
- * no es un nombre de persona.
+ * Every draft and send uses the team mailbox. `fromName` and the connected
+ * account's display name are ignored so Gmail cannot store Kelly or mojibake.
  */
-export function encodeMailboxDisplayName(name: string | undefined): string {
-  const raw = (name || "").trim();
-  const chosen = !raw || /kelly\s+casta/i.test(raw) ? ATS_FROM_NAME : raw;
-  if (/[^\x20-\x7E]/.test(chosen)) {
-    return `=?UTF-8?B?${Buffer.from(chosen, "utf8").toString("base64")}?=`;
-  }
-  if (/[",<>()]/.test(chosen)) return `"${chosen.replace(/"/g, "")}"`;
-  return chosen;
-}
-
-function formatFrom(name: string | undefined, email: string): string {
-  return `${encodeMailboxDisplayName(name)} <${email}>`;
+function formatFrom(_name: string | undefined, _accountEmail: string): string {
+  return atsFromHeader(ATS_FROM_EMAIL);
 }
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
