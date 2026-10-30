@@ -49,9 +49,41 @@ const TEAM_VOICE: [string, string][] = [
   ["this is Kelly.", "the Talent Acquisition Team at Trading Solutions is writing to you."],
 ];
 
+/**
+ * The candidate is always tú. The team speaks as "nosotros", not as one
+ * person ("te escribo", "escríbeme", "quedo atenta") and not as usted,
+ * ustedes, or vos.
+ */
+const TEAM_TU: [string, string][] = [
+  ["Vuelvo a escribirte porque sigues en mi radar", "Volvemos a escribirte porque sigues en nuestro radar"],
+  ["vuelvo a escribirte de Trading Solutions", "volvemos a escribirte de Trading Solutions"],
+  ["en lo que pueda ayudarte para avanzar, escríbeme. Estoy aquí.", "en lo que podamos ayudarte para avanzar, escríbenos. Estamos aquí."],
+  ["Si hay algo en el contenido o en tu agenda que está dificultando, cuéntame y vemos cómo destrabamos.", "Si hay algo en el contenido o en tu agenda que está dificultando, cuéntanos y vemos cómo destrabamos."],
+  ["Si necesitas más tiempo o tienes alguna pregunta antes de continuar, respóndeme y resolvemos juntos.", "Si necesitas más tiempo o tienes alguna pregunta antes de continuar, respóndenos y resolvemos juntos."],
+  ["Si decidiste no seguir, solo confírmame por aquí.", "Si decidiste no seguir, solo confírmanos por aquí."],
+  ["Solo quería asegurarme", "Solo queríamos asegurarnos"],
+  ["estoy disponible cuando quieras", "estamos disponibles cuando quieras"],
+  ["Quedo atenta,", "Quedamos atentos,"],
+  ["Quería confirmar", "Queríamos confirmar"],
+  ["quería confirmar", "queríamos confirmar"],
+  ["Quería saber", "Queríamos saber"],
+  ["quería saber", "queríamos saber"],
+  ["Te escribo desde", "Te escribimos desde"],
+  ["Te escribo para recordarte", "Te escribimos para recordarte"],
+  ["Te escribo para avanzar", "Te escribimos para avanzar"],
+  ["Cualquier duda me cuentas", "Cualquier duda nos cuentas"],
+  ["escríbeme y vemos", "escríbenos y vemos"],
+  ["solo escríbeme", "solo escríbenos"],
+  ["escríbeme respondiendo", "escríbenos respondiendo"],
+  ["escríbeme.", "escríbenos."],
+  ["¿Hay algo en lo que pueda ayudarte?", "¿Hay algo en lo que podamos ayudarte?"],
+  ["Te recuerdo", "Te recordamos"],
+];
+
 /** Firma y saludo del equipo, aunque la fila en la base todavía diga Kelly. */
 export function teamReminderVoice(text: string): string {
-  return TEAM_VOICE.reduce((out, [from, to]) => out.split(from).join(to), text);
+  const signed = TEAM_VOICE.reduce((out, [from, to]) => out.split(from).join(to), text);
+  return TEAM_TU.reduce((out, [from, to]) => out.split(from).join(to), signed);
 }
 
 /** Renderiza un template con variables del candidato/vacante */

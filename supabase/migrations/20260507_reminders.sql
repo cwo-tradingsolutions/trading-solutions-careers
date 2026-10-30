@@ -70,8 +70,8 @@ VALUES (
     "1": {
       "es": {
         "email_subject": "{firstName}, ¿pudiste ver nuestro mensaje?",
-        "email_body": "Hola {firstName},\n\nTe escribo desde Trading Solutions para retomar tu aplicación a {vacancy}. Tu perfil nos llamó la atención y queremos seguir conociéndote.\n\nHace unos días te enviamos un breve cuestionario de prefiltro · toma menos de 5 minutos:\n{prefilter_url}\n\nSi tienes preguntas o algo que conversar antes, escríbeme respondiendo este correo.\n\nTalent Acquisition Team · Trading Solutions",
-        "whatsapp": "Hola {firstName} 👋 Te escribe el Talent Acquisition Team de Trading Solutions. Te escribo para recordarte que dejaste pendiente el cuestionario de la vacante {vacancy}. Toma 5 min y nos ayuda a seguir avanzando: {prefilter_url}. Cualquier duda me cuentas por aquí."
+        "email_body": "Hola {firstName},\n\nTe escribimos desde Trading Solutions para retomar tu aplicación a {vacancy}. Tu perfil nos llamó la atención y queremos seguir conociéndote.\n\nHace unos días te enviamos un breve cuestionario de prefiltro · toma menos de 5 minutos:\n{prefilter_url}\n\nSi tienes preguntas o algo que conversar antes, escríbenos respondiendo este correo.\n\nTalent Acquisition Team · Trading Solutions",
+        "whatsapp": "Hola {firstName} 👋 Te escribe el Talent Acquisition Team de Trading Solutions. Te escribimos para recordarte que dejaste pendiente el cuestionario de la vacante {vacancy}. Toma 5 min y nos ayuda a seguir avanzando: {prefilter_url}. Cualquier duda nos cuentas por aquí."
       },
       "en": {
         "email_subject": "{firstName}, did you see our message?",
@@ -82,8 +82,8 @@ VALUES (
     "2": {
       "es": {
         "email_subject": "¿Hay algo que podamos resolver juntos? · {vacancy}",
-        "email_body": "Hola {firstName},\n\nVuelvo a escribirte porque sigues en mi radar para {vacancy}. A veces el cuestionario se nos pasa entre el correo o un día complicado.\n\nSi quieres retomarlo: {prefilter_url}\n\nY si hay algo en lo que pueda ayudarte para avanzar, escríbeme. Estoy aquí.\n\nTalent Acquisition Team · Trading Solutions",
-        "whatsapp": "Hola {firstName}, vuelvo a escribirte de Trading Solutions. Quería saber si tuviste algún problema con el cuestionario de {vacancy} o si hay algo en lo que podamos ayudarte. Si sigues interesado: {prefilter_url}"
+        "email_body": "Hola {firstName},\n\nVolvemos a escribirte porque sigues en nuestro radar para {vacancy}. A veces el cuestionario se nos pasa entre el correo o un día complicado.\n\nSi quieres retomarlo: {prefilter_url}\n\nY si hay algo en lo que podamos ayudarte para avanzar, escríbenos. Estamos aquí.\n\nTalent Acquisition Team · Trading Solutions",
+        "whatsapp": "Hola {firstName}, volvemos a escribirte de Trading Solutions. Queríamos saber si tuviste algún problema con el cuestionario de {vacancy} o si hay algo en lo que podamos ayudarte. Si sigues interesado: {prefilter_url}"
       },
       "en": {
         "email_subject": "Anything we can sort out together? · {vacancy}",
@@ -94,8 +94,8 @@ VALUES (
     "3": {
       "es": {
         "email_subject": "{firstName}, hay un lugar para ti en Trading Solutions",
-        "email_body": "Hola {firstName},\n\nEn Trading Solutions estamos construyendo el equipo que mueve el comercio internacional desde Colombia hacia el mundo. Cada persona que sumamos lleva ese propósito.\n\nPara {vacancy} estamos a punto de cerrar la primera ronda de candidatos. Si todavía te interesa el rol, este es un buen momento para completar tu aplicación:\n{prefilter_url}\n\nSi necesitas más tiempo, o si quieres que conversemos antes, escríbeme y vemos la mejor forma de avanzar.\n\nTalent Acquisition Team · Trading Solutions",
-        "whatsapp": "Hola {firstName}, te escribe el Talent Acquisition Team de Trading Solutions. Estamos cerrando la primera ronda para {vacancy} esta semana. Si sigues interesado: {prefilter_url}. Si necesitas más tiempo o quieres conversar antes, solo escríbeme. Cualquiera funciona."
+        "email_body": "Hola {firstName},\n\nEn Trading Solutions estamos construyendo el equipo que mueve el comercio internacional desde Colombia hacia el mundo. Cada persona que sumamos lleva ese propósito.\n\nPara {vacancy} estamos a punto de cerrar la primera ronda de candidatos. Si todavía te interesa el rol, este es un buen momento para completar tu aplicación:\n{prefilter_url}\n\nSi necesitas más tiempo, o si quieres que conversemos antes, escríbenos y vemos la mejor forma de avanzar.\n\nTalent Acquisition Team · Trading Solutions",
+        "whatsapp": "Hola {firstName}, te escribe el Talent Acquisition Team de Trading Solutions. Estamos cerrando la primera ronda para {vacancy} esta semana. Si sigues interesado: {prefilter_url}. Si necesitas más tiempo o quieres conversar antes, solo escríbenos. Cualquiera funciona."
       },
       "en": {
         "email_subject": "{firstName}, there''s a place for you at Trading Solutions",
@@ -117,8 +117,8 @@ VALUES (
     "1": {
       "es": {
         "email_subject": "{firstName}, Assessment virtual pendiente · {vacancy}",
-        "email_body": "Hola {firstName},\n\nTe escribo para avanzar tu proceso de {vacancy} en Trading Solutions.\n\nPasaste el prefiltro, así que el siguiente paso para conocerte mejor es nuestro Assessment virtual · son ~30 minutos desde tu computador:\n{assessment_url}\n\nCualquier duda técnica o sobre el contenido, escríbeme.\n\nTalent Acquisition Team · Trading Solutions",
-        "whatsapp": "Hola {firstName}, te escribe el Talent Acquisition Team de Trading Solutions. Te recuerdo que dejaste pendiente el Assessment virtual para {vacancy}. Son ~30 min desde tu computador y nos permite avanzar a entrevistas. Link: {assessment_url}"
+        "email_body": "Hola {firstName},\n\nTe escribimos para avanzar tu proceso de {vacancy} en Trading Solutions.\n\nPasaste el prefiltro, así que el siguiente paso para conocerte mejor es nuestro Assessment virtual · son ~30 minutos desde tu computador:\n{assessment_url}\n\nCualquier duda técnica o sobre el contenido, escríbenos.\n\nTalent Acquisition Team · Trading Solutions",
+        "whatsapp": "Hola {firstName}, te escribe el Talent Acquisition Team de Trading Solutions. Te recordamos que dejaste pendiente el Assessment virtual para {vacancy}. Son ~30 min desde tu computador y nos permite avanzar a entrevistas. Link: {assessment_url}"
       },
       "en": {
         "email_subject": "{firstName}, Virtual Assessment pending · {vacancy}",
@@ -129,8 +129,8 @@ VALUES (
     "2": {
       "es": {
         "email_subject": "¿Necesitas ayuda con el Assessment virtual? · {vacancy}",
-        "email_body": "Hola {firstName},\n\nEl Assessment virtual para {vacancy} sigue abierto. Solo quería confirmar que el link funciona y que no hay nada bloqueándote.\n\nSi tienes 30 minutos hoy o mañana: {assessment_url}\n\nSi hay algo en el contenido o en tu agenda que está dificultando, cuéntame y vemos cómo destrabamos.\n\nTalent Acquisition Team · Trading Solutions",
-        "whatsapp": "Hola {firstName}, te escribe el Talent Acquisition Team de Trading Solutions. El Assessment virtual para {vacancy} sigue pendiente. ¿Hay algo en lo que pueda ayudarte? Link: {assessment_url}"
+        "email_body": "Hola {firstName},\n\nEl Assessment virtual para {vacancy} sigue abierto. Solo queríamos confirmar que el link funciona y que no hay nada bloqueándote.\n\nSi tienes 30 minutos hoy o mañana: {assessment_url}\n\nSi hay algo en el contenido o en tu agenda que está dificultando, cuéntanos y vemos cómo destrabamos.\n\nTalent Acquisition Team · Trading Solutions",
+        "whatsapp": "Hola {firstName}, te escribe el Talent Acquisition Team de Trading Solutions. El Assessment virtual para {vacancy} sigue pendiente. ¿Hay algo en lo que podamos ayudarte? Link: {assessment_url}"
       },
       "en": {
         "email_subject": "Need help with the Virtual Assessment? · {vacancy}",
@@ -141,8 +141,8 @@ VALUES (
     "3": {
       "es": {
         "email_subject": "{firstName}, hay un lugar para ti en Trading Solutions",
-        "email_body": "Hola {firstName},\n\nEn Trading Solutions estamos eligiendo al equipo que se sumará a mover el comercio internacional desde Colombia. Para {vacancy} esta semana definimos quiénes avanzan a entrevistas.\n\nSi sigues interesado en sumarte, este es el día para completar el Assessment virtual:\n{assessment_url}\n\nSi necesitas más tiempo o tienes alguna pregunta antes de continuar, respóndeme y resolvemos juntos.\n\nTalent Acquisition Team · Trading Solutions",
-        "whatsapp": "Hola {firstName}, esta semana definimos quiénes pasan a entrevistas para {vacancy}. Si sigues interesado, completa el Assessment virtual hoy: {assessment_url}. Si decidiste no seguir, solo confírmame por aquí."
+        "email_body": "Hola {firstName},\n\nEn Trading Solutions estamos eligiendo al equipo que se sumará a mover el comercio internacional desde Colombia. Para {vacancy} esta semana definimos quiénes avanzan a entrevistas.\n\nSi sigues interesado en sumarte, este es el día para completar el Assessment virtual:\n{assessment_url}\n\nSi necesitas más tiempo o tienes alguna pregunta antes de continuar, respóndenos y resolvemos juntos.\n\nTalent Acquisition Team · Trading Solutions",
+        "whatsapp": "Hola {firstName}, esta semana definimos quiénes pasan a entrevistas para {vacancy}. Si sigues interesado, completa el Assessment virtual hoy: {assessment_url}. Si decidiste no seguir, solo confírmanos por aquí."
       },
       "en": {
         "email_subject": "{firstName}, there''s a place for you at Trading Solutions",
@@ -164,8 +164,8 @@ VALUES (
     "1": {
       "es": {
         "email_subject": "{firstName}, sobre la oferta para {vacancy}",
-        "email_body": "Hola {firstName},\n\nSolo quería asegurarme de que recibiste la propuesta económica para la posición de {vacancy} en Trading Solutions.\n\nSi tienes alguna pregunta sobre los detalles, beneficios o el proceso de incorporación, estoy disponible cuando quieras hablar.\n\nTalent Acquisition Team · Trading Solutions",
-        "whatsapp": "Hola {firstName}, te escribe el Talent Acquisition Team de Trading Solutions. Quería confirmar que recibiste la propuesta para {vacancy} en Trading Solutions. Si tienes preguntas sobre la oferta o los beneficios, podemos hablar cuando gustes."
+        "email_body": "Hola {firstName},\n\nSolo queríamos asegurarnos de que recibiste la propuesta económica para la posición de {vacancy} en Trading Solutions.\n\nSi tienes alguna pregunta sobre los detalles, beneficios o el proceso de incorporación, estamos disponibles cuando quieras hablar.\n\nTalent Acquisition Team · Trading Solutions",
+        "whatsapp": "Hola {firstName}, te escribe el Talent Acquisition Team de Trading Solutions. Queríamos confirmar que recibiste la propuesta para {vacancy} en Trading Solutions. Si tienes preguntas sobre la oferta o los beneficios, podemos hablar cuando gustes."
       },
       "en": {
         "email_subject": "{firstName}, about your offer for {vacancy}",
@@ -176,8 +176,8 @@ VALUES (
     "2": {
       "es": {
         "email_subject": "{firstName}, ¿podemos conversar sobre la oferta?",
-        "email_body": "Hola {firstName},\n\nHan pasado unos días desde que te enviamos la propuesta para {vacancy}, y queremos asegurarnos de que tienes toda la información para tomar la mejor decisión.\n\n¿Tienes 15 minutos esta semana para una llamada? Podemos resolver cualquier duda — del rol, el equipo, la compensación.\n\nQuedo atenta,\nTalent Acquisition Team · Trading Solutions",
-        "whatsapp": "Hola {firstName}, quería saber si tuviste oportunidad de revisar la oferta para {vacancy}. Si te ayuda, podemos agendar 15 min para resolver cualquier duda — del rol, equipo, compensación, lo que necesites. ¿Te queda bien esta semana?"
+        "email_body": "Hola {firstName},\n\nHan pasado unos días desde que te enviamos la propuesta para {vacancy}, y queremos asegurarnos de que tienes toda la información para tomar la mejor decisión.\n\n¿Tienes 15 minutos esta semana para una llamada? Podemos resolver cualquier duda — del rol, el equipo, la compensación.\n\nQuedamos atentos,\nTalent Acquisition Team · Trading Solutions",
+        "whatsapp": "Hola {firstName}, queríamos saber si tuviste oportunidad de revisar la oferta para {vacancy}. Si te ayuda, podemos agendar 15 min para resolver cualquier duda — del rol, equipo, compensación, lo que necesites. ¿Te queda bien esta semana?"
       },
       "en": {
         "email_subject": "{firstName}, can we talk about the offer?",
