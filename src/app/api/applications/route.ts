@@ -10,6 +10,7 @@ import { recordStageEvent } from "@/lib/stage-events";
 // /api/admin/sync-applications-to-funnel · no duplicarla acá.
 import { resolverVacante } from "@/lib/vacancy-map";
 import { isEnglishTemplate, resolveCandidateLang } from "@/lib/candidate-lang";
+import { candidateSignatureHtml } from "@/lib/ats-from";
 import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 import { canalPostulacionPublica } from "@/lib/candidate-source";
 
@@ -246,14 +247,13 @@ export async function POST(request: NextRequest) {
       <p style="margin:0 0 8px"><strong>Nuestros compromisos contigo:</strong></p>
       <ul style="margin:0;padding-left:20px">
         <li>Te respondemos en <strong>máximo 7 días hábiles</strong>, avances o no</li>
-        <li>Si no avanzas, te decimos por qué con respeto y honestidad</li>
         <li>Tu información se mantiene confidencial</li>
       </ul>
     </div>
     <p>Puedes ver el estado de tu aplicación en cualquier momento:</p>
     <p style="text-align:center"><a href="${portalLink}" style="display:inline-block;background:#2C64ED;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600">Ver mi proceso</a></p>
     <p style="font-size:12px;color:#666">Si tienes preguntas, simplemente responde este correo.</p>
-    <p style="margin-top:24px">Un abrazo,<br><strong>Equipo Trading Solutions</strong></p>
+    ${candidateSignatureHtml("es")}
   </div>
   <div style="padding:18px 32px;text-align:center;color:#999;font-size:12px;border-top:1px solid #eee">Boutique Freight Forwarder · Operación en +10 países</div>
 </div></body></html>`;
@@ -268,14 +268,13 @@ export async function POST(request: NextRequest) {
       <p style="margin:0 0 8px"><strong>What we commit to:</strong></p>
       <ul style="margin:0;padding-left:20px">
         <li>We get back to you within <strong>7 business days</strong>, either way</li>
-        <li>If you don't move forward, we tell you why, honestly and respectfully</li>
         <li>Your information stays confidential</li>
       </ul>
     </div>
     <p>You can check the status of your application at any time:</p>
     <p style="text-align:center"><a href="${portalLink}" style="display:inline-block;background:#2C64ED;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600">View my process</a></p>
     <p style="font-size:12px;color:#666">If you have any questions, just reply to this email.</p>
-    <p style="margin-top:24px">Best regards,<br><strong>Talent Acquisition Team · Trading Solutions</strong></p>
+    ${candidateSignatureHtml("en")}
   </div>
   <div style="padding:18px 32px;text-align:center;color:#999;font-size:12px;border-top:1px solid #eee">Boutique Freight Forwarder · Operations in 10+ countries</div>
 </div></body></html>`;
