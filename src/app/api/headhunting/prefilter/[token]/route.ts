@@ -240,12 +240,19 @@ const PANAMA_OPS_ENGLISH_RANK: Record<string, number> = {
 const PANAMA_OPS_ENGLISH_MIN_RANK = 3; // B1
 const PANAMA_OPS_YEARS_MIN = 4;
 
-/** "USD 2,500/month gross" → 2500. Devuelve null si no hay número legible. */
-function parseSalaryUsd(raw: unknown): number | null {
-  const digits = String(raw ?? "").replace(/[^0-9.]/g, "");
-  if (!digits) return null;
-  const n = Number(digits);
-  return Number.isFinite(n) && n > 0 ? n : null;
+/**
+ * Lee un monto o un rango en USD.
+ * "USD 2,500" y "2.300" → 2500 / 2300 (el punto de miles no es decimal).
+ * "1800-2000" → min 1800, max 2000. "1.500,00" → 1500. Sin número → null.
+ * El tope se compara contra `min`: un rango que empieza bajo el techo no lo supera.
+ */
+function parseSalaryRangeUsd(raw: unknown): { min: number; max: number } | null {
+  const toks = String(raw ?? "").match(/\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?/g) ?? [];
+  const nums = toks.map((t) => {
+    const m = t.match(/^(\d{1,3}(?:[.,]\d{3})+)(?:[.,]\d{1,2})?$/);
+    return m ? Number(m[1].replace(/[.,]/g, "")) : Number(t.replace(",", "."));
+  }).filter((n) => Number.isFinite(n) && n > 0).slice(0, 2);
+  return nums.length ? { min: Math.min(...nums), max: Math.max(...nums) } : null;
 }
 
 const TS_LINKEDIN_URL = "https://www.linkedin.com/company/trading-sol/";
@@ -374,7 +381,8 @@ export async function POST(
   if (templateKey === "china") {
     // ─── Rama CHINA · knock-outs solamente ──────────────────────────
     //   - Consentimiento PIPL es OBLIGATORIO · sin él no se procesa.
-    //   - Salario (salary_usd) es SOLO DATO · nunca descarta.
+    //   - Salario (salary_usd) nunca descarta. Sobre el tope (mínimo del
+    //     rango) entra como bloqueo blando y la decisión pasa a revisión.
     //   - Knock-outs: work_authorized, inglés (>=B2), onsite_available.
     if (!isYes(body.pipl_consent)) {
       return NextResponse.json({ error: "pipl_consent_required" }, { status: 400 });
@@ -418,17 +426,26 @@ export async function POST(
     }
     decision = bloqueos.length ? "review" : "pass";
 
-    // Presupuesto · sobre el tope no se rechaza, se manda a revisión.
-    const salaryUsd = parseSalaryUsd(body.salary_usd);
-    const salaryOverBudget = salaryUsd !== null && salaryUsd > CHINA_SALARY_CAP_USD;
-    if (salaryOverBudget && decision === "pass") {
-      decision = "review";
+    // Presupuesto · se compara el mínimo del rango. Sobre el tope no se
+    // rechaza: queda un bloqueo blando y, si iba a pasar, pasa a revisión.
+    const salaryRange = parseSalaryRangeUsd(body.salary_usd);
+    const salaryOverBudget = salaryRange !== null && salaryRange.min > CHINA_SALARY_CAP_USD;
+    if (salaryOverBudget) {
+      bloqueos.push({
+        regla: "salario_sobre_tope",
+        severidad: "blando",
+        categoria: "pretension_salarial",
+        sub_detail: "salario_sobre_tope",
+        valor: String(body.salary_usd),
+      });
+      if (decision === "pass") decision = "review";
     }
 
     meta = {
       china: true,
       salary_usd_expectation: body.salary_usd ?? null, // dato · no descarta
-      salary_usd_parsed: salaryUsd,
+      salary_usd_parsed: salaryRange?.min ?? null,
+      salary_usd_max: salaryRange?.max ?? null,
       salary_cap_usd: CHINA_SALARY_CAP_USD,
       salary_over_budget: salaryOverBudget,
       english_min_required_rank: CHINA_ENGLISH_MIN_RANK,
@@ -441,7 +458,8 @@ export async function POST(
   } else if (templateKey === "panama_ops") {
     // ─── Rama PANAMA OPS · freight knock-outs (EN) ──────────────────
     //   - Consentimiento privacy EN obligatorio (no PIPL, no habeas CO).
-    //   - Salario (salary_usd) es SOLO DATO · nunca descarta.
+    //   - Salario (salary_usd) nunca descarta. Sobre el tope (mínimo del
+    //     rango) entra como bloqueo blando y la decisión pasa a revisión.
     //   - Knock-outs → review flags: work_authorized_panama, onsite_panama_city.
     //   - Soft mark: years_freight_panama < 4, english below B1.
     if (!isYes(body.privacy_consent)) {
@@ -495,16 +513,24 @@ export async function POST(
 
     decision = bloqueos.length ? "review" : "pass";
 
-    const salaryUsd = parseSalaryUsd(body.salary_usd);
-    const salaryOverBudget = salaryUsd !== null && salaryUsd > PANAMA_OPS_SALARY_CAP_USD;
-    if (salaryOverBudget && decision === "pass") {
-      decision = "review";
+    const salaryRange = parseSalaryRangeUsd(body.salary_usd);
+    const salaryOverBudget = salaryRange !== null && salaryRange.min > PANAMA_OPS_SALARY_CAP_USD;
+    if (salaryOverBudget) {
+      bloqueos.push({
+        regla: "salario_sobre_tope",
+        severidad: "blando",
+        categoria: "pretension_salarial",
+        sub_detail: "salario_sobre_tope",
+        valor: String(body.salary_usd),
+      });
+      if (decision === "pass") decision = "review";
     }
 
     meta = {
       panama_ops: true,
       salary_usd_expectation: body.salary_usd ?? null,
-      salary_usd_parsed: salaryUsd,
+      salary_usd_parsed: salaryRange?.min ?? null,
+      salary_usd_max: salaryRange?.max ?? null,
       salary_cap_usd: PANAMA_OPS_SALARY_CAP_USD,
       salary_over_budget: salaryOverBudget,
       english_min_required_rank: PANAMA_OPS_ENGLISH_MIN_RANK,
@@ -849,9 +875,15 @@ export async function POST(
     if (gmail.connected) {
       // @ts-expect-error supabase relation
       const vacancyTitle = candidate.ht_vacancies?.title || "vacante";
-      const enRojo = bloqueos.length > 0;
-      const decisionEmoji = enRojo ? "🔴" : "✅";
-      const decisionLabel = enRojo ? "EN ROJO · decide tú" : "PASA";
+      const salarioRaw = body.salary || body.salary_usd;
+      const salarioTxt = salarioRaw ? String(salarioRaw) : "Salario no informado";
+      // Salario desconocido no pinta la ficha de rojo. Revisión amarilla si
+      // el único bloqueo es el tope, o si no hay bloqueos y aun así no pasó.
+      const soloSalario = bloqueos.length > 0 && bloqueos.every((b) => b.regla === "salario_sobre_tope");
+      const decisionLabel = decision === "pass" ? "PASA"
+        : soloSalario || bloqueos.length === 0 ? "REVISIÓN" : "EN ROJO · decide tú";
+      const decisionEmoji = decision === "pass" ? "✅"
+        : soloSalario || bloqueos.length === 0 ? "🟡" : "🔴";
       const listaBloqueos = bloqueos
         .map((b) => `<li>${b.sub_detail.replace(/_/g, " ")} — dato ${b.severidad}${b.valor ? ` (marcó: ${b.valor})` : ""}${b.contradiccion ? ` · <strong>${b.contradiccion}</strong>` : ""}</li>`)
         .join("");
@@ -865,11 +897,11 @@ export async function POST(
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Vacante:</td><td><strong>${vacancyTitle}</strong></td></tr>
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Email:</td><td>${candidate.email}</td></tr>
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Decisión:</td><td><strong>${decisionEmoji} ${decisionLabel}</strong></td></tr>
-            <tr><td style="padding: 4px 12px 4px 0; color: #666;">Salario que pidió:</td><td>${body.salary || "—"}</td></tr>
+            <tr><td style="padding: 4px 12px 4px 0; color: #666;">Salario que pidió:</td><td>${salarioTxt}</td></tr>
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Inglés:</td><td>${body.english_level || "—"}</td></tr>
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Ciudad:</td><td>${body.city || "—"}</td></tr>
           </table>
-          ${enRojo ? `<div style="background: #FEF2F2; padding: 10px 14px; border-radius: 6px; color: #991B1B; font-size: 13px;"><strong>No se rechazó a nadie.</strong> Quedó en rojo esperando tu decisión:<ul style="margin: 8px 0 0; padding-left: 18px;">${listaBloqueos}</ul></div>` : ""}
+          ${bloqueos.length > 0 ? `<div style="background: ${soloSalario ? "#FFFBEB" : "#FEF2F2"}; padding: 10px 14px; border-radius: 6px; color: ${soloSalario ? "#92400E" : "#991B1B"}; font-size: 13px;"><strong>No se rechazó a nadie.</strong> ${soloSalario ? "Quedó en revisión por el salario:" : "Quedó en rojo esperando tu decisión:"}<ul style="margin: 8px 0 0; padding-left: 18px;">${listaBloqueos}</ul></div>` : ""}
           <p><a href="${baseUrl}/hr-admin?tab=prefiltros" style="color: #2C64ED;">Ver en HR Admin →</a></p>
         </body></html>`,
         fromName: "Trading Solutions ATS",
