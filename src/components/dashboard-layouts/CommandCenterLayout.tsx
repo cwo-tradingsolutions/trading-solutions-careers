@@ -377,7 +377,7 @@ export default function CommandCenterLayout({
                           onClick={() => onOpenVac(v.id)}
                           className="border-t border-[color:var(--ts-line)] cursor-pointer hover:bg-[var(--ts-canvas)]"
                         >
-                          <td className="py-1.5"><Estado id={estadoDe(v.semaforo)} /></td>
+                          <td className="py-1.5"><Estado id={estadoDe(v.semaforo)} plazo /></td>
                           <td>
                             <div className="font-medium">{v.title}</div>
                             <div className="text-[10px] text-[var(--ts-muted)]">{v.area}</div>
@@ -655,11 +655,11 @@ function Drill({
   );
 }
 
-function Estado({ id }: { id: EstadoId }) {
+function Estado({ id, plazo = false }: { id: EstadoId; plazo?: boolean }) {
   if (id === "en_sla") {
     return (
       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--ts-accent)]">
-        <Check className="w-3.5 h-3.5" aria-hidden /> En SLA
+        <Check className="w-3.5 h-3.5" aria-hidden /> {plazo ? "En plazo" : "En SLA"}
       </span>
     );
   }
@@ -674,7 +674,7 @@ function Estado({ id }: { id: EstadoId }) {
   if (id === "fuera") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-[var(--ts-ink)] text-white text-[11px] font-semibold px-2 py-0.5">
-        <AlertOctagon className="w-3.5 h-3.5" aria-hidden /> Fuera de SLA
+        <AlertOctagon className="w-3.5 h-3.5" aria-hidden /> {plazo ? "Fuera de plazo" : "Fuera de SLA"}
       </span>
     );
   }
