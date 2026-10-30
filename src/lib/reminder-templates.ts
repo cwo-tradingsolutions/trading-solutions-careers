@@ -81,6 +81,18 @@ const TEAM_TU: [string, string][] = [
   ["escríbeme.", "escríbenos."],
   ["¿Hay algo en lo que pueda ayudarte?", "¿Hay algo en lo que podamos ayudarte?"],
   ["Te recuerdo", "Te recordamos"],
+  ["anything I can help with to move forward, just write. I'm here.", "anything we can help with to move forward, just write. We're here."],
+  ["you're still on my radar", "you're still on our radar"],
+  ["I'm available whenever you'd like to talk.", "We're available whenever you'd like to talk."],
+  ["Let me know if you have any questions.", "Let us know if you have any questions."],
+  ["let me know and we'll figure it out.", "let us know and we'll figure it out."],
+  ["just message me back", "just message us back"],
+  ["Anything I can help with?", "Anything we can help with?"],
+  ["Just wanted to make sure you received", "We just wanted to make sure you received"],
+  ["Wanted to confirm you received", "We wanted to confirm you received"],
+  ["Happy to address any question", "We're happy to address any question"],
+  ["Wanted to check if you ran into", "We wanted to check if you ran into"],
+  [", wanted to check if you had a chance", ", we wanted to check if you had a chance"],
 ];
 
 /** Firma y saludo del equipo, aunque la fila en la base todavía diga Kelly. */

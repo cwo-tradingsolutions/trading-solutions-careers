@@ -76,7 +76,7 @@ VALUES (
       "en": {
         "email_subject": "{firstName}, did you see our message?",
         "email_body": "Hi {firstName},\n\nReaching out from Trading Solutions to follow up on your application for {vacancy}. Your profile caught our attention and we''d love to get to know you better.\n\nA few days ago we sent you a brief questionnaire — takes less than 5 minutes:\n{prefilter_url}\n\nIf you have any questions or want to chat first, just reply.\n\nTalent Acquisition Team · Trading Solutions",
-        "whatsapp": "Hi {firstName} 👋 The Talent Acquisition Team at Trading Solutions is writing to you. Just a reminder that you have our pre-screening questionnaire pending for the {vacancy} role. Takes 5 min: {prefilter_url}. Let me know if you have any questions."
+        "whatsapp": "Hi {firstName} 👋 The Talent Acquisition Team at Trading Solutions is writing to you. Just a reminder that you have our pre-screening questionnaire pending for the {vacancy} role. Takes 5 min: {prefilter_url}. Let us know if you have any questions."
       }
     },
     "2": {
@@ -87,8 +87,8 @@ VALUES (
       },
       "en": {
         "email_subject": "Anything we can sort out together? · {vacancy}",
-        "email_body": "Hi {firstName},\n\nCircling back because you''re still on my radar for {vacancy}. Sometimes a questionnaire slips through email or a busy day.\n\nIf you want to pick it back up: {prefilter_url}\n\nAnd if there''s anything I can help with to move forward, just write. I''m here.\n\nTalent Acquisition Team · Trading Solutions",
-        "whatsapp": "Hi {firstName}, following up from Trading Solutions. Wanted to check if you ran into any issues with the questionnaire for {vacancy}, or if there''s anything we can help with. Here''s the link: {prefilter_url}"
+        "email_body": "Hi {firstName},\n\nCircling back because you''re still on our radar for {vacancy}. Sometimes a questionnaire slips through email or a busy day.\n\nIf you want to pick it back up: {prefilter_url}\n\nAnd if there''s anything we can help with to move forward, just write. We''re here.\n\nTalent Acquisition Team · Trading Solutions",
+        "whatsapp": "Hi {firstName}, following up from Trading Solutions. We wanted to check if you ran into any issues with the questionnaire for {vacancy}, or if there''s anything we can help with. Here''s the link: {prefilter_url}"
       }
     },
     "3": {
@@ -100,7 +100,7 @@ VALUES (
       "en": {
         "email_subject": "{firstName}, there''s a place for you at Trading Solutions",
         "email_body": "Hi {firstName},\n\nAt Trading Solutions we''re building the team that moves international commerce from Colombia to the world. Every person we bring in carries that mission.\n\nFor {vacancy}, we''re about to close the first round of candidates. If you''re still interested in the role, now''s a good moment to complete your application:\n{prefilter_url}\n\nIf you need more time or want to talk first, reply and we''ll figure out the best way forward.\n\nTalent Acquisition Team · Trading Solutions",
-        "whatsapp": "Hi {firstName}, the Talent Acquisition Team at Trading Solutions is writing to you. We''re closing the first round for {vacancy} this week. If you''re still interested: {prefilter_url}. If you need more time or want to chat first, just message me back. Either way works."
+        "whatsapp": "Hi {firstName}, the Talent Acquisition Team at Trading Solutions is writing to you. We''re closing the first round for {vacancy} this week. If you''re still interested: {prefilter_url}. If you need more time or want to chat first, just message us back. Either way works."
       }
     }
   }'::jsonb
@@ -134,8 +134,8 @@ VALUES (
       },
       "en": {
         "email_subject": "Need help with the Virtual Assessment? · {vacancy}",
-        "email_body": "Hi {firstName},\n\nThe Virtual Assessment for {vacancy} is still open. Just confirming the link works and nothing''s blocking you.\n\nIf you have 30 minutes today or tomorrow: {assessment_url}\n\nIf there''s anything about the content or your schedule that''s making it hard, let me know and we''ll figure it out.\n\nTalent Acquisition Team · Trading Solutions",
-        "whatsapp": "Hi {firstName}, the Talent Acquisition Team at Trading Solutions is writing to you. The Virtual Assessment for {vacancy} is still pending. Anything I can help with? Link: {assessment_url}"
+        "email_body": "Hi {firstName},\n\nThe Virtual Assessment for {vacancy} is still open. Just confirming the link works and nothing''s blocking you.\n\nIf you have 30 minutes today or tomorrow: {assessment_url}\n\nIf there''s anything about the content or your schedule that''s making it hard, let us know and we''ll figure it out.\n\nTalent Acquisition Team · Trading Solutions",
+        "whatsapp": "Hi {firstName}, the Talent Acquisition Team at Trading Solutions is writing to you. The Virtual Assessment for {vacancy} is still pending. Anything we can help with? Link: {assessment_url}"
       }
     },
     "3": {
@@ -169,8 +169,8 @@ VALUES (
       },
       "en": {
         "email_subject": "{firstName}, about your offer for {vacancy}",
-        "email_body": "Hi {firstName},\n\nJust wanted to make sure you received the offer we sent for the {vacancy} role at Trading Solutions.\n\nIf you have any questions about the details, benefits, or onboarding, I''m available whenever you''d like to talk.\n\nTalent Acquisition Team · Trading Solutions",
-        "whatsapp": "Hi {firstName}, the Talent Acquisition Team at Trading Solutions is writing to you. Wanted to confirm you received the offer for {vacancy} at Trading Solutions. Any questions about the offer or benefits, we can hop on a call whenever works for you."
+        "email_body": "Hi {firstName},\n\nWe just wanted to make sure you received the offer we sent for the {vacancy} role at Trading Solutions.\n\nIf you have any questions about the details, benefits, or onboarding, We''re available whenever you''d like to talk.\n\nTalent Acquisition Team · Trading Solutions",
+        "whatsapp": "Hi {firstName}, the Talent Acquisition Team at Trading Solutions is writing to you. We wanted to confirm you received the offer for {vacancy} at Trading Solutions. Any questions about the offer or benefits, we can hop on a call whenever works for you."
       }
     },
     "2": {
@@ -181,8 +181,8 @@ VALUES (
       },
       "en": {
         "email_subject": "{firstName}, can we talk about the offer?",
-        "email_body": "Hi {firstName},\n\nIt''s been a few days since we sent the offer for {vacancy}, and we want to make sure you have all the info to make the best decision.\n\nDo you have 15 minutes this week for a quick call? Happy to address any question — role, team, compensation.\n\nLooking forward,\nTalent Acquisition Team · Trading Solutions",
-        "whatsapp": "Hi {firstName}, wanted to check if you had a chance to review the offer for {vacancy}. If it helps, we can set up 15 min to address any question — role, team, compensation, whatever you need. Does this week work?"
+        "email_body": "Hi {firstName},\n\nIt''s been a few days since we sent the offer for {vacancy}, and we want to make sure you have all the info to make the best decision.\n\nDo you have 15 minutes this week for a quick call? We''re happy to address any question — role, team, compensation.\n\nLooking forward,\nTalent Acquisition Team · Trading Solutions",
+        "whatsapp": "Hi {firstName}, we wanted to check if you had a chance to review the offer for {vacancy}. If it helps, we can set up 15 min to address any question — role, team, compensation, whatever you need. Does this week work?"
       }
     },
     "3": {

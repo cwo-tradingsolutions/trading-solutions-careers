@@ -1,4 +1,4 @@
--- NOT APPLIED. Rewrites only the Spanish reminder voice inside
+-- NOT APPLIED. Rewrites the Spanish and English reminder voice inside
 -- ts_reminder_rules.templates so the candidate is addressed as tú and the
 -- team speaks as "nosotros". It does not change English copy, subjects,
 -- stages, or the signature line.
@@ -23,7 +23,8 @@ UPDATE ts_reminder_rules
 SET templates = (
   replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(
   replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(
-  replace(replace(replace(
+  replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(
+  replace(replace(replace(replace(replace(
     templates::text,
     'Vuelvo a escribirte porque sigues en mi radar', 'Volvemos a escribirte porque sigues en nuestro radar'),
     'vuelvo a escribirte de Trading Solutions', 'volvemos a escribirte de Trading Solutions'),
@@ -47,7 +48,19 @@ SET templates = (
     'escríbeme respondiendo', 'escríbenos respondiendo'),
     'escríbeme.', 'escríbenos.'),
     '¿Hay algo en lo que pueda ayudarte?', '¿Hay algo en lo que podamos ayudarte?'),
-    'Te recuerdo', 'Te recordamos')
+    'Te recuerdo', 'Te recordamos'),
+    'anything I can help with to move forward, just write. I''m here.', 'anything we can help with to move forward, just write. We''re here.'),
+    'you''re still on my radar', 'you''re still on our radar'),
+    'I''m available whenever you''d like to talk.', 'We''re available whenever you''d like to talk.'),
+    'Let me know if you have any questions.', 'Let us know if you have any questions.'),
+    'let me know and we''ll figure it out.', 'let us know and we''ll figure it out.'),
+    'just message me back', 'just message us back'),
+    'Anything I can help with?', 'Anything we can help with?'),
+    'Just wanted to make sure you received', 'We just wanted to make sure you received'),
+    'Wanted to confirm you received', 'We wanted to confirm you received'),
+    'Happy to address any question', 'We''re happy to address any question'),
+    'Wanted to check if you ran into', 'We wanted to check if you ran into'),
+    ', wanted to check if you had a chance', ', we wanted to check if you had a chance')
 )::jsonb,
     updated_at = NOW()
 WHERE templates::text LIKE '%Te escribo%'
@@ -63,4 +76,16 @@ WHERE templates::text LIKE '%Te escribo%'
    OR templates::text LIKE '%Te recuerdo%'
    OR templates::text LIKE '%pueda ayudarte%'
    OR templates::text LIKE '%Quería %'
-   OR templates::text LIKE '%quería %';
+   OR templates::text LIKE '%quería %'
+   OR templates::text LIKE '%Let me know%'
+   OR templates::text LIKE '%let me know%'
+   OR templates::text LIKE '%on my radar%'
+   OR templates::text LIKE '%I''m available%'
+   OR templates::text LIKE '%I''m here.%'
+   OR templates::text LIKE '%message me back%'
+   OR templates::text LIKE '%I can help%'
+   OR templates::text LIKE '%Just wanted to make sure%'
+   OR templates::text LIKE '%Wanted to confirm you received%'
+   OR templates::text LIKE '%Happy to address any question%'
+   OR templates::text LIKE '%Wanted to check if you ran into%'
+   OR templates::text LIKE '%, wanted to check if you had a chance%';
