@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
       });
       return NextResponse.json({
         ...okBase,
-        channel: delivered.status === 'sent' ? 'gmail' : 'pending',
+        channel: delivered.status === 'sent' ? 'gmail' : delivered.status,
         email_status: delivered.status,
       });
     };

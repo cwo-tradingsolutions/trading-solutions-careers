@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
 import { requireAdmin } from "@/lib/admin-auth";
+import { secretsEqual } from "@/lib/secret-compare";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -22,8 +23,11 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://trading-solutions-ca
 
 function isVercelCron(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
-  if (!auth) return false;
-  return auth === `Bearer ${process.env.CRON_SECRET || ""}`;
+  const secret = process.env.CRON_SECRET;
+  if (!auth || !secret) return false;
+  const bearer = auth.startsWith("Bearer ") ? auth.slice("Bearer ".length) : "";
+  if (!bearer) return false;
+  return secretsEqual(bearer, secret);
 }
 
 export async function GET(req: NextRequest) {
@@ -197,6 +201,9 @@ export async function GET(req: NextRequest) {
     });
 
     if (!sendRes.ok) {
+      if (sendRes.blocked === "bloqueado_staging") {
+        return NextResponse.json({ status: "bloqueado_staging", sent: false });
+      }
       return NextResponse.json({ error: sendRes.error }, { status: 500 });
     }
 
