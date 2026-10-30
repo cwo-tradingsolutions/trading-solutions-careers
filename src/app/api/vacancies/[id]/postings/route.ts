@@ -18,11 +18,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
-import { FUENTES, type FuenteKey } from "@/lib/requisitions";
+import { normalizarClaveFuente, validarFuente } from "@/lib/recruitment-sources";
+import { cargarFuentes } from "@/lib/recruitment-sources-db";
 
 export const runtime = "nodejs";
-
-const CLAVES = FUENTES.map((f) => f.key) as readonly string[];
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const authError = requireAdmin(req);
@@ -37,16 +36,19 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const publicadas = new Set((data || []).map((p: any) => p.source));
+  const { fuentes, desde } = await cargarFuentes();
 
   return NextResponse.json({
     publicaciones: data || [],
-    // Se devuelven TODAS las fuentes, publicadas o no: la pantalla tiene que
-    // mostrar los huecos. Una lista que solo trae lo publicado esconde
-    // justamente lo que falta hacer.
-    fuentes: FUENTES.map((f) => ({
-      ...f,
-      publicada: publicadas.has(f.key),
-    })),
+    fuentes_desde: desde,
+    // Activas, publicadas o no: la pantalla tiene que mostrar los huecos.
+    // Una desactivada que ya estaba publicada sigue en `publicaciones`.
+    fuentes: fuentes
+      .filter((f) => f.active || publicadas.has(f.key))
+      .map((f) => ({
+        ...f,
+        publicada: publicadas.has(f.key),
+      })),
   });
 }
 
@@ -56,14 +58,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   try {
     const body = await req.json().catch(() => ({}));
-    const source = String(body.source || "") as FuenteKey;
-
-    if (!CLAVES.includes(source)) {
-      return NextResponse.json(
-        { error: `Fuente desconocida: "${source}". Se esperaba una de: ${CLAVES.join(", ")}.` },
-        { status: 400 },
-      );
+    const forma = normalizarClaveFuente(body.source);
+    if (!forma.ok) return NextResponse.json({ error: forma.error }, { status: 400 });
+    const { fuentes } = await cargarFuentes();
+    const validada = validarFuente(forma.key, fuentes, "marcar");
+    if (!validada.ok) {
+      return NextResponse.json({ error: validada.error }, { status: 400 });
     }
+    const source = validada.key;
 
     // upsert: volver a marcar una fuente ya registrada actualiza la fecha en
     // vez de fallar. Republicar una vacante es normal.
@@ -127,10 +129,14 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const authError = requireAdmin(req);
   if (authError) return authError;
 
-  const source = req.nextUrl.searchParams.get("source") || "";
-  if (!CLAVES.includes(source)) {
-    return NextResponse.json({ error: `Fuente desconocida: "${source}"` }, { status: 400 });
+  const forma = normalizarClaveFuente(req.nextUrl.searchParams.get("source"));
+  if (!forma.ok) return NextResponse.json({ error: forma.error }, { status: 400 });
+  const { fuentes } = await cargarFuentes();
+  const validada = validarFuente(forma.key, fuentes, "desmarcar");
+  if (!validada.ok) {
+    return NextResponse.json({ error: validada.error }, { status: 400 });
   }
+  const source = validada.key;
 
   const { error } = await supabaseAdmin
     .from("ht_vacancy_postings")

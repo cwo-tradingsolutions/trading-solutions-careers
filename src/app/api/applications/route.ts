@@ -15,6 +15,8 @@ import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 import { candidateMailBcc } from "@/lib/candidate-bcc";
 import { requireAdmin } from "@/lib/admin-auth";
 import { canalPostulacionPublica } from "@/lib/candidate-source";
+import { resolverArrivalSource } from "@/lib/recruitment-sources";
+import { clavesFuenteActivas } from "@/lib/recruitment-sources-db";
 import { publicStepBody } from "@/lib/candidate-public-error";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
@@ -50,9 +52,17 @@ export async function POST(request: NextRequest) {
       return previewTestJson("POST /api/applications talent_pool");
     }
 
-    const { job_id, job_title, full_name, email, phone, linkedin, cv_filename, cv_data, why_ts, ref } = body;
+    const { job_id, job_title, full_name, email, phone, linkedin, cv_filename, cv_data, why_ts, ref, src } = body;
     // El formulario público no pide canal y no se bloquea por eso.
+    // ?src= es el portal de donde vino (ht_candidates.arrival_source).
+    // No se copia a ht_candidates.source.
     const canalPublico = canalPostulacionPublica({ ref, interno: false });
+    let arrivalSource: string | null = null;
+    try {
+      arrivalSource = resolverArrivalSource(src, await clavesFuenteActivas());
+    } catch {
+      arrivalSource = null;
+    }
 
     if (!job_id || !full_name || !email) {
       return NextResponse.json(
@@ -154,6 +164,16 @@ export async function POST(request: NextRequest) {
             .from("ht_candidates")
             .update({ updated_at: new Date().toISOString() })
             .eq("id", existing.id);
+          // Solo llena arrival_source si todavía está vacío. source no entra
+          // en este update.
+          if (arrivalSource) {
+            const { error: arrivalErr } = await supabaseAdmin
+              .from("ht_candidates")
+              .update({ arrival_source: arrivalSource })
+              .eq("id", existing.id)
+              .is("arrival_source", null);
+            if (arrivalErr) console.error("[applications] arrival_source:", arrivalErr.message);
+          }
         } else {
           const { data: created, error: insertErr } = await supabaseAdmin
             .from("ht_candidates")
@@ -165,6 +185,7 @@ export async function POST(request: NextRequest) {
               phone: phone || null,
               stage: "aplico",
               source: isInternal ? "public_form_internal" : canalPublico,
+              arrival_source: arrivalSource,
               notes: why_ts ? `[Public form] ${why_ts}` : `[Public form] · application_id=${newId}`,
               preferred_language: isEnglishTemplate(vacTemplate) ? "en" : "es",
               created_at: new Date().toISOString(),

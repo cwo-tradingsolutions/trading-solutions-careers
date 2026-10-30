@@ -13,6 +13,7 @@ import { useLanguage } from "@/i18n/context";
 export default function JobView({ id, previewTestMode = false }: { id: string; previewTestMode?: boolean }) {
   const searchParams = useSearchParams();
   const refCode = searchParams.get("ref");
+  const srcCode = searchParams.get("src");
   const { t, locale } = useLanguage();
   const { jobs, loading } = useOpenJobs();
   const [showJump, setShowJump] = useState(true);
@@ -183,7 +184,7 @@ export default function JobView({ id, previewTestMode = false }: { id: string; p
               ) : null}
             </div>
             <aside className="cr-apply" id="apply">
-              <ApplyForm mode="job" job={job} areas={departmentsFrom(jobs)} refCode={refCode} previewTestMode={previewTestMode} />
+              <ApplyForm mode="job" job={job} areas={departmentsFrom(jobs)} refCode={refCode} srcCode={srcCode} previewTestMode={previewTestMode} />
               <div className="cr-share">
                 <span>{t.ui.knowSomeone}</span>
                 <a href={shareHref || linkedInShareHref(`https://careers.tradingsolutions.com/vacantes/${job.id}`)} target="_blank" rel="noopener">

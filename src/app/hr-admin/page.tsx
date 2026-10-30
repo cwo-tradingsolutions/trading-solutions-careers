@@ -68,6 +68,10 @@ import {
 import { jobs } from "@/data/jobs";
 // La bandeja donde caen las vacantes que piden los líderes desde WXM.
 import RequisitionsInbox from "@/components/RequisitionsInbox";
+import RequisitionCountCards from "@/components/RequisitionCountCards";
+import FuentesAdmin from "@/components/FuentesAdmin";
+import { ArrivalCross, SourceChips } from "@/components/VacancySourceChips";
+import { useVacantesBoard } from "@/components/useVacantesBoard";
 import NuevaVacanteModal from "@/components/NuevaVacanteModal";
 import { factorXTS } from "@/data/assessments";
 import { STAGE_SLA_DAYS, STAGE_ACTION } from "@/lib/stage-labels";
@@ -2900,6 +2904,7 @@ type AgentDetailModalData = {
 };
 
 function Vacantes() {
+  const board = useVacantesBoard();
   const [publicandoWeb, setPublicandoWeb] = useState(false);
   const [recuperando, setRecuperando] = useState(false);
   const [vacancies, setVacancies] = useState<LiveVacancy[]>([]);
@@ -3131,7 +3136,7 @@ function Vacantes() {
 
   const active = vacancies.filter((v) => !v.status || v.status === 'open' || v.status === 'active');
   const closed = vacancies.filter((v) => v.status === 'closed' || v.status === 'filled' || v.status === 'paused');
-  const list = tab === 'active' ? active : closed;
+  const list = (tab === 'active' ? active : closed).filter((v) => board.pasa(v.id));
   const totalApplications = Object.values(statsByVacancy).reduce((s, x) => s + x.total, 0);
 
   function exportToExcel() {
@@ -3223,9 +3228,37 @@ function Vacantes() {
         />
       )}
 
-      <div className="grid grid-cols-4 gap-3 mb-4">
+      <RequisitionCountCards counts={board.conteos} activo={board.filtro} onElegir={board.setFiltro} />
+
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <label className="flex items-center gap-1.5 text-[12px] text-[var(--ts-muted)]">
+          Fuente
+          <select
+            value={board.fuenteFiltro}
+            onChange={(e) => board.setFuenteFiltro(e.target.value)}
+            className="rounded-full border border-[color:var(--ts-line)] bg-white px-3 py-1 text-[13px] text-[var(--ts-ink)]"
+          >
+            <option value="">Todas</option>
+            {board.fuentes.filter((f) => f.active).map((f) => (
+              <option key={f.key} value={f.key}>{f.label}</option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          onClick={() => board.setAdmin((v) => !v)}
+          className="rounded-full border border-[color:var(--ts-line)] px-3 py-1 text-[13px]"
+        >
+          Fuentes
+        </button>
+      </div>
+      {board.admin && (
+        <FuentesAdmin fuentes={board.fuentes} onCerrar={() => board.setAdmin(false)} onGuardar={board.guardarFuente} />
+      )}
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <KPI label="Activas" value={loading ? '…' : String(active.length)} delta="En Neon" tone="neutral" />
-        <KPI label="Cerradas" value={loading ? '…' : String(closed.length)} delta="Histórico" tone="neutral" />
+        <KPI label="Cerradas en la web" value={loading ? '…' : String(closed.length)} delta="Histórico Neon" tone="neutral" />
         <KPI label="Aplicaciones totales" value={String(totalApplications)} delta="Across all vacancies" />
         <KPI label="Departamentos" value={String(new Set(vacancies.map((v) => v.department)).size)} delta="Áreas activas" tone="neutral" />
       </div>
@@ -3278,6 +3311,20 @@ function Vacantes() {
                       {v.department} · {v.location} · {v.work_mode} · {v.level ?? '—'}
                       {v.posted_at ? ` · ${new Date(v.posted_at).toISOString().slice(0, 10)}` : ''}
                     </div>
+                    {(() => {
+                      const row = board.porWeb(v.id);
+                      if (!row) return null;
+                      return (
+                        <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                          <SourceChips
+                            fuentes={board.fuentes}
+                            activas={row.sources}
+                            onAlternar={(key, on) => board.alternar(row.vacancy_id, key, on)}
+                          />
+                          <ArrivalCross sources={row.sources} llegada={row.llegada} fuentes={board.fuentes} />
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
                 <div className="flex gap-2 items-center">

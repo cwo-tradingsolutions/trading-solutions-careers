@@ -20,7 +20,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { requireWxm, correoDelLider } from "@/lib/wxm-auth";
 import { STAGES, normalizeStage, slaStatus, type StageCode } from "@/lib/stage-labels";
-import { STATUS_LABEL, STATUS_HINT, diasEnEstado, type RequisitionStatus } from "@/lib/requisitions";
+import { STATUS_HINT, diasEnEstado, type RequisitionStatus } from "@/lib/requisitions";
+import { aplicarVisibilidad, decidirIncludeHidden, etiquetaTarjeta, quiereIncludeHidden } from "@/lib/requisition-board";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 
@@ -44,17 +46,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Falta el correo del líder" }, { status: 400 });
   }
 
+  const decision = decidirIncludeHidden({
+    includeHidden: quiereIncludeHidden(req.nextUrl.searchParams.get("include_hidden")),
+    esAdmin: requireAdmin(req) === null,
+  });
+  if (!decision.ok) {
+    return NextResponse.json({ error: decision.error }, { status: decision.status });
+  }
+
   try {
     // ── 1) Sus requisiciones ────────────────────────────────────────────
-    const { data: reqsRaw, error: reqErr } = await supabaseAdmin
+    const reqsQuery = supabaseAdmin
       .from("ht_requisitions")
       .select(
         "id, title, area, requisition_type, status, reason, needed_by, " +
-          "decision_note, approved_at, vacancy_id, created_at, updated_at",
+          "decision_note, approved_at, vacancy_id, created_at, updated_at, " +
+          "hidden_at, hidden_reason",
       )
       .eq("client_id", TS_CLIENT_ID)
       .ilike("lead_email", leadEmail)
       .order("created_at", { ascending: false });
+    const { data: reqsRaw, error: reqErr } = await aplicarVisibilidad(reqsQuery, decision.incluir);
 
     if (reqErr) return NextResponse.json({ error: reqErr.message }, { status: 500 });
     const reqs = (reqsRaw || []) as any[];
@@ -163,6 +175,11 @@ export async function GET(req: NextRequest) {
       const enTerna = candidatos.filter((c: any) => c.stage === "terna");
 
       const diasDesdeAprobacion = r.approved_at ? dias(r.approved_at) : null;
+      const etiqueta = etiquetaTarjeta({
+        status: r.status as RequisitionStatus,
+        hidden_at: r.hidden_at,
+        hidden_reason: r.hidden_reason,
+      });
 
       // Qué necesita el proceso de él. Sin esto el tablero es algo que se
       // mira una vez y nunca más.
@@ -184,8 +201,8 @@ export async function GET(req: NextRequest) {
         area: r.area,
         tipo: r.requisition_type,
         status: r.status as RequisitionStatus,
-        status_label: STATUS_LABEL[r.status as RequisitionStatus] || r.status,
-        status_hint: STATUS_HINT[r.status as RequisitionStatus] || null,
+        status_label: etiqueta.label,
+        status_hint: etiqueta.oculta ? null : STATUS_HINT[r.status as RequisitionStatus] || null,
         dias_en_estado: diasEnEstado(r.updated_at),
         motivo_devolucion: r.status === "devuelta" ? r.decision_note : null,
         aprobada_el: r.approved_at,

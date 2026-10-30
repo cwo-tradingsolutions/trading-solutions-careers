@@ -11,6 +11,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
 import { requireWxm, correoDelLider } from "@/lib/wxm-auth";
 import { RequisitionStatus, RequisitionType, diasEnEstado } from "@/lib/requisitions";
+import { aplicarVisibilidad, decidirIncludeHidden, quiereIncludeHidden } from "@/lib/requisition-board";
 
 export const runtime = "nodejs";
 
@@ -120,6 +121,13 @@ export async function GET(req: NextRequest) {
   try {
     const leadEmail = correoDelLider(req);
     const estado = req.nextUrl.searchParams.get("status");
+    const decision = decidirIncludeHidden({
+      includeHidden: quiereIncludeHidden(req.nextUrl.searchParams.get("include_hidden")),
+      esAdmin,
+    });
+    if (!decision.ok) {
+      return NextResponse.json({ error: decision.error }, { status: decision.status });
+    }
 
     // WXM solo puede pedir las de un líder concreto. Sin esa restricción, el
     // secreto de servicio serviría para listar todas las requisiciones de la
@@ -142,14 +150,30 @@ export async function GET(req: NextRequest) {
 
     if (leadEmail) q = q.ilike("lead_email", leadEmail);
     if (estado) q = q.eq("status", estado);
+    q = aplicarVisibilidad(q, decision.incluir);
 
     const { data, error } = await q;
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    const vacIds = Array.from(
+      new Set((data || []).map((r: any) => r.vacancy_id).filter(Boolean)),
+    ) as string[];
+    const statusPorVacante = new Map<string, string | null>();
+    if (vacIds.length > 0) {
+      const { data: vacs } = await supabaseAdmin
+        .from("ht_vacancies")
+        .select("id, status")
+        .in("id", vacIds);
+      for (const v of (vacs || []) as { id: string; status: string | null }[]) {
+        statusPorVacante.set(v.id, v.status ?? null);
+      }
+    }
+
     const requisiciones = (data || []).map((r: any) => ({
       ...r,
+      vacancy_status: r.vacancy_id ? statusPorVacante.get(r.vacancy_id) ?? null : null,
       dias_en_estado: diasEnEstado(r.updated_at),
     }));
 

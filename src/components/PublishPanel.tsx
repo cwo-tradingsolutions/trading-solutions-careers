@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { construirAviso, type DatosDelAviso } from "@/lib/job-post";
+import { enlaceConSrc } from "@/lib/recruitment-sources";
 
 type Fuente = {
   key: string;
@@ -269,6 +270,12 @@ export default function PublishPanel({
                             "Se publica desde acá, con lo que armaste en la requisición"
                           ) : (
                             "Hay que montarla a mano en el portal"
+                          )}
+                          {enlace && f.key !== "careers" && (
+                            <>
+                              {" · "}
+                              <span className="break-all">{enlaceConSrc(enlace, f.key)}</span>
+                            </>
                           )}
                         </p>
                       </div>
