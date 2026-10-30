@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { hasMaskedCredentialConfig } from './lib/credential-config';
+import { previewReadOnlyBlock } from '@/lib/preview-readonly';
 
 /**
  * Middleware combinado:
@@ -44,6 +46,26 @@ async function isValidSession(token: string | undefined, secret: string | undefi
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Los marcadores de exportación nunca son credenciales. Fallar antes de
+  // aceptar cookies, tokens o login evita autorizar un literal adivinable.
+  if ((pathname.startsWith('/api') || pathname.startsWith('/hr-admin')) &&
+      hasMaskedCredentialConfig({
+        ADMIN_SECRET: process.env.ADMIN_SECRET,
+        CRON_SECRET: process.env.CRON_SECRET,
+        WXM_SERVICE_SECRET: process.env.WXM_SERVICE_SECRET,
+      })) {
+    return NextResponse.json(
+      { error: 'Servicio temporalmente no disponible.' },
+      { status: 503, headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
+
+  // Preview de Vercel puede apuntar a la base de producción. Ahí no se escribe.
+  const blocked = previewReadOnlyBlock(process.env.VERCEL_ENV, request.method, pathname);
+  if (blocked) {
+    return NextResponse.json(blocked, { status: 403 });
+  }
+
   // ---------- 1) Protección de /hr-admin ----------
   if (pathname.startsWith('/hr-admin')) {
     // Permitir login y su API
@@ -51,7 +73,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next();
     }
     const token = request.cookies.get(SESSION_COOKIE)?.value;
-    const secret = process.env.ADMIN_SECRET;
+    const secret = (process.env.ADMIN_SECRET ?? '').trim();
     const ok = await isValidSession(token, secret);
     if (!ok) {
       const url = request.nextUrl.clone();

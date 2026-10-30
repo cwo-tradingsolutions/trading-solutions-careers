@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
+import { candidateSignatureHtml } from "@/lib/ats-from";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import crypto from "crypto";
 import { ATS_FROM_NAME } from "@/lib/ats-from";
@@ -27,7 +28,7 @@ export async function POST(
     // Get candidate + vacancy
     const { data: cand, error: cErr } = await supabaseAdmin
       .from("ht_candidates")
-      .select("id, name, email, stage, status, vacancy_id, preferred_language, ht_vacancies(title, form_template_key, country)")
+      .select("id, name, email, stage, status, vacancy_id, preferred_language, rejection_sent_at, ht_vacancies(title, form_template_key, country)")
       .eq("id", candidateId)
       .single();
 
@@ -48,6 +49,13 @@ export async function POST(
     if (cand.stage === 'rechazado') outcome = 'rejected';
     else if (cand.stage === 'contratado') outcome = 'hired';
     else if (cand.status === 'withdrew') outcome = 'withdrew';
+
+    if (send && outcome === 'rejected' && !cand.rejection_sent_at) {
+      return NextResponse.json(
+        { error: "No se envió la encuesta NPS: el correo de rechazo todavía no consta como enviado." },
+        { status: 409 },
+      );
+    }
 
     // Check si ya hay encuesta activa no-completa
     const { data: existing } = await supabaseAdmin
@@ -128,10 +136,7 @@ export async function POST(
                   <a href="${surveyLink}" style="display: inline-block; background: #0a0a0a; color: #fff; padding: 13px 28px; text-decoration: none; font-weight: 700; font-size: 13px; letter-spacing: 0.3px;">Responder encuesta</a>
                 </div>
                 <p style="margin: 18px 0 0; font-size: 12px; color: #737373;">Si el botón no funciona, copia este link:<br/><span style="color: #0a0a0a; word-break: break-all;">${surveyLink}</span></p>
-                <p style="margin: 24px 0 0; padding-top: 18px; border-top: 1px solid #e8e8e8; font-size: 12px; color: #737373; line-height: 1.6;">
-                  Un abrazo,<br/>
-                  <strong>Talent Acquisition Team</strong>
-                </p>
+                ${candidateSignatureHtml("es")}
               </div>
             </div>
           `;
@@ -147,10 +152,7 @@ export async function POST(
                   <a href="${surveyLink}" style="display: inline-block; background: #0a0a0a; color: #fff; padding: 13px 28px; text-decoration: none; font-weight: 700; font-size: 13px; letter-spacing: 0.3px;">Answer the survey</a>
                 </div>
                 <p style="margin: 18px 0 0; font-size: 12px; color: #737373;">If the button does not work, copy this link:<br/><span style="color: #0a0a0a; word-break: break-all;">${surveyLink}</span></p>
-                <p style="margin: 24px 0 0; padding-top: 18px; border-top: 1px solid #e8e8e8; font-size: 12px; color: #737373; line-height: 1.6;">
-                  Best regards,<br/>
-                  <strong style="color: #0a0a0a;">Talent Team</strong> · Trading Solutions
-                </p>
+                ${candidateSignatureHtml("en")}
               </div>
             </div>
           `;

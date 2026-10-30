@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { almacen } from "@/lib/almacen";
 import { supabaseAdmin } from '@/lib/supabase';
 import { isAdminRequest } from '@/lib/bateria/auth';
 import {
@@ -35,8 +36,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
   const filas = data ?? [];
   const firmadas: Record<string, string> = {};
   if (filas.length > 0) {
-    const { data: urls } = await supabaseAdmin.storage
-      .from(BUCKET)
+    const { data: urls } = await almacen(BUCKET)
       .createSignedUrls(filas.map((f) => f.storage_path), VIGENCIA_URL);
     for (const u of urls ?? []) {
       if (u?.path && u.signedUrl) firmadas[u.path] = u.signedUrl;
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const binario = Buffer.from(await archivo.arrayBuffer());
     const path = `candidatos/${params.id}/${Date.now()}_${slugArchivo(titulo)}.${ext}`;
 
-    const { error: upErr } = await supabaseAdmin.storage.from(BUCKET).upload(path, binario, {
+    const { error: upErr } = await almacen(BUCKET).upload(path, binario, {
       contentType: archivo.type,
       cacheControl: '3600',
       upsert: false,
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     if (insErr) {
       // Si no se pudo indexar, el archivo sobra en el bucket. Se retira para
       // que el storage no quede con basura que nadie sabe de quién es.
-      await supabaseAdmin.storage.from(BUCKET).remove([path]);
+      await almacen(BUCKET).remove([path]);
       console.error('candidates/files insert', insErr);
       return NextResponse.json({ error: insErr.message }, { status: 500 });
     }
@@ -143,7 +143,7 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
     .single();
   if (!fila) return NextResponse.json({ error: 'Adjunto no encontrado' }, { status: 404 });
 
-  const { error: rmErr } = await supabaseAdmin.storage.from(BUCKET).remove([fila.storage_path]);
+  const { error: rmErr } = await almacen(BUCKET).remove([fila.storage_path]);
   if (rmErr) console.error('candidates/files remove', rmErr);
 
   const { error } = await supabaseAdmin.from('ht_candidate_files').delete().eq('id', fila.id);

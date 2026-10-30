@@ -3,8 +3,9 @@
  *   GET   → datos del token (para la pantalla del candidato y para resultados)
  *   PATCH → actualizar status / score / results
  */
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 import { NextRequest, NextResponse } from "next/server";
+import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -65,6 +66,9 @@ export async function PATCH(
 ) {
   try {
     const body = (await req.json()) as PatchBody;
+    if (isPreviewTestMode()) {
+      return previewTestJson("PATCH /api/assessments/[token]");
+    }
     const sql = neon(process.env.DATABASE_URL!);
 
     // Update auto-timestamps cuando cambia el status

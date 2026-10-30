@@ -6,19 +6,26 @@
     "dev": "next dev -p 3010",
     "build": "next build",
     "start": "next start -p 3010",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:required-fields": "node --experimental-strip-types --test src/lib/required-fields.test.ts",
+    "test:dashboard": "node --import tsx --test src/lib/funnel-dashboard/metrics.test.ts src/lib/preview-readonly.test.ts",
+    "test": "node --import tsx src/lib/preview-mode.check.ts && node --experimental-strip-types --import ./scripts/register-ts.mjs --test src/lib/ats-from.test.ts src/lib/application-status-email.test.ts src/lib/battery-auto-send.test.ts src/lib/stage-drafts.test.ts src/lib/rejection-email.test.ts src/lib/interview-invite.test.ts src/lib/google-oauth-env.test.ts src/lib/required-fields.test.ts src/lib/funnel-dashboard/metrics.test.ts src/lib/preview-readonly.test.ts src/lib/preview-public-writes.check.ts src/lib/panama-ops-prefilter.check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
+    "@google-cloud/storage": "^7.22.0",
     "@neondatabase/serverless": "^0.10.4",
     "@react-pdf/renderer": "^4.9.0",
     "@supabase/supabase-js": "^2.98.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "google-auth-library": "^10.9.1",
     "lucide-react": "^0.460.0",
     "next": "14.2.35",
+    "postgres": "^3.4.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "recharts": "^3.10.1",
     "resend": "^6.9.2",
     "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7",
@@ -33,6 +40,7 @@
     "eslint-config-next": "14.2.35",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { Resend } from 'resend';
 import { createDraftViaGmail, isGmailConnected } from '@/lib/gmail';
 import crypto from 'crypto';
-import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { ATS_FROM_NAME, candidateSignatureHtml } from "@/lib/ats-from";
 
 function getResend(): Resend | null {
   const key = process.env.RESEND_API_KEY;
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
       .eq('id', candidate_id);
 
     // Build assessment URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.elevarecareer.com';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://careers.tradingsolutions.com';
     const assessmentUrl = `${baseUrl}/assessment/ht/${token}`;
 
     // Get client info for branding
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     <div class="header"><h1>${clientName}</h1></div>
     <div class="body">
       <p>Hola <strong>${candidate.name}</strong>,</p>
-      <p>Espero que estés muy bien. Te escribo para invitarte a la siguiente etapa de nuestro proceso de selección para la posición de <strong>${vacancyTitle}</strong> en ${clientName}.</p>
+      <p>Esperamos que estés muy bien. Te escribimos para invitarte a la siguiente etapa de nuestro proceso de selección para la posición de <strong>${vacancyTitle}</strong> en ${clientName}.</p>
       <p>El siguiente paso es una evaluación que nos ayuda a entender mejor cómo piensas y decides en situaciones reales del trabajo. No hay respuestas correctas o incorrectas — solo queremos conocer tu forma de ser.</p>
       <p style="text-align:center"><a href="${assessmentUrl}" class="cta">Iniciar Evaluación</a></p>
       <div class="info-box"><p style="margin:0"><strong>Detalles importantes:</strong></p>
@@ -107,9 +107,8 @@ export async function POST(req: NextRequest) {
           <li>Responde con tu primera reacción</li>
         </ul></div>
       <p>Si tienes alguna pregunta, simplemente responde este correo.</p>
-      <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>${clientName}</p>
+      ${candidateSignatureHtml("es")}
     </div>
-    <div class="footer">Powered by ELEVARE Career · Evaluación confidencial<br>Este enlace es personal e intransferible.</div>
   </div></body></html>`;
 
     // ── Dispatcher por modo ──────────────────────────────────────────────

@@ -11,7 +11,7 @@ import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
 import { recordStageEvent } from "@/lib/stage-events";
 import crypto from "crypto";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
-import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { ATS_FROM_NAME, candidateSignatureHtml } from "@/lib/ats-from";
 
 export async function POST(
   req: NextRequest,
@@ -104,7 +104,7 @@ export async function POST(
       <li>Your answers are saved automatically</li>
     </ul>
     <p>If you have any questions, just reply to this email.</p>
-    <p>Best regards,<br><strong>Talent Team</strong><br>Trading Solutions</p>
+    ${candidateSignatureHtml("en")}
     <div class="footer">This link is personal and non-transferable.</div>
   </div>
 </body></html>`;
@@ -128,7 +128,7 @@ export async function POST(
       <li>Tus respuestas se guardan automáticamente</li>
     </ul>
     <p>Si tienes alguna pregunta, simplemente responde a este correo.</p>
-    <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>
+    ${candidateSignatureHtml("es")}
     <div class="footer">Este enlace es personal e intransferible.</div>
   </div>
 </body></html>`;

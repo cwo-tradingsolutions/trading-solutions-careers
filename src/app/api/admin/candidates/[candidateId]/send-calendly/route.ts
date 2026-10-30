@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
+import { candidateSignatureHtml, candidateSignatureText } from "@/lib/ats-from";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { agendaDeVacante } from "@/lib/reclutadores";
 import { ATS_FROM_NAME } from "@/lib/ats-from";
@@ -67,7 +68,7 @@ function getHost(vacancyId: string | null | undefined, stage: string | null | un
   if (vacancyId && CALENDLY_HOST_BY_VACANCY[vacancyId]) {
     return CALENDLY_HOST_BY_VACANCY[vacancyId];
   }
-  return { firstName: "Kelly", fullName: "Kelly Castañeda", role: "Talent Acquisition and Development Lead · Trading Solutions" };
+  return { firstName: "Talent Acquisition Team", fullName: "Talent Acquisition Team", role: "Trading Solutions" };
 }
 
 function buildPrefillUrl(baseUrl: string, name: string, email: string, vacancyTitle: string): string {
@@ -96,8 +97,8 @@ function buildEmailHtml(firstName: string, vacancyTitle: string, calendlyUrl: st
     <p>${slotText}</p>
     <p style="text-align:center"><a href="${calendlyUrl}" class="cta">Elegir horario</a></p>
     <p style="font-size:13px;color:#737373"><em>Nota: los festivos colombianos no son hábiles · si ves alguno disponible (ej. lunes 18 de mayo · Día de la Ascensión), por favor escoge otro día.</em></p>
-    <p>Si ninguno de los horarios disponibles te funciona, regálame una respuesta a este correo y buscamos juntos.</p>
-    <p>Un abrazo,<br><strong>${host.fullName}</strong><br>${host.role}</p>
+    <p>Si ninguno de los horarios disponibles te funciona, regálanos una respuesta a este correo y buscamos juntos.</p>
+    ${candidateSignatureHtml("es")}
     <div class="footer">La dirección y los detalles quedan también en la invitación de Calendly al confirmar tu horario.</div>
   </div>
 </body></html>`;
@@ -123,7 +124,7 @@ function buildEmailHtmlEn(firstName: string, vacancyTitle: string, calendlyUrl: 
     <p style="text-align:center"><a href="${calendlyUrl}" class="cta">Choose a time</a></p>
     <p style="font-size:13px;color:#737373"><em>Note: Colombian public holidays are not working days · if you see one available (e.g. Monday, May 18 · Ascension Day), please pick another day.</em></p>
     <p>If none of the available times work for you, just reply to this email and we will find one together.</p>
-    <p>Best regards,<br><strong>Talent Team</strong> · Trading Solutions</p>
+    ${candidateSignatureHtml("en")}
     <div class="footer">The address and the details are also included in the Calendly invitation once you confirm your time.</div>
   </div>
 </body></html>`;
@@ -226,8 +227,8 @@ export async function POST(
     }
 
     // WhatsApp link · pre-llenado para click-to-send (firmado por el host correspondiente)
-    const waMessageEs = `Hola ${firstName}, te escribo desde Trading Solutions.\n\nPasaste a la siguiente etapa para ${vacancyTitle}. La próxima conversación es una entrevista PRESENCIAL con ${host.fullName}.\n📍 Dirección: Cra. 57 #99A-65, Torre Sur, Oficina 1501 — Barranquilla.\n🪪 Importante: lleva tu cédula en original.\n\nElige el horario que mejor te funcione desde acá: ${calendlyUrl}\n\nSi ninguno te funciona, regálame una respuesta y buscamos juntos.\n\nUn abrazo,\n${host.firstName}`;
-    const waMessageEn = `Hi ${firstName}, this is Trading Solutions.\n\nYou have moved on to the next stage for ${vacancyTitle}. The next conversation is an IN-PERSON interview with ${host.fullName}.\n📍 Address: Cra. 57 #99A-65, Torre Sur, Office 1501 — Barranquilla.\n🪪 Important: bring your original ID document.\n\nChoose the time that works best for you here: ${calendlyUrl}\n\nIf none of them work, just reply and we will find one together.\n\nBest regards,\nTalent Team · Trading Solutions`;
+    const waMessageEs = `Hola ${firstName}, te escribimos desde Trading Solutions.\n\nPasaste a la siguiente etapa para ${vacancyTitle}. La próxima conversación es una entrevista PRESENCIAL con ${host.fullName}.\n📍 Dirección: Cra. 57 #99A-65, Torre Sur, Oficina 1501 — Barranquilla.\n🪪 Importante: lleva tu cédula en original.\n\nElige el horario que mejor te funcione desde acá: ${calendlyUrl}\n\nSi ninguno te funciona, regálanos una respuesta y buscamos juntos.\n\nUn abrazo,\nTalent Acquisition Team de Trading Solutions`;
+    const waMessageEn = `Hi ${firstName}, this is Trading Solutions.\n\nYou have moved on to the next stage for ${vacancyTitle}. The next conversation is an IN-PERSON interview with ${host.fullName}.\n📍 Address: Cra. 57 #99A-65, Torre Sur, Office 1501 — Barranquilla.\n🪪 Important: bring your original ID document.\n\nChoose the time that works best for you here: ${calendlyUrl}\n\nIf none of them work, just reply and we will find one together.\n\n${candidateSignatureText("en")}`;
     const waMessage = lang === "en" ? waMessageEn : waMessageEs;
     const cleanPhone = (candidate.phone || "").replace(/[^0-9]/g, "");
     const finalPhone = cleanPhone.length === 10 ? `57${cleanPhone}` : cleanPhone;

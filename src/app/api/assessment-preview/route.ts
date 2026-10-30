@@ -16,10 +16,11 @@
  *   POST   /api/assessment-preview?op=complete → marcar run como completo + computar reporte
  *   GET    /api/assessment-preview?run_id=X  → leer un run para revisar después
  */
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 import { NextRequest, NextResponse } from "next/server";
 import { TS_SCENARIOS } from "@/lib/headhunting/scenarios-ts";
 import { TS_BENCHMARK_STATS, TS_DNA_PATTERNS } from "@/lib/headhunting/calibration-data";
+import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 
 export const runtime = "nodejs";
 
@@ -70,6 +71,21 @@ async function ensureTables() {
 // ─── POST: guardar respuesta o completar run ─────────────────────────
 export async function POST(req: NextRequest) {
   try {
+    if (isPreviewTestMode()) {
+      const op = new URL(req.url).searchParams.get("op");
+      const body = await req.json().catch(() => ({}));
+      if (op === "complete") {
+        if (!body?.session_id) {
+          return NextResponse.json({ error: "missing_fields" }, { status: 400, headers: corsHeaders });
+        }
+      } else if (!body?.session_id || body?.scenario_index === undefined) {
+        return NextResponse.json({ error: "missing_fields" }, { status: 400, headers: corsHeaders });
+      }
+      return previewTestJson(
+        op === "complete" ? "POST /api/assessment-preview?op=complete" : "POST /api/assessment-preview"
+      );
+    }
+
     const sql = neon(process.env.DATABASE_URL!);
     await ensureTables();
 
@@ -220,6 +236,10 @@ export async function POST(req: NextRequest) {
 // ─── GET: leer run completo ──────────────────────────────────────────
 export async function GET(req: NextRequest) {
   try {
+    if (isPreviewTestMode()) {
+      return NextResponse.json({ runs: [], run: null, responses: [] }, { headers: corsHeaders });
+    }
+
     const sql = neon(process.env.DATABASE_URL!);
     await ensureTables();
 

@@ -16,7 +16,7 @@
  *     source?: string  // "linkedin_recruiter", "linkedin_easy_apply", "manual", etc.
  *   }
  */
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prefilter, toPrefilterData, VACANCY_CONFIG } from "@/lib/agent/prefilter";

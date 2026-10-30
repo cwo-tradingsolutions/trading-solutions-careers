@@ -18,6 +18,7 @@
  * el vacío.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { almacen } from "@/lib/almacen";
 import { supabaseAdmin } from "@/lib/supabase";
 import { isAdminRequest } from "@/lib/bateria/auth";
 import { getAnthropic } from "@/lib/anthropic";
@@ -211,7 +212,7 @@ export async function POST(req: NextRequest) {
       const nombre = f.title || f.storage_path.split("/").pop() || "documento";
       if ((f.bytes ?? 0) > MAX_DOC) { omitidos.push(`${nombre} (pesa demasiado)`); continue; }
 
-      const { data: blob, error: dErr } = await supabaseAdmin.storage.from(BUCKET).download(f.storage_path);
+      const { data: blob, error: dErr } = await almacen(BUCKET).download(f.storage_path);
       if (dErr || !blob) { omitidos.push(`${nombre} (no se pudo abrir)`); continue; }
 
       const b64 = Buffer.from(await blob.arrayBuffer()).toString("base64");

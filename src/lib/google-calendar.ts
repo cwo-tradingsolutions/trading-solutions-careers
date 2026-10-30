@@ -220,3 +220,60 @@ export async function createMeetEvent(opts: {
     html_link: data.htmlLink,
   };
 }
+
+/**
+ * events.insert para la invitación a entrevista.
+ * `sendUpdates=all` y `conferenceDataVersion=1` van en el query, que es
+ * donde Calendar los lee. El campo sendUpdates del payload de dominio no
+ * se reenvía en el body.
+ */
+export async function insertInterviewEvent(payload: {
+  summary: string;
+  description: string;
+  start: { dateTime: string; timeZone: string };
+  end: { dateTime: string; timeZone: string };
+  attendees: { email: string }[];
+  conferenceData: {
+    createRequest: {
+      requestId: string;
+      conferenceSolutionKey: { type: "hangoutsMeet" };
+    };
+  };
+}): Promise<{ ok: true; event_id: string; meet_url: string; html_link: string } | { ok: false; error: string; status?: number }> {
+  const valid = await getValidAccessToken();
+  if (!valid) {
+    return { ok: false, error: "Google OAuth no conectado" };
+  }
+
+  const body = {
+    summary: payload.summary,
+    description: payload.description,
+    start: payload.start,
+    end: payload.end,
+    attendees: payload.attendees,
+    conferenceData: payload.conferenceData,
+    reminders: { useDefault: true },
+  };
+
+  const r = await fetch(`${EVENTS_URL}?conferenceDataVersion=1&sendUpdates=all`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${valid.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!r.ok) {
+    const text = await r.text();
+    return { ok: false, status: r.status, error: `Calendar API error ${r.status}: ${text.slice(0, 300)}` };
+  }
+
+  const data = await r.json();
+  const meet =
+    data.conferenceData?.entryPoints?.find((e: { entryPointType?: string; uri?: string }) => e.entryPointType === "video")?.uri
+    || data.hangoutLink
+    || "";
+
+  return { ok: true, event_id: data.id, meet_url: meet, html_link: data.htmlLink || "" };
+}

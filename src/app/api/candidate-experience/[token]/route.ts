@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 
 export async function GET(
   _req: NextRequest,
@@ -82,6 +83,10 @@ export async function POST(
     };
     for (const f of ratingFields) {
       updates[f] = clampInt(body[f], 1, 5);
+    }
+
+    if (isPreviewTestMode()) {
+      return previewTestJson("POST /api/candidate-experience/[token]");
     }
 
     const { error: upErr } = await supabaseAdmin

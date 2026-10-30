@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase';
+import { validarCanalReclutador } from '@/lib/candidate-source';
 
 // GET /api/headhunting/candidates?vacancy_id=xxx&client_id=xxx
 export async function GET(req: NextRequest) {
@@ -9,11 +10,13 @@ export async function GET(req: NextRequest) {
 
   try {
     const vacancyId = req.nextUrl.searchParams.get('vacancy_id');
-    const clientId = req.nextUrl.searchParams.get('client_id');
+    // `clientId` se acepta por compatibilidad: el funnel lo mandó así meses y
+    // el filtro se ignoraba en silencio.
+    const clientId = req.nextUrl.searchParams.get('client_id') ?? req.nextUrl.searchParams.get('clientId');
 
     let query = supabaseAdmin
       .from('ht_candidates')
-      .select('*, ht_results(match_percentage, recommendation), ht_vacancies(title)')
+      .select('*, notes, ht_results(match_percentage, recommendation), ht_vacancies(title)')
       .order('created_at', { ascending: false });
 
     if (vacancyId) query = query.eq('vacancy_id', vacancyId);
@@ -51,6 +54,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const canal = validarCanalReclutador(body.source);
+    if (!canal.ok) {
+      return NextResponse.json({ error: canal.error }, { status: 400 });
+    }
+
     // Check for duplicate email in same vacancy
     const { data: existing } = await supabaseAdmin
       .from('ht_candidates')
@@ -76,6 +84,8 @@ export async function POST(req: NextRequest) {
         phone: phone || null,
         cv_url: cv_url || null,
         status: 'pending',
+        source: canal.source,
+        stage: 'aplico',
       })
       .select()
       .single();

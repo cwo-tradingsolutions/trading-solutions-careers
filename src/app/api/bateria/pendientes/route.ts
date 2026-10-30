@@ -25,7 +25,7 @@ import { aWhatsapp } from '@/lib/whatsapp';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const BASE = 'https://trading-solutions-careers.vercel.app';
+const BASE = process.env.NEXT_PUBLIC_APP_URL || 'https://trading-solutions-careers.vercel.app';
 
 /** Días completos desde una fecha. */
 function diasDesde(iso: string | null): number | null {
@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
     // El texto va acá y no en la pantalla para que el recordatorio diga lo
     // mismo salga de donde salga.
     const mensaje =
-      `Hola ${primerNombre}, te saludamos del Talent Team de Trading Solutions. ` +
+      `Hola ${primerNombre}, te saludamos del Talent Acquisition Team de Trading Solutions. ` +
       `Te recordamos que tienes pendiente la prueba de selección del proceso de ${s.vacancy_title}. ` +
       `Toma alrededor de 90 minutos y debe presentarse en una sola sesión, desde un computador con cámara. ` +
       `Este es tu enlace personal: ${urlPrueba} ` +

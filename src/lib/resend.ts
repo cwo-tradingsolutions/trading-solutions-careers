@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { ATS_FROM_EMAIL, ATS_FROM_NAME } from '@/lib/ats-from';
 
 let _client: Resend | null = null;
 
@@ -12,5 +13,5 @@ export function getResend(): Resend {
   return _client;
 }
 
-export const EMAIL_FROM = process.env.EMAIL_FROM || 'Elevare Careers <orders@elevarecareer.com>';
-export const EMAIL_BCC = process.env.EMAIL_BCC || 'hello@elevarecareer.com';
+export const EMAIL_FROM = process.env.EMAIL_FROM || `${ATS_FROM_NAME} <${ATS_FROM_EMAIL}>`;
+export const EMAIL_BCC = process.env.EMAIL_BCC || '';

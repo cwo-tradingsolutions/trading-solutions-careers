@@ -1,4 +1,4 @@
-import { neon } from '@neondatabase/serverless';
+import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -13,6 +13,11 @@ export async function OPTIONS() {
 }
 
 export async function GET(request: NextRequest) {
+  // El banco Neon no es público: la tab CV Bank salió del panel, pero
+  // Agentes/imports siguen leyendo esta tabla. Misma llave que el POST.
+  const authError = requireAdmin(request);
+  if (authError) return authError;
+
   try {
     const sql = neon(process.env.DATABASE_URL!);
     const searchParams = request.nextUrl.searchParams;

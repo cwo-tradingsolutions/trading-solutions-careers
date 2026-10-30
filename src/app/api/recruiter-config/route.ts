@@ -9,8 +9,9 @@
  *        modificarlos sin tocar Vercel). EMAIL_FROM se queda como env var
  *        porque cambiarlo requiere DNS verificado en Resend.
  */
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
+import { ATS_FROM_EMAIL, ATS_FROM_NAME } from "@/lib/ats-from";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -62,13 +63,13 @@ export async function GET() {
     const rows = await sql`SELECT * FROM recruiter_config WHERE id = 1`;
     const row = rows[0] ?? {};
 
-    const emailFrom = process.env.EMAIL_FROM ?? "Elevare Careers <orders@elevarecareer.com>";
+    const emailFrom = process.env.EMAIL_FROM ?? `${ATS_FROM_NAME} <${ATS_FROM_EMAIL}>`;
     const isTSDomain = /tradingsolutions\.com/i.test(emailFrom);
 
     return NextResponse.json(
       {
         email_from: emailFrom,
-        email_bcc: row.email_bcc ?? process.env.EMAIL_BCC ?? "",
+        email_bcc: row.email_bcc ?? "",
         email_reply_to: row.email_reply_to ?? "",
         booking_url: row.booking_url ?? "",
         resend_domain_status: isTSDomain ? "verified_ts" : "default_elevare",

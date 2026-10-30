@@ -5,17 +5,22 @@ import {
   Inbox, ClipboardList, ClipboardCheck, AlertTriangle, Mail, Hourglass, Target,
   Video, ListChecks, MessageSquare, UserCheck, Building2, Trophy, Send,
   CheckCircle2, XCircle, ArrowRight,
-  User, Users,
 } from "lucide-react";
 import RejectionModal from "./RejectionModal";
+import { resolveCandidateLang, type CandidateLang } from "@/lib/candidate-lang";
+import { NOTA_BATERIA_PENDIENTE } from "@/lib/battery-auto-send";
 import RecruiterAssessmentCard from "./RecruiterAssessmentCard";
 import JointSchedulingModal from "./JointSchedulingModal";
 import CandidateFilesBlock from "./CandidateFilesBlock";
 import EvaluacionPanel from "./EvaluacionPanel";
 import { rubricaDeVacante } from "@/lib/rubricas";
-import { escucharPedidos, tomarPedidoDeCandidato } from "@/lib/abrirCandidato";
+import { escucharPedidos, pedirAbrirCandidato, tomarPedidoDeCandidato } from "@/lib/abrirCandidato";
+import FunnelDashboard from "@/components/FunnelDashboard";
 import HistorialContactos from "@/components/HistorialContactos";
 import SeguimientoVacante from "@/components/SeguimientoVacante";
+import { CanalSelect, errorCanal } from "@/components/CamposObligatorios";
+import { etiquetaCanal } from "@/lib/candidate-source";
+import { InvitarEntrevistaModal } from "@/components/InvitarEntrevistaModal";
 
 // Map de stage → icono Lucide. Centralizado para reutilizar en cualquier render.
 const STAGE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -57,7 +62,9 @@ type Cand = {
   /** De dónde salió el candidato · 'cv_proceso_anterior' = HV cargada de un
    *  banco o de una búsqueda previa, no aplicó por la web. */
   source?: string | null;
-  ht_vacancies?: { title: string };
+  preferred_language?: string | null;
+  notes?: string | null;
+  ht_vacancies?: { title: string; form_template_key?: string | null; country?: string | null };
   // Rejection metadata · llenado al rechazar con motivo
   rejection_category?: string | null;
   rejection_sub_detail?: string | null;
@@ -66,7 +73,19 @@ type Cand = {
   rejection_note_public?: string | null;
   rejection_sent_at?: string | null;
   rejection_draft_id?: string | null;
+  /** El listado trae `select *`. Sirven para el aging del journey; no son un stage nuevo. */
+  created_at?: string | null;
+  updated_at?: string | null;
 };
+
+function langDe(c: Pick<Cand, "preferred_language" | "ht_vacancies">): CandidateLang {
+  return resolveCandidateLang({
+    preferredLanguage: c.preferred_language,
+    formTemplateKey: c.ht_vacancies?.form_template_key,
+    jobTitle: c.ht_vacancies?.title,
+    country: c.ht_vacancies?.country,
+  });
+}
 
 type PrefilterData = {
   doc_type?: string;
@@ -166,6 +185,8 @@ type Vacancy = {
   owner_recruiter_id?: string | null;
   /** Quien puede operarla igual sin aparecer frente al candidato. */
   support_recruiter_id?: string | null;
+  /** Hiring Lead del área. No es el dueño del proceso (owner_recruiter_id). */
+  hiring_lead_email?: string | null;
 };
 
 /** El equipo de Talent, para saber de quién es cada vacante. */
@@ -249,6 +270,12 @@ import {
   normalizeStage,
   stageOrder,
   siguienteEtapa,
+  stageLabel,
+  stageSla,
+  slaStatus,
+  KELLY_GATES,
+  kellyGateFromStage,
+  type KellyGate,
 } from "@/lib/stage-labels";
 
 type StageCategory = "screening" | "assessment" | "interview" | "decision" | "terminal-positive" | "terminal-negative";
@@ -286,6 +313,25 @@ const STAGES: Array<{ id: string; label: string; category: StageCategory; owner:
     owner: OWNER_BY_STAGE[s.id] ?? "recruiter",
   }));
 
+/**
+ * El tablero es el journey de los 12 gates de Kelly, en este orden
+ * (Docs después de Oferta, Onboarding incluido). No hay columnas.
+ * Psicométricas y Entrevista HM solo se llenan con codes históricos:
+ * no tienen code v4 propio hasta que Kelly lo nombre.
+ */
+const OWNER_BY_GATE: Record<string, StageOwner> = {
+  psicometricas: "candidate",
+  entrevista_hm: "recruiter",
+};
+function ownerDeGate(g: KellyGate): StageOwner {
+  return OWNER_BY_GATE[g.id] ?? OWNER_BY_STAGE[g.stages[0]] ?? "recruiter";
+}
+
+/** Nota de producto del gate. Assessment es Case global ± On-call. */
+const GATE_NOTA: Partial<Record<string, string>> = {
+  assessment: "Case global ± On-call",
+};
+
 const REJECTED_STAGE = { id: "rechazado", label: "Rechazado", category: "terminal-negative" as StageCategory, owner: "terminal" as StageOwner };
 
 const OWNER_STYLE: Record<StageOwner, { label: string; barColor: string; bgTint: string }> = {
@@ -301,7 +347,13 @@ const OWNER_STYLE: Record<StageOwner, { label: string; barColor: string; bgTint:
 // cargar significado, y con eso el tablero deja de competir con los nombres
 // de los candidatos.
 
-export default function PipelineFunnel() {
+export default function PipelineFunnel({
+  onBuscarBanco,
+}: {
+  /** Abre el rediscovery HT de la vacante filtrada. Opcional: el dashboard ya lo tiene en la card. */
+  onBuscarBanco?: (vacancy: { id: string; title: string }) => void;
+} = {}) {
+  const [vista, setVista] = useState<"pipeline" | "dashboard">("pipeline");
   const [candidates, setCandidates] = useState<Cand[]>([]);
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
   /** El equipo de Talent. Si la tabla todavía no existe, queda vacío y el
@@ -353,6 +405,7 @@ export default function PipelineFunnel() {
     [vacantesVisibles, verCerradas, vacFilter],
   );
   const [loading, setLoading] = useState(true);
+  const [agregar, setAgregar] = useState(false);
   const [selectedCand, setSelectedCand] = useState<Cand | null>(null);
   // Quiénes escribieron y esperan respuesta nuestra · lo llena el panel de
   // seguimiento y se marca en las tarjetas.
@@ -362,6 +415,8 @@ export default function PipelineFunnel() {
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; ok: number; fail: number } | null>(null);
   /** Estado de la bateria por candidato · ht_candidate_id -> estado. */
   const [bateria, setBateria] = useState<Record<string, BatEstado>>({});
+  /** Gate encendido del journey. Null = el primero que tenga gente. */
+  const [litGateId, setLitGateId] = useState<string | null>(null);
 
   useEffect(() => { void load(); }, []);
 
@@ -407,7 +462,7 @@ export default function PipelineFunnel() {
     // Sobre lo que se está viendo, no sobre la base entera: si no, «seleccionar
     // toda la columna» alcanzaba a gente de procesos cerrados que no aparece
     // en pantalla, y la acción siguiente les caía encima sin que nadie lo viera.
-    const ids = filtered.filter(c => (c.stage || "aplico") === stageId).map(c => c.id);
+    const ids = filtered.filter(c => kellyGateFromStage(c.stage)?.id === stageId).map(c => c.id);
     setSelectedIds(prev => {
       const n = new Set(prev);
       ids.forEach(id => n.add(id));
@@ -419,8 +474,8 @@ export default function PipelineFunnel() {
     setLoading(true);
     try {
       const [cRes, vRes] = await Promise.all([
-        fetch(`/api/headhunting/candidates?clientId=${TS_CLIENT_ID}`),
-        fetch(`/api/headhunting/vacancies?clientId=${TS_CLIENT_ID}`),
+        fetch(`/api/headhunting/candidates?client_id=${TS_CLIENT_ID}`),
+        fetch(`/api/headhunting/vacancies?client_id=${TS_CLIENT_ID}`),
       ]);
       const cJ = await cRes.json();
       const vJ = await vRes.json();
@@ -564,10 +619,35 @@ export default function PipelineFunnel() {
     return m;
   }, [filtered, ordenarPorBateria]);
 
-  const totals = filtered.length;
+  const byGate = useMemo(() => {
+    const m: Record<string, Cand[]> = {};
+    KELLY_GATES.forEach(g => { m[g.id] = []; });
+    filtered.forEach(c => {
+      const gate = kellyGateFromStage(c.stage);
+      if (gate && m[gate.id]) m[gate.id].push(c);
+    });
+    for (const k of Object.keys(m)) m[k] = ordenarPorBateria(m[k]);
+    return m;
+  }, [filtered, ordenarPorBateria]);
 
-  // Stages a renderizar (ocultar las terminales · van en footer aparte)
-  const visibleStages = STAGES.filter(s => s.category !== 'terminal-positive');
+  const leadPorVacante = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const v of vacancies) {
+      const email = (v.hiring_lead_email ?? "").trim();
+      if (email) m[v.id] = email;
+    }
+    return m;
+  }, [vacancies]);
+
+  const litGate = useMemo(() => {
+    if (litGateId) {
+      const elegido = KELLY_GATES.find((g) => g.id === litGateId);
+      if (elegido) return elegido;
+    }
+    return KELLY_GATES.find((g) => (byGate[g.id] || []).length > 0) ?? KELLY_GATES[0];
+  }, [litGateId, byGate]);
+
+  const totals = filtered.length;
   const hiredCount = (byStage['contratado'] || []).length;
   const rejectedCount = (byStage['rechazado'] || []).length;
   const activeCount = totals - hiredCount - rejectedCount;
@@ -582,6 +662,22 @@ export default function PipelineFunnel() {
             <h1 className="ts-display text-[44px] md:text-[56px] text-[var(--ts-black)] m-0">
               Funnel
             </h1>
+            <div className="mt-3 inline-flex rounded-full border border-[color:var(--ts-line)] bg-white p-0.5">
+              <button
+                type="button"
+                onClick={() => setVista("pipeline")}
+                className={`rounded-full px-4 py-1 text-[13px] ${vista === "pipeline" ? "bg-[var(--ts-ink)] text-white" : "text-[var(--ts-ink)]"}`}
+              >
+                Pipeline
+              </button>
+              <button
+                type="button"
+                onClick={() => setVista("dashboard")}
+                className={`rounded-full px-4 py-1 text-[13px] ${vista === "dashboard" ? "bg-[var(--ts-ink)] text-white" : "text-[var(--ts-ink)]"}`}
+              >
+                Dashboard
+              </button>
+            </div>
             <p className="text-[15px] text-[var(--ts-gray-60)] mt-3 max-w-[640px] leading-[1.55]">
               Vista del proceso completo · {totals} candidatos
               {vacFilter !== "all" && <span className="text-[var(--ts-black)] font-semibold"> · filtro activo</span>}
@@ -645,6 +741,14 @@ export default function PipelineFunnel() {
                 <option value="web">Aplicaron por la web</option>
               </select>
             </div>
+            <button
+              type="button"
+              onClick={() => setAgregar(true)}
+              className="text-xs font-bold px-3 py-2.5 bg-black text-white"
+              style={{ borderRadius: 0 }}
+            >
+              Agregar candidato
+            </button>
             <span className="ts-eyebrow text-[10px]">Vacante</span>
             <div className="flex items-center gap-2">
               <select
@@ -684,6 +788,20 @@ export default function PipelineFunnel() {
                   />
                   ver cerradas ({opcionesVacante.cerradas.length})
                 </label>
+              )}
+              {vacFilter !== "all" && onBuscarBanco && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const v = vacancies.find((x) => x.id === vacFilter);
+                    onBuscarBanco({ id: vacFilter, title: v?.title || "Vacante" });
+                  }}
+                  className="text-xs font-bold px-3 py-2.5 border border-black text-black hover:bg-black hover:text-white transition-colors whitespace-nowrap"
+                  style={{ borderRadius: 0 }}
+                  title="Buscar en el banco HT (rechazados o contratados de otras vacantes) y traerlos a esta"
+                >
+                  Buscar en banco
+                </button>
               )}
               {vacFilter !== "all" && (
                 <a
@@ -751,10 +869,28 @@ export default function PipelineFunnel() {
                 </div>
               );
             })()}
+            {vacFilter !== "all" && (() => {
+              const email = (vacancies.find((x) => x.id === vacFilter)?.hiring_lead_email ?? "").trim();
+              if (!email) return null;
+              return (
+                <div className="text-[11px] text-[var(--ts-gray-60)]">
+                  Hiring Lead: <span className="font-bold text-[var(--ts-black)]">{email}</span>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
 
+      {vista === "dashboard" ? (
+        <FunnelDashboard
+          onOpenCandidate={(id) => {
+            pedirAbrirCandidato(id);
+            setVista("pipeline");
+          }}
+        />
+      ) : (
+      <>
       {/* Seguimiento de contactos de la vacante elegida: quién espera
           respuesta nuestra y quién no tiene ningún contacto. */}
       {vacFilter !== "all" && (
@@ -772,130 +908,27 @@ export default function PipelineFunnel() {
         <div className="text-center py-16 ts-eyebrow text-[var(--ts-gray-40)]">Cargando pipeline…</div>
       ) : (
         <>
-          {/* ════════════════ LEYENDA DE OWNERS ════════════════ */}
-          <div className="flex items-center gap-5 mb-3 pb-3 border-b border-[var(--ts-gray-10)]">
-            <div className="ts-eyebrow text-[10px]">¿De quién depende?</div>
-            <LegendItem icon={User} label="Candidato" color={OWNER_STYLE.candidate.barColor} />
-            <LegendItem icon={UserCheck} label="Reclutador" color={OWNER_STYLE.recruiter.barColor} />
-            <LegendItem icon={Users} label="Compartido" color={OWNER_STYLE.shared.barColor} />
-            <div className="text-[11px] text-[var(--ts-gray-40)] ml-auto italic">
-              La barra superior de cada columna indica quién mueve la pelota.
-            </div>
-          </div>
+          {/* Journey de 12 gates. Onboarding es el paso 12; rechazados quedan aparte. */}
+          <JourneyBoard
+            byGate={byGate}
+            lit={litGate}
+            onLit={setLitGateId}
+            selectedIds={selectedIds}
+            onToggle={toggleSelect}
+            onSelectAll={(id) => {
+              const cands = byGate[id] || [];
+              const todos = cands.length > 0 && cands.every((c) => selectedIds.has(c.id));
+              if (todos) cands.forEach((c) => toggleSelect(c.id));
+              else selectAllInStage(id);
+            }}
+            onOpen={setSelectedCand}
+            bateria={bateria}
+            esperandoIds={esperandoIds}
+            leadPorVacante={leadPorVacante}
+          />
 
-          {/* ════════════════ KANBAN FUNNEL ════════════════ */}
-          <div className="overflow-x-auto pb-4 -mx-6 px-6">
-            <div className="flex gap-2 min-w-max">
-              {visibleStages.map((stage) => {
-                const cands = byStage[stage.id] || [];
-                const stageSelected = cands.filter(c => selectedIds.has(c.id)).length;
-                const ownerStyle = OWNER_STYLE[stage.owner];
-                const OwnerIcon = stage.owner === 'candidate' ? User : stage.owner === 'recruiter' ? UserCheck : stage.owner === 'shared' ? Users : null;
-                return (
-                  <div key={stage.id} className="w-[260px] flex-shrink-0">
-                    {/* Cabecera de etapa · opción C
-                        El contraste sale del peso de la letra y de un fondo
-                        apenas marcado, no de una barra negra: cinco barras
-                        negras seguidas se comen el tablero y compiten con los
-                        nombres de los candidatos, que es lo que hay que leer.
-                        De quién depende la etapa se dice con un punto de color
-                        y con el texto, no pintando la columna entera. */}
-                    <div className="ts-etapa rounded-t-xl px-3.5 pt-3 pb-2.5">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-[7px] h-[7px] rounded-full flex-shrink-0"
-                          style={{ background: ownerStyle.barColor }}
-                          title={`Depende de: ${ownerStyle.label}`}
-                        />
-                        <span className="ts-etapa-nombre flex-1 min-w-0">{stage.label}</span>
-                        {cands.length > 0 && (
-                          <button
-                            onClick={() => stageSelected === cands.length ? cands.forEach(c => toggleSelect(c.id)) : selectAllInStage(stage.id)}
-                            className="text-[13px] text-[var(--texto-3)] hover:text-[var(--texto)] transition-colors leading-none"
-                            title={stageSelected === cands.length ? "Deseleccionar todos" : "Seleccionar todos"}
-                          >
-                            {stageSelected === cands.length ? "−" : "+"}
-                          </button>
-                        )}
-                        <span className="ts-etapa-conteo inline-flex items-center justify-center">
-                          {cands.length}
-                        </span>
-                      </div>
-                      <div className="ts-etapa-duenio mt-1 pl-[15px]">{ownerStyle.label}</div>
-                    </div>
-                    {/* Column body */}
-                    <div
-                      className="border border-t-0 border-gray-200 rounded-b-xl p-2 min-h-[120px] max-h-[600px] overflow-y-auto bg-white"
-                    >
-                      {cands.length === 0 ? (
-                        <div className="text-[13px] text-[var(--texto-3)] text-center py-7">
-                          Nadie en esta etapa
-                        </div>
-                      ) : cands.map(c => {
-                        const isSelected = selectedIds.has(c.id);
-                        return (
-                          <div
-                            key={c.id}
-                            className={`relative bg-white border p-3 mb-2 transition-all ${
-                              isSelected
-                                ? "border-[var(--ts-black)] shadow-sm"
-                                : "border-[var(--ts-gray-10)] hover:border-[var(--ts-gray-60)]"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={(e) => { e.stopPropagation(); toggleSelect(c.id); }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="absolute top-2.5 right-2.5 w-3.5 h-3.5 cursor-pointer accent-[var(--ts-black)]"
-                              title="Seleccionar para acción masiva"
-                            />
-                            <button onClick={() => setSelectedCand(c)} className="w-full text-left pr-5">
-                              <div className="text-[14px] font-bold leading-tight text-[var(--ts-black)]" style={{ letterSpacing: '-0.01em' }}>
-                                {c.name}
-                              </div>
-                              <div className="text-[11px] text-[var(--ts-gray-60)] truncate mt-1 ts-tabular">
-                                {c.email}
-                              </div>
-                              {esperandoIds.has(c.id) && (
-                                <div
-                                  className="mt-1.5 inline-block text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5"
-                                  title="El último mensaje es del candidato y no le hemos respondido"
-                                >
-                                  ✉ Espera respuesta
-                                </div>
-                              )}
-                              <div className="mt-2 inline-block ts-eyebrow text-[9px] tracking-[1.5px] text-[var(--ts-gray-90)] border border-[var(--ts-gray-20)] px-1.5 py-0.5">
-                                {c.ht_vacancies?.title || "—"}
-                              </div>
-                              {c.source === "cv_proceso_anterior" && (
-                                <div
-                                  className="mt-1.5 inline-block ts-eyebrow text-[9px] tracking-[1.5px] text-[var(--ts-gray-60)] bg-[var(--ts-gray-10)] px-1.5 py-0.5"
-                                  title="Hoja de vida cargada de un proceso anterior · no aplicó por la web"
-                                >
-                                  CV proceso anterior
-                                </div>
-                              )}
-                            </button>
-                            <ChipBateria est={bateria[c.id]} />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* ════════════════ TERMINAL FOOTER · contratados + rechazados ════════════════ */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-[var(--ts-gray-20)] mt-6 border border-[var(--ts-gray-20)]">
-            <ContractedColumn
-              cands={byStage['contratado'] || []}
-              selectedIds={selectedIds}
-              onToggle={toggleSelect}
-              onSelect={setSelectedCand}
-            />
+          {/* Rechazados aparte del journey. Contratados viven en el gate 12. */}
+          <div className="mt-6 border border-[var(--ts-gray-20)]">
             <RejectedColumn
               cands={byStage['rechazado'] || []}
               selectedIds={selectedIds}
@@ -927,9 +960,418 @@ export default function PipelineFunnel() {
           {/* end rechazados */}
         </>
       )}
+      </>
+      )}
 
       {/* Side panel con detalles del candidato */}
-      {selectedCand && <CandDetailPanel cand={selectedCand} onClose={() => setSelectedCand(null)} onChanged={() => { void load(); }} />}
+      {selectedCand && (
+        <CandDetailPanel
+          cand={selectedCand}
+          hiringLeadEmail={leadPorVacante[selectedCand.vacancy_id] ?? null}
+          onClose={() => setSelectedCand(null)}
+          onChanged={() => { void load(); }}
+        />
+      )}
+      {agregar && (
+        <AgregarCandidato
+          vacantes={vacancies.filter((v) => v.status == null || v.status === "open")}
+          onClose={() => setAgregar(false)}
+          onCreado={() => { setAgregar(false); void load(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AgregarCandidato({
+  vacantes,
+  onClose,
+  onCreado,
+}: {
+  vacantes: { id: string; title: string }[];
+  onClose: () => void;
+  onCreado: () => void;
+}) {
+  const [nombre, setNombre] = useState("");
+  const [email, setEmail] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [vacante, setVacante] = useState(vacantes[0]?.id || "");
+  const [canal, setCanal] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-6" onClick={onClose}>
+      <form
+        className="bg-white w-full max-w-lg p-5 space-y-3"
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const canalError = errorCanal(canal);
+          if (!nombre.trim() || !email.trim() || !vacante) { setMsg("Nombre, email y vacante son obligatorios."); return; }
+          if (canalError) { setMsg(canalError); return; }
+          setBusy(true);
+          setMsg(null);
+          try {
+            const r = await fetch("/api/headhunting/candidates", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                client_id: TS_CLIENT_ID,
+                vacancy_id: vacante,
+                name: nombre.trim(),
+                email: email.trim(),
+                phone: telefono.trim() || null,
+                source: canal,
+              }),
+            });
+            const j = await r.json().catch(() => ({}));
+            if (!r.ok) { setMsg(j.error || "No se pudo crear el candidato."); return; }
+            onCreado();
+          } catch (err: any) {
+            setMsg(err?.message || "Error de red.");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <h2 className="text-lg font-bold">Agregar candidato</h2>
+        <input className="w-full border border-gray-300 px-3 py-2 text-sm" placeholder="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+        <input className="w-full border border-gray-300 px-3 py-2 text-sm" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input className="w-full border border-gray-300 px-3 py-2 text-sm" placeholder="Teléfono (opcional)" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+        <select className="w-full border border-gray-300 px-3 py-2 text-sm bg-white" value={vacante} onChange={(e) => setVacante(e.target.value)}>
+          {vacantes.map((v) => <option key={v.id} value={v.id}>{v.title}</option>)}
+        </select>
+        <CanalSelect value={canal} onChange={setCanal} />
+        {msg && <div className="text-sm text-red-700">{msg}</div>}
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="text-sm px-3 py-2">Cancelar</button>
+          <button type="submit" disabled={busy} className="text-sm font-bold px-4 py-2 bg-black text-white disabled:opacity-50">
+            {busy ? "Guardando…" : "Crear"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/**
+ * Journey horizontal de los 12 gates. Un solo paso encendido; el panel
+ * de abajo son las fichas de ese paso. Los colores son los de Clara
+ * (canvas, ink, mute). El azul solo marca el paso encendido y el eyebrow.
+ */
+function JourneyBoard({
+  byGate, lit, onLit, selectedIds, onToggle, onSelectAll, onOpen, bateria, esperandoIds, leadPorVacante,
+}: {
+  byGate: Record<string, Cand[]>;
+  lit: KellyGate;
+  onLit: (id: string) => void;
+  selectedIds: Set<string>;
+  onToggle: (id: string) => void;
+  onSelectAll: (gateId: string) => void;
+  onOpen: (c: Cand) => void;
+  bateria: Record<string, BatEstado>;
+  esperandoIds: Set<string>;
+  leadPorVacante: Record<string, string>;
+}) {
+  const cands = byGate[lit.id] || [];
+  const todos = cands.length > 0 && cands.every((c) => selectedIds.has(c.id));
+  const owner = OWNER_STYLE[ownerDeGate(lit)].label;
+  const nota = GATE_NOTA[lit.id];
+
+  return (
+    <div style={{ background: "#F3F4F6", borderRadius: 16, padding: 16 }}>
+      <div
+        role="tablist"
+        aria-label="Journey de selección"
+        style={{ display: "flex", alignItems: "stretch", overflowX: "auto", gap: 0, paddingBottom: 4 }}
+      >
+        {KELLY_GATES.map((g, i) => {
+          const n = (byGate[g.id] || []).length;
+          const estado = g.n < lit.n ? "done" : g.id === lit.id ? "lit" : "upcoming";
+          const ink = estado === "upcoming" ? "#9ca3af" : "#1d1d1f";
+          return (
+            <div key={g.id} style={{ display: "flex", alignItems: "center", flex: "1 0 auto", minWidth: 0 }}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={g.id === lit.id}
+                onClick={() => onLit(g.id)}
+                title={`${g.n}. ${g.label} · ${n}`}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 6,
+                  minWidth: 84,
+                  padding: "6px 4px",
+                  background: "transparent",
+                  border: 0,
+                  cursor: "pointer",
+                  color: ink,
+                  fontFamily: "Inter, system-ui, sans-serif",
+                }}
+              >
+                <span
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 999,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    fontVariantNumeric: "tabular-nums",
+                    background: estado === "done" ? "#1d1d1f" : "#ffffff",
+                    color: estado === "done" ? "#ffffff" : ink,
+                    border: estado === "lit"
+                      ? "2px solid #1d1d1f"
+                      : "1px solid rgba(0,0,0,.06)",
+                    boxShadow: estado === "lit" ? "0 0 0 3px #1747D9" : "none",
+                  }}
+                >
+                  {g.n}
+                </span>
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: estado === "lit" ? 700 : 500,
+                  lineHeight: 1.2,
+                  textAlign: "center",
+                  maxWidth: 96,
+                }}>
+                  {g.label}
+                </span>
+                <span style={{
+                  fontSize: 11,
+                  fontVariantNumeric: "tabular-nums",
+                  color: "#6e6e73",
+                  background: "#ffffff",
+                  borderRadius: 999,
+                  padding: "1px 7px",
+                  border: "1px solid rgba(0,0,0,.06)",
+                }}>
+                  {n}
+                </span>
+              </button>
+              {i < KELLY_GATES.length - 1 && (
+                <span
+                  aria-hidden
+                  style={{
+                    width: 18,
+                    height: 1,
+                    flex: "0 0 18px",
+                    background: g.n < lit.n ? "#1d1d1f" : "rgba(0,0,0,.12)",
+                    marginBottom: 28,
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <section
+        aria-label={`Candidatos en ${lit.label}`}
+        style={{
+          marginTop: 8,
+          background: "#ffffff",
+          borderRadius: 16,
+          border: "1px solid rgba(0,0,0,.06)",
+          padding: 16,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <div style={{
+              color: "#1747D9",
+              fontSize: 11,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              fontWeight: 700,
+              fontFamily: "Inter, system-ui, sans-serif",
+            }}>
+              Talent Acquisition
+            </div>
+            <h2 style={{ margin: "4px 0 0", fontSize: 22, lineHeight: 1.2, color: "#1d1d1f", fontWeight: 700 }}>
+              {lit.n}. {lit.label}
+            </h2>
+            {nota && (
+              <p style={{ margin: "4px 0 0", color: "#6e6e73", fontSize: 13 }}>{nota}</p>
+            )}
+            <p style={{ margin: "2px 0 0", color: "#6e6e73", fontSize: 12 }}>
+              Depende de: {owner}
+            </p>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ color: "#6e6e73", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+              {cands.length}
+            </span>
+            {cands.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onSelectAll(lit.id)}
+                style={{
+                  background: "#1d1d1f",
+                  color: "#ffffff",
+                  border: 0,
+                  borderRadius: 999,
+                  padding: "8px 14px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {todos ? "Quitar selección" : "Seleccionar"}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {cands.length === 0 ? (
+          <p style={{ margin: "20px 0 4px", textAlign: "center", color: "#6e6e73", fontSize: 13 }}>
+            Nadie en esta etapa
+          </p>
+        ) : (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+            gap: 12,
+            marginTop: 16,
+          }}>
+            {cands.map((c) => (
+              <JourneyCard
+                key={c.id}
+                cand={c}
+                gate={lit}
+                selected={selectedIds.has(c.id)}
+                esperando={esperandoIds.has(c.id)}
+                bateria={bateria[c.id]}
+                hiringLead={leadPorVacante[c.vacancy_id] ?? null}
+                onToggle={() => onToggle(c.id)}
+                onOpen={() => onOpen(c)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function diasEnEtapa(c: Cand): number | null {
+  const iso = c.updated_at || c.created_at;
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000));
+}
+
+/** Semáforo en gris: el dato sigue, el color no pinta la tarjeta. */
+function semaforoDe(c: Cand, bat?: BatEstado): string | null {
+  if (c.prefilter_decision === "pass") return "Prefiltro ok";
+  if (c.prefilter_decision === "review") return "Prefiltro revisión";
+  if (c.prefilter_decision === "reject") return "Prefiltro no";
+  if (bat?.status === "completed" && bat.match != null) return `Match ${Math.round(bat.match)}`;
+  return null;
+}
+
+function JourneyCard({
+  cand, gate, selected, esperando, bateria, hiringLead, onToggle, onOpen,
+}: {
+  cand: Cand;
+  gate: KellyGate;
+  selected: boolean;
+  esperando: boolean;
+  bateria?: BatEstado;
+  hiringLead?: string | null;
+  onToggle: () => void;
+  onOpen: () => void;
+}) {
+  const sub = stageLabel(cand.stage);
+  const mostrarSub = gate.stages.length !== 1 || (cand.stage && cand.stage !== gate.stages[0]);
+  const dias = diasEnEtapa(cand);
+  const sla = dias == null ? null : slaStatus(cand.stage, dias);
+  const aging = dias == null
+    ? null
+    : sla === "serious" || sla === "critical"
+      ? `${dias} d · fuera de plazo`
+      : `${dias} d`;
+  const sem = semaforoDe(cand, bateria);
+  const pill: React.CSSProperties = {
+    display: "inline-block",
+    borderRadius: 999,
+    padding: "2px 8px",
+    fontSize: 11,
+    lineHeight: 1.4,
+    color: "#1d1d1f",
+    background: "#F3F4F6",
+    border: "1px solid rgba(0,0,0,.06)",
+  };
+
+  return (
+    <div style={{
+      position: "relative",
+      background: "#ffffff",
+      borderRadius: 16,
+      border: selected ? "1px solid #1d1d1f" : "1px solid rgba(0,0,0,.06)",
+      padding: 14,
+    }}>
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={(e) => { e.stopPropagation(); onToggle(); }}
+        onClick={(e) => e.stopPropagation()}
+        aria-label={`Seleccionar ${cand.name}`}
+        style={{ position: "absolute", top: 12, right: 12, width: 14, height: 14, accentColor: "#1d1d1f", cursor: "pointer" }}
+      />
+      <button type="button" onClick={onOpen} style={{
+        display: "block",
+        width: "100%",
+        textAlign: "left",
+        background: "transparent",
+        border: 0,
+        padding: 0,
+        paddingRight: 22,
+        cursor: "pointer",
+        fontFamily: "Inter, system-ui, sans-serif",
+        color: "#1d1d1f",
+      }}>
+        <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.25 }}>{cand.name}</div>
+        <div style={{ fontSize: 12, color: "#6e6e73", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {cand.email}
+        </div>
+        {hiringLead && (
+          <div style={{ fontSize: 12, color: "#6e6e73", marginTop: 4 }}>
+            Hiring Lead: {hiringLead}
+          </div>
+        )}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+          <span style={pill}>{cand.ht_vacancies?.title || "—"}</span>
+          {mostrarSub && sub !== gate.label && (
+            <span style={{ ...pill, background: "#EEF2FF" }}>{sub}</span>
+          )}
+          {cand.source === "cv_proceso_anterior" && (
+            <span style={{ ...pill, background: "#F5F3FF" }} title="Hoja de vida cargada de un proceso anterior">
+              CV proceso anterior
+            </span>
+          )}
+          {esperando && (
+            <span style={{ ...pill, background: "#F4F4F5" }} title="El último mensaje es del candidato y no le hemos respondido">
+              Espera respuesta
+            </span>
+          )}
+          {cand.notes?.includes(NOTA_BATERIA_PENDIENTE) && (
+            <span style={{ ...pill, background: "#FEF3C7" }}>{NOTA_BATERIA_PENDIENTE}</span>
+          )}
+          {sem && <span style={{ ...pill, color: "#6e6e73" }}>{sem}</span>}
+          {aging && (
+            <span style={{ ...pill, color: "#6e6e73" }} title={stageSla(cand.stage) ? `Plazo de la etapa: ${stageSla(cand.stage)} días` : undefined}>
+              {aging}
+            </span>
+          )}
+        </div>
+      </button>
+      <ChipBateria est={bateria} />
     </div>
   );
 }
@@ -1116,16 +1558,14 @@ function ChipBateria({ est }: { est?: BatEstado }) {
   if (!est) return null;
 
   if (est.status === "completed" && est.match != null) {
-    const color = est.match >= 75 ? "text-emerald-700 border-emerald-300 bg-emerald-50"
-      : est.match >= 55 ? "text-blue-700 border-blue-300 bg-blue-50"
-      : "text-amber-700 border-amber-300 bg-amber-50";
     return (
       <a href={`/hr-admin/bateria/informe/${est.token}`} target="_blank" rel="noreferrer"
         onClick={(e) => e.stopPropagation()}
-        className={`mt-2 flex items-center justify-between gap-1 border px-1.5 py-1 text-[10px] font-bold ${color}`}
+        className="mt-2 flex items-center justify-between gap-1 px-2 py-1 text-[10px] font-semibold"
+        style={{ borderRadius: 999, background: "#F3F4F6", color: "#6e6e73", border: "1px solid rgba(0,0,0,.06)" }}
         title="Abrir el informe · match con el perfil del cargo">
         <span>Batería completa · {est.match}%</span>
-        <span className="opacity-70 font-normal">{est.conInforme ? "informe ↗" : "sin IA ↗"}</span>
+        <span className="font-normal">{est.conInforme ? "informe ↗" : "sin IA ↗"}</span>
       </a>
     );
   }
@@ -1137,7 +1577,11 @@ function ChipBateria({ est }: { est?: BatEstado }) {
     : "Batería con enlace · sin enviar";
 
   return (
-    <div className="mt-2 border border-[var(--ts-gray-20)] px-1.5 py-1 text-[10px] text-[var(--ts-gray-60)]" title={txt}>
+    <div
+      className="mt-2 px-2 py-1 text-[10px]"
+      style={{ borderRadius: 999, background: "#F3F4F6", color: "#6e6e73", border: "1px solid rgba(0,0,0,.06)" }}
+      title={txt}
+    >
       {txt}
     </div>
   );
@@ -1160,7 +1604,10 @@ function BulkActionBar({
   // Los hooks van antes de cualquier return: si no, React se desincroniza
   // al pasar de "hay seleccion" a "no hay seleccion".
   const [batMsg, setBatMsg] = useState<string | null>(null);
+  const [batIsError, setBatIsError] = useState(false);
   const [citando, setCitando] = useState(false);
+  /** Rechazo masivo: pasa por el mismo modal con motivo que el individual. */
+  const [rechazando, setRechazando] = useState(false);
   const [cita, setCita] = useState({ fechaISO: "", horaLlegada: "08:00", horaFin: "12:00", direccion: "", referencia: "" });
   const [previaCita, setPreviaCita] = useState<any>(null);
 
@@ -1212,6 +1659,7 @@ function BulkActionBar({
       : "";
     if (!confirm(`Se van a crear ${n} borradores de la batería en tu Gmail.${aviso}\n\nNo se envía nada todavía: quedan en Borradores para que los revises.`)) return;
     setRunning(true);
+    setBatIsError(false);
     setBatMsg(null);
     try {
       const r = await fetch("/api/bateria/enviar", {
@@ -1242,6 +1690,7 @@ function BulkActionBar({
     if (running) return;
     if (!confirm(`Se van a crear ${n} borradores de recordatorio del prefiltro en tu Gmail.\n\nA quien tenga el enlace vigente se le manda EL MISMO, para no borrarle lo que ya llevaba respondido.\n\nNo se envía nada todavía.`)) return;
     setRunning(true);
+    setBatIsError(false);
     setBatMsg(null);
     try {
       const r = await fetch("/api/headhunting/candidates/recordatorio-prefiltro", {
@@ -1268,6 +1717,8 @@ function BulkActionBar({
     if (running || !destino) return;
     const etiqueta = CANON_STAGES.find((e) => e.id === destino)?.label ?? destino;
     if (!confirm(`Mover ${n} candidato${n > 1 ? "s" : ""} a "${etiqueta}"?`)) return;
+    setBatIsError(false);
+    setBatMsg(null);
     setRunning(true);
     setProgress({ done: 0, total: n, ok: 0, fail: 0 });
     let ok = 0, fail = 0;
@@ -1288,7 +1739,7 @@ function BulkActionBar({
   async function pedirCita(modo: "previsualizar" | "borrador") {
     if (running) return;
     if (modo === "borrador" && !confirm(`Se van a crear ${n} borradores de citación en tu Gmail.\n\nNo se envía nada todavía.`)) return;
-    setRunning(true); setBatMsg(null);
+    setRunning(true); setBatIsError(false); setBatMsg(null);
     try {
       const r = await fetch("/api/headhunting/candidates/citar-assessment", {
         method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
@@ -1307,12 +1758,15 @@ function BulkActionBar({
     }
   }
 
-  async function runBulk(action: "stage_action" | "advance" | "reject") {
+  async function runBulk(action: "stage_action" | "advance") {
     if (running) return;
-    if (!confirm(`Aplicar acción a ${n} candidatos seleccionados? Se crearán drafts en tu Gmail (revisar antes de enviar).`)) return;
+    if (!confirm(`Aplicar acción a ${n} candidatos seleccionados? Quien quede en «Prefiltro pasado» recibe la Batería TS por correo de inmediato (desde jointheteam@); el resto de correos quedan como borrador en tu Gmail.`)) return;
+    setBatIsError(false);
+    setBatMsg(null);
     setRunning(true);
     setProgress({ done: 0, total: n, ok: 0, fail: 0 });
     let ok = 0, fail = 0;
+    const errors: string[] = [];
 
     for (let i = 0; i < selectedCands.length; i++) {
       const c = selectedCands[i];
@@ -1332,20 +1786,36 @@ function BulkActionBar({
           if (!next) { fail++; setProgress({ done: i + 1, total: n, ok, fail }); continue; }
           url = `/api/headhunting/candidates/${c.id}/stage`;
           body = { stage: next.id };
-        } else if (action === "reject") {
-          url = `/api/headhunting/candidates/${c.id}/stage`;
-          body = { stage: "rechazado" };
         }
         const r = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: body ? JSON.stringify(body) : undefined,
         });
-        if (r.ok) ok++; else fail++;
-      } catch { fail++; }
+        if (r.ok) ok++;
+        else {
+          fail++;
+          let msg = `HTTP ${r.status}`;
+          try {
+            const j = await r.json();
+            if (j?.error) msg = String(j.error);
+          } catch { /* the status is enough */ }
+          if (!errors.includes(msg)) errors.push(msg);
+        }
+      } catch (e: any) {
+        fail++;
+        const msg = e?.message ?? "error";
+        if (!errors.includes(msg)) errors.push(msg);
+      }
       setProgress({ done: i + 1, total: n, ok, fail });
     }
 
+    if (errors.length) {
+      setBatIsError(true);
+      setBatMsg(errors.join(" · "));
+    } else {
+      setBatIsError(false);
+    }
     setRunning(false);
     setTimeout(() => {
       setProgress(null);
@@ -1357,6 +1827,17 @@ function BulkActionBar({
 
   return (
     <>
+    {rechazando && (
+      <RejectionModal
+        candidateId={selectedCands[0].id}
+        candidateName={selectedCands[0].name}
+        vacancyTitle={selectedCands[0].ht_vacancies?.title || "la posición"}
+        lang={langDe(selectedCands[0])}
+        bulk={selectedCands.map((c) => ({ id: c.id, name: c.name, vacancyTitle: c.ht_vacancies?.title || "la posición" }))}
+        onClose={() => setRechazando(false)}
+        onRejected={() => { setRechazando(false); onActionComplete(); }}
+      />
+    )}
     {citando && (
       <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center overflow-y-auto p-6"
         onClick={(e) => { if (e.target === e.currentTarget) setCitando(false); }}>
@@ -1435,7 +1916,7 @@ function BulkActionBar({
       </div>
 
       {batMsg && (
-        <div className="text-[11px] px-3 py-1 bg-white/10 rounded-full max-w-xs leading-snug">{batMsg}</div>
+        <div className={`text-[11px] px-3 py-1 rounded-full max-w-xs leading-snug ${batIsError ? "bg-red-100 text-red-800" : "bg-white/10"}`}>{batMsg}</div>
       )}
 
       {progress && (
@@ -1499,13 +1980,14 @@ function BulkActionBar({
           </select>
           <button
             onClick={() => runBulk("advance")}
-            className="text-xs font-bold px-3 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700"
+            className="text-xs font-bold px-3 py-1.5 rounded-full hover:opacity-90"
+            style={{ background: "#1d1d1f", color: "#ffffff" }}
             title="Avanzar cada uno a su siguiente etapa"
           >
             → Avanzar etapa
           </button>
           <button
-            onClick={() => runBulk("reject")}
+            onClick={() => setRechazando(true)}
             className="text-xs font-bold px-3 py-1.5 rounded-full bg-red-600 hover:bg-red-700"
           >
             ❌ Rechazar
@@ -1523,61 +2005,7 @@ function BulkActionBar({
   );
 }
 
-// ─── Terminal footer columns · contratados + rechazados ──────────
-function ContractedColumn({
-  cands,
-  selectedIds,
-  onToggle,
-  onSelect,
-}: {
-  cands: Cand[];
-  selectedIds: Set<string>;
-  onToggle: (id: string) => void;
-  onSelect: (c: Cand) => void;
-}) {
-  return (
-    <div className="bg-white p-5">
-      <div className="flex items-baseline justify-between mb-4 pb-3 border-b border-[var(--ts-gray-10)]">
-        <div className="flex items-baseline gap-3">
-          <CheckCircle2 className="w-4 h-4 text-[var(--ts-green)] flex-shrink-0 self-center" />
-          <div className="ts-eyebrow text-[var(--ts-green)]">Contratados</div>
-        </div>
-        <div className="text-[28px] font-extrabold ts-tabular text-[var(--ts-green)]" style={{ letterSpacing: '-0.04em' }}>
-          {cands.length}
-        </div>
-      </div>
-      {cands.length === 0 ? (
-        <div className="ts-eyebrow text-[10px] text-[var(--ts-gray-40)] py-4">Sin contrataciones aún</div>
-      ) : (
-        <div className="space-y-2">
-          {cands.map(c => {
-            const isSelected = selectedIds.has(c.id);
-            return (
-              <div
-                key={c.id}
-                className={`relative bg-white border p-3 transition-all ${isSelected ? 'border-[var(--ts-black)]' : 'border-[var(--ts-green-border)] hover:border-[var(--ts-green)]'}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => onToggle(c.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="absolute top-2.5 right-2.5 w-3.5 h-3.5 cursor-pointer accent-[var(--ts-black)]"
-                />
-                <button onClick={() => onSelect(c)} className="w-full text-left pr-5">
-                  <div className="text-[14px] font-bold text-[var(--ts-black)] leading-tight" style={{ letterSpacing: '-0.01em' }}>
-                    {c.name}
-                  </div>
-                  <div className="text-[11px] text-[var(--ts-gray-60)] mt-1">{c.ht_vacancies?.title || '—'}</div>
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
+// Contratados van en el gate 12 (Onboarding) del journey, no en una columna.
 
 // Etiquetas cortas por category_key para badges en cards
 const REJECTION_CATEGORY_SHORT: Record<string, string> = {
@@ -1781,7 +2209,7 @@ function RejectedColumn({
         <div className="space-y-1.5 max-h-[280px] overflow-y-auto">
           {visibleCands.map(c => {
             const isSelected = selectedIds.has(c.id);
-            const catShort = c.rejection_category ? REJECTION_CATEGORY_SHORT[c.rejection_category] : null;
+            const catShort = c.rejection_category ? (REJECTION_CATEGORY_SHORT[c.rejection_category] || c.rejection_category) : "Sin motivo";
             return (
               <div
                 key={c.id}
@@ -1802,11 +2230,9 @@ function RejectedColumn({
                     )}
                   </div>
                   <div className="text-[10px] text-[var(--ts-gray-60)] mt-0.5">{c.ht_vacancies?.title || '—'}</div>
-                  {catShort && (
-                    <div className="text-[9px] uppercase tracking-[1px] text-[var(--ts-red)] mt-1 font-bold">
-                      {catShort}
-                    </div>
-                  )}
+                  <div className="text-[9px] uppercase tracking-[1px] text-[var(--ts-red)] mt-1 font-bold">
+                    {catShort}
+                  </div>
                 </button>
 
                 {/* Correo de rechazo · queda en borrador para enviarlo desde Gmail */}
@@ -1849,7 +2275,7 @@ function RejectedColumn({
 }
 
 // ─── Side panel con detalle + respuestas del prefiltro ──────────────
-function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: () => void; onChanged?: () => void }) {
+function CandDetailPanel({ cand, onClose, onChanged, hiringLeadEmail }: { cand: Cand; onClose: () => void; onChanged?: () => void; hiringLeadEmail?: string | null }) {
   const pf = cand.prefilter_data;
   const decision = cand.prefilter_decision;
   const decisionBadge = decision === "pass" ? { label: "✅ PASS", color: "#10B981" }
@@ -1860,7 +2286,10 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string>("");
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [canal, setCanal] = useState(cand.source || "");
+  const [canalMsg, setCanalMsg] = useState<string | null>(null);
   const [showJointScheduling, setShowJointScheduling] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
   const currentStage = cand.stage || "aplico";
   const nextStage = siguienteDelBoton(currentStage);
   const isTerminal = currentStage === "rechazado" || currentStage === "contratado";
@@ -1877,9 +2306,11 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
       });
       const j = await res.json();
       if (j.success) {
-        setFeedback(targetStage === "rechazado"
-          ? "✅ Rechazado · draft de descarte creado en tu Gmail"
-          : `✅ Movido a ${targetStage}`);
+        setFeedback(j.bateria_auto?.enviado
+          ? "✅ Prefiltro pasado · Batería TS enviada por correo"
+          : j.bateria_auto
+            ? `✅ Prefiltro pasado · la Batería TS no salió: ${j.bateria_auto.motivo}`
+            : `✅ Movido a ${label.replace(/^Movido a /, "")}`);
         // Re-fetch sin reload: preserva filtro de vacante
         setTimeout(() => {
           onChanged?.();
@@ -1909,6 +2340,9 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
           <div>
             <h2 className="text-xl font-bold">{cand.name}</h2>
             <p className="text-xs text-gray-500 mt-0.5">{cand.ht_vacancies?.title || "—"}</p>
+            {hiringLeadEmail && (
+              <p className="text-xs text-gray-500 mt-0.5">Hiring Lead: {hiringLeadEmail}</p>
+            )}
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-black text-2xl leading-none w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100">×</button>
         </div>
@@ -1932,7 +2366,10 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
             onChange={(e) => {
               const v = e.target.value;
               if (!v) return;
-              const s = [...STAGES, REJECTED_STAGE].find(x => x.id === v);
+              // Rechazar siempre pasa por el modal con motivo, nunca por el
+              // cambio de etapa pelado: sin motivo no hay clasificación.
+              if (v === REJECTED_STAGE.id) { setShowRejectModal(true); e.target.value = ""; return; }
+              const s = STAGES.find(x => x.id === v);
               if (s) moveToStage(s.id, `Movido a ${s.label}`);
               e.target.value = "";
             }}
@@ -1978,6 +2415,21 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
               title="Regenera el token del cuestionario y crea un nuevo draft en tu Gmail con el link"
             >
               🔄 Reenviar Prefiltro
+            </button>
+          )}
+
+          {/* Invitación Wellness → HM. Va en la ficha, como Reenviar Prefiltro,
+              y no toca el botón Agendar (ts_interviews) para poder rebasar
+              sobre feat/ats-fase0-soft-delete. */}
+          {!isTerminal && (
+            <button
+              type="button"
+              onClick={() => setShowInvite(true)}
+              disabled={busy}
+              className="text-xs font-bold px-4 py-2 rounded-full border-2 border-black text-black bg-white hover:bg-gray-50 disabled:opacity-50"
+              title="Envía la invitación de Wellness o de Hiring Manager. En preview solo llega a la lista de prueba."
+            >
+              Invitar a entrevista
             </button>
           )}
 
@@ -2075,6 +2527,38 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
             </button>
           )}
 
+          {!isTerminal && (
+            <button
+              onClick={async () => {
+                if (busy) return;
+                setBusy(true);
+                setFeedback("Creando borrador de pruebas…");
+                try {
+                  const r = await fetch(`/api/headhunting/candidates/${cand.id}/send-test-battery`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({}),
+                  });
+                  const j = await r.json();
+                  if (j.success) {
+                    setFeedback(`✅ ${j.note || "Borrador listo en Gmail. Antes de enviarlo, pega los enlaces de Bluesite y Psicoalianza."}`);
+                  } else {
+                    setFeedback(`❌ ${[j.error, j.detail].filter(Boolean).join(" · ") || "Error"}`);
+                  }
+                } catch (e) {
+                  setFeedback(`❌ ${(e as Error).message}`);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              disabled={busy}
+              className="text-xs font-bold px-4 py-2 rounded-full border-2 border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 disabled:opacity-50"
+              title="Crea un borrador en Gmail. Antes de enviarlo, pega los enlaces personalizados de Bluesite y Psicoalianza."
+            >
+              Pruebas complementarias
+            </button>
+          )}
+
           {!isTerminal && currentStage === "cwo_interview" && (
             <button
               onClick={async () => {
@@ -2156,6 +2640,32 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
           </Section>
 
           {/* Estado */}
+          <Section title="Canal">
+            <div className="text-[11px] text-gray-500 mb-2">{cand.source ? etiquetaCanal(cand.source) : "Sin canal"}</div>
+            <CanalSelect value={canal} onChange={setCanal} />
+            <button
+              type="button"
+              className="mt-2 text-xs font-bold px-3 py-1.5 bg-black text-white"
+              onClick={async () => {
+                const err = errorCanal(canal);
+                if (err) { setCanalMsg(err); return; }
+                setCanalMsg(null);
+                const r = await fetch(`/api/headhunting/candidates/${cand.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ source: canal, exigir_canal: true }),
+                });
+                const j = await r.json().catch(() => ({}));
+                if (!r.ok) { setCanalMsg(j.error || "No se guardó el canal."); return; }
+                setCanalMsg("Canal guardado.");
+                onChanged?.();
+              }}
+            >
+              Guardar canal
+            </button>
+            {canalMsg && <div className="text-xs mt-1 text-gray-700">{canalMsg}</div>}
+          </Section>
+
           <Section title="Estado actual">
             <Row k="Stage" v={<span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{cand.stage || "aplico"}</span>} />
             <Row k="Status Integridad" v={cand.status} />
@@ -2169,6 +2679,9 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
             {cand.prefilter_completed_at && (
               <Row k="Completó prefiltro" v={new Date(cand.prefilter_completed_at).toLocaleString("es-CO")} />
             )}
+            {cand.notes?.includes(NOTA_BATERIA_PENDIENTE) && (
+              <Row k="Batería TS" v={NOTA_BATERIA_PENDIENTE} />
+            )}
           </Section>
 
           {/* Historial de contactos · correos de Gmail, WhatsApp importado,
@@ -2178,8 +2691,10 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
           </Section>
 
           {/* Motivo de rechazo · solo si ya está clasificado */}
-          {cand.stage === "rechazado" && cand.rejection_category && (
-            <RejectionDetailBlock cand={cand} />
+          {cand.stage === "rechazado" && (
+            cand.rejection_category
+              ? <RejectionDetailBlock cand={cand} />
+              : <Section title="Motivo"><div className="text-sm text-amber-800">Sin motivo</div></Section>
           )}
 
           {/* Elevare results — solo si ya hizo el assessment */}
@@ -2449,6 +2964,7 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
         candidateId={cand.id}
         candidateName={cand.name}
         vacancyTitle={cand.ht_vacancies?.title || "la posición"}
+        lang={langDe(cand)}
         onClose={() => setShowRejectModal(false)}
         onRejected={() => {
           setShowRejectModal(false);
@@ -2458,6 +2974,14 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
             onClose();
           }, 1200);
         }}
+      />
+    )}
+
+    {showInvite && (
+      <InvitarEntrevistaModal
+        candidateId={cand.id}
+        candidateName={cand.name || ""}
+        onClose={() => setShowInvite(false)}
       />
     )}
 
@@ -3221,14 +3745,4 @@ function RobustAudioPlayer({
 }
 
 
-// ─── Legend item · usado en la barra superior del Funnel ──────────
-function LegendItem({ icon: Icon, label, color }: { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; label: string; color: string }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="w-3 h-[3px]" style={{ background: color }} />
-      <Icon className="w-3 h-3" style={{ color }} />
-      <span className="text-[11px] font-semibold text-[var(--ts-gray-90)]">{label}</span>
-    </div>
-  );
-}
 

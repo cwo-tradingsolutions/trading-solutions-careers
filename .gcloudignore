@@ -1,0 +1,27 @@
+# Lo que sube `gcloud builds submit` (sin esto usaría .gitignore, que deja
+# fuera package-lock.json). Fuera: secretos, datos y material de trabajo.
+.git
+.gitignore
+node_modules
+.next
+.vercel
+.env*
+*.tsbuildinfo
+*.patch
+*.tar
+*.tgz
+*.zip
+*.sql
+Claude outputs/
+_to_delete/
+_aplicados/
+compensacion-wxm/
+migrations/
+sql/
+supabase/
+docs/
+*.md
+!README.md
+.DS_Store
+.prev/
+scripts/

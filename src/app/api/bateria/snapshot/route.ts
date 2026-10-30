@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { almacen } from "@/lib/almacen";
+import { isPreviewTestMode, previewTestJson } from '@/lib/preview-mode';
 import { supabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -38,10 +40,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Captura demasiado grande' }, { status: 413 });
     }
 
+    if (isPreviewTestMode()) {
+      return previewTestJson('POST /api/bateria/snapshot', { saved: true });
+    }
+
     const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
     const path = `bateria/${session.id}/${block ?? 'X'}_${Date.now()}.${ext}`;
 
-    const { error: upErr } = await supabaseAdmin.storage.from(BUCKET).upload(path, binary, {
+    const { error: upErr } = await almacen(BUCKET).upload(path, binary, {
       contentType: mime,
       cacheControl: '3600',
       upsert: false,
