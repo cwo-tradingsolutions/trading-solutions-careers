@@ -566,6 +566,9 @@ test("login copy defaults to English, and rejection uses only the session email"
   assert.equal(loginCopy("es").title, "Te damos la bienvenida.");
   assert.equal(loginCopy("es").heroLead, "El talento que");
   assert.equal(loginCopy("es").heroRest, "mueve al mundo.");
+  assert.equal(loginCopy("es").toolLine, "Adquisición de talento · Herramienta interna");
+  assert.equal(loginCopy("es").tagline, "Donde la visión se encuentra con la ejecución.");
+  assert.match(form, /<Hero lang=\{lang\} \/>/);
   assert.match(page, /LoginFallback googleHref=\{googleHref\}/);
   assert.match(page, /googleLoginHref\(next\)/);
   assert.equal(reject.includes("body.rejected_by"), false);
@@ -603,6 +606,7 @@ test("equal auth secrets are refused and the health check logs the failure", asy
     const { GET } = await import("../app/api/health/route.ts");
     const res = await GET();
     assert.equal(res.status, 503);
+    assert.deepEqual(await res.json(), { ok: false });
     assert.match(lines.join("\n"), /\[hr-admin\] FATAL: HR_ADMIN_SESSION_SECRET must not equal ADMIN_SECRET/);
     assert.equal(readSessionSecret(), null);
     const shared = "shared-auth-secret-value-32-characters";

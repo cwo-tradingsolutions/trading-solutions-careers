@@ -60,6 +60,7 @@ export async function middleware(request: NextRequest) {
         WXM_SERVICE_SECRET: process.env.WXM_SERVICE_SECRET,
         HR_ADMIN_SESSION_SECRET: process.env.HR_ADMIN_SESSION_SECRET,
         ADMIN_SCRIPTS_SECRET: process.env.ADMIN_SCRIPTS_SECRET,
+        PORTAL_TOKEN_SECRET: process.env.PORTAL_TOKEN_SECRET,
       })) {
     return NextResponse.json(
       { error: 'Servicio temporalmente no disponible.' },

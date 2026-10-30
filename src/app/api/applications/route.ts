@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, initDB } from "@/lib/db";
 import { prefilter, toPrefilterData } from "@/lib/agent/prefilter";
 import { generatePortalToken } from "@/lib/portal-token";
+import { readPortalSecret, SESSION_SECRET_FATAL_LOG } from "@/lib/hr-admin-secrets";
 import { getResend, EMAIL_FROM } from "@/lib/resend";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -67,6 +68,22 @@ export async function POST(request: NextRequest) {
 
     await ensureDB();
 
+    // The portal link needs an id. Reserve it and sign before the INSERT so a
+    // missing PORTAL_TOKEN_SECRET cannot save a row and then return 500.
+    if (!readPortalSecret()) {
+      console.error(`${SESSION_SECRET_FATAL_LOG}: PORTAL_TOKEN_SECRET is missing, shorter than 32 characters, or equal to another auth secret`);
+      return NextResponse.json(publicStepBody(), { status: 503 });
+    }
+    const reserved = await sql`
+      SELECT nextval(pg_get_serial_sequence('applications', 'id')) AS id
+    `;
+    const newId = Number(reserved[0]?.id);
+    if (!Number.isFinite(newId) || newId <= 0) {
+      console.error(`${SESSION_SECRET_FATAL_LOG}: could not reserve an application id`);
+      return NextResponse.json(publicStepBody(), { status: 503 });
+    }
+    const portalToken = generatePortalToken(newId, email);
+
     // ─── Detectar candidato INTERNO ────────────────────────────────────
     // Criterios (cualquiera dispara internal):
     //   1. Email termina en @tradingsolutions.com (más robusto · no se puede falsear)
@@ -97,18 +114,16 @@ export async function POST(request: NextRequest) {
 
     const result = await sql`
       INSERT INTO applications (
-        job_id, job_title, full_name, email, phone, linkedin,
+        id, job_id, job_title, full_name, email, phone, linkedin,
         cv_filename, cv_data, why_ts, status, score, prefilter_data
       )
       VALUES (
-        ${job_id}, ${job_title || ''}, ${full_name}, ${email}, ${phone || null}, ${linkedin || null},
+        ${newId}, ${job_id}, ${job_title || ''}, ${full_name}, ${email}, ${phone || null}, ${linkedin || null},
         ${cv_filename || null}, ${cv_data || null}, ${why_ts || null},
         ${initialStatus}, ${pf.score}, ${JSON.stringify(prefilterPayload)}::jsonb
       )
       RETURNING id, created_at, status, score
     `;
-
-    const newId = result[0].id as number;
 
     // ─── Auto-sync al funnel del ATS (Supabase ht_candidates) ──
     // Cada nueva aplicación entra directo al funnel en stage 'aplico'
@@ -205,7 +220,6 @@ export async function POST(request: NextRequest) {
     const isWebApply = !request.headers.get('x-skip-email');
     if (isWebApply && email) {
       try {
-        const portalToken = generatePortalToken(newId, email);
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://trading-solutions-careers.vercel.app';
         const portalLink = `${baseUrl}/portal/${portalToken}`;
 
@@ -312,7 +326,7 @@ export async function POST(request: NextRequest) {
         status: result[0].status,
         score: result[0].score,
         prefilter: prefilterPayload,
-        portal_token: generatePortalToken(newId, email),
+        portal_token: portalToken,
       },
       { status: 201 }
     );

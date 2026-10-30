@@ -54,11 +54,34 @@ export function sessionSecretFailure(env: NodeJS.ProcessEnv = process.env): stri
   return null;
 }
 
-export function logSessionSecretFailure(env: NodeJS.ProcessEnv = process.env): string | null {
-  const problem = sessionSecretFailure(env);
+export function portalSecretFailure(env: NodeJS.ProcessEnv = process.env): string | null {
+  const value = (env.PORTAL_TOKEN_SECRET ?? "").trim();
+  if (value.length < MIN_PORTAL_SECRET_LENGTH) {
+    return "PORTAL_TOKEN_SECRET is missing or shorter than 32 characters";
+  }
+  if (!secretIsDistinct("PORTAL_TOKEN_SECRET", env)) {
+    return "PORTAL_TOKEN_SECRET must not equal another auth secret";
+  }
+  return null;
+}
+
+/** Session signer and portal signer. Either one blocks a candidate-facing host. */
+export function startupSecretFailure(env: NodeJS.ProcessEnv = process.env): string | null {
+  return sessionSecretFailure(env) || portalSecretFailure(env);
+}
+
+export function logStartupSecretFailure(env: NodeJS.ProcessEnv = process.env): string | null {
+  const problem = startupSecretFailure(env);
   if (!problem) return null;
   console.error(`${SESSION_SECRET_FATAL_LOG}: ${problem}`);
   return problem;
+}
+
+/** True only for a live candidate-facing server. Never during `next build`. */
+export function shouldExitOnStartupFailure(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.NEXT_PHASE === "phase-production-build") return false;
+  if (env.npm_lifecycle_event === "build") return false;
+  return Boolean((env.K_SERVICE ?? "").trim()) || env.VERCEL_ENV === "production";
 }
 
 export function readSessionSecret(env: NodeJS.ProcessEnv = process.env): string | null {

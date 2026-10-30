@@ -3,6 +3,8 @@ export type LoginLang = "en" | "es";
 export type LoginCopy = {
   kicker: string;
   title: string;
+  toolLine: string;
+  tagline: string;
   heroLead: string;
   heroRest: string;
   subtitle: string;
@@ -26,6 +28,8 @@ export const LOGIN_COPY: Record<LoginLang, LoginCopy> = {
   en: {
     kicker: "HR Admin",
     title: "Welcome.",
+    toolLine: "Talent Acquisition · Internal Tool",
+    tagline: "Where vision meets execution.",
     heroLead: "Talent that",
     heroRest: "moves the world.",
     subtitle: "Restricted access · Talent Acquisition.",
@@ -47,6 +51,8 @@ export const LOGIN_COPY: Record<LoginLang, LoginCopy> = {
   es: {
     kicker: "HR Admin",
     title: "Te damos la bienvenida.",
+    toolLine: "Adquisición de talento · Herramienta interna",
+    tagline: "Donde la visión se encuentra con la ejecución.",
     heroLead: "El talento que",
     heroRest: "mueve al mundo.",
     subtitle: "Acceso restringido · Equipo de Talent Acquisition.",

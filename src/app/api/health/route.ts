@@ -1,17 +1,13 @@
 import { NextResponse } from "next/server";
-import { logSessionSecretFailure } from "@/lib/hr-admin-secrets";
+import { logStartupSecretFailure } from "@/lib/hr-admin-secrets";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/** Loud failure when the session signer is missing or reused as another secret. */
+/** 503 when the session or portal signer cannot be used. The log has the reason. */
 export async function GET() {
-  const problem = logSessionSecretFailure();
-  if (problem) {
-    return NextResponse.json(
-      { ok: false, error: "HR_ADMIN_SESSION_SECRET is not usable" },
-      { status: 503, headers: { "Cache-Control": "no-store" } },
-    );
+  if (logStartupSecretFailure()) {
+    return NextResponse.json({ ok: false }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
   return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }

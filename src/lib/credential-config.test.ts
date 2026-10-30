@@ -5,7 +5,7 @@ import { NextRequest } from 'next/server';
 import { middleware } from '../middleware';
 import { isMaskedCredential } from './credential-config';
 
-const KEYS = ['ADMIN_SECRET', 'CRON_SECRET', 'WXM_SERVICE_SECRET', 'HR_ADMIN_SESSION_SECRET', 'ADMIN_SCRIPTS_SECRET'] as const;
+const KEYS = ['ADMIN_SECRET', 'CRON_SECRET', 'WXM_SERVICE_SECRET', 'HR_ADMIN_SESSION_SECRET', 'ADMIN_SCRIPTS_SECRET', 'PORTAL_TOKEN_SECRET'] as const;
 const originals = Object.fromEntries(KEYS.map(key => [key, process.env[key]]));
 const VALID = 'clave-valida-ficticia-para-pruebas';
 const SESSION = `${VALID}-session`;
@@ -15,6 +15,7 @@ beforeEach(() => {
   for (const key of KEYS) process.env[key] = VALID;
   process.env.HR_ADMIN_SESSION_SECRET = SESSION;
   process.env.ADMIN_SCRIPTS_SECRET = SCRIPTS;
+  process.env.PORTAL_TOKEN_SECRET = `${VALID}-portal-token-32`;
   process.env.HR_ADMIN_ALLOWED_EMAILS = 'kelly@tradingsolutions.com';
 });
 afterEach(() => {

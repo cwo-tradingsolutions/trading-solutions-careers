@@ -17,19 +17,21 @@ Set the same names on the staging host and on production (Vercel Production and 
 | `GOOGLE_ADMIN_OAUTH_CLIENT_ID` | both, when Google sign-in is turned on | The HR Admin OAuth client. Not the Gmail client (`GOOGLE_CLIENT_ID`). |
 | `GOOGLE_ADMIN_OAUTH_CLIENT_SECRET` | both | Server only, token exchange. |
 | `HR_ADMIN_ALLOWED_EMAILS` | both | Comma-separated `@tradingsolutions.com` emails. Re-checked on every request. Cloud Run value: `cwo@tradingsolutions.com,jointheteam@tradingsolutions.com`. Empty admits nobody through Google, IAP, or an existing session. |
-| `HR_ADMIN_SESSION_SECRET` | both, required | The app only. Signs `hr_admin_session` and the OAuth state cookie. Missing, shorter than 16 characters, or equal to another auth secret: no session. Startup and `GET /api/health` log `[hr-admin] FATAL` and fail. Cloud Run secret: `prod-careers-hr-admin-session-secret` / `stg-careers-hr-admin-session-secret`. |
+| `HR_ADMIN_SESSION_SECRET` | both, required before a candidate-facing deploy | Signs the session. Missing, shorter than 16 characters, or equal to another auth secret: `[hr-admin] FATAL` in the log, `process.exit(1)` on Cloud Run and Vercel production (never during `next build`), and `GET /api/health` returns 503 `{ok:false}`. Load it in Vercel Production before this revision deploys. Cloud Run secret: `prd-careers-hr-admin-session-secret` / `stg-careers-hr-admin-session-secret`. |
 | `HR_ADMIN_PASSWORD_LOGIN_ENABLED` | `0` at cutover | Vault break-glass. On only for `1`, `true`, `yes`, or `on`. The password itself must be at least 16 characters. Retired 7 days after Google sign-in is live. |
 | `ADMIN_SECRET` | both, rotated | Vault password for `POST /api/hr-admin/login` only, and only while the flag is on. Not a session signer, not a script key, and not the portal signer. Must differ from the other three secrets. |
-| `ADMIN_SCRIPTS_SECRET` | both, if those jobs still run | Only the three script routes below. Unset, or equal to another auth secret: those calls fail closed. Cloud Run secret: `prod-careers-admin-scripts-secret` / `stg-careers-admin-scripts-secret`. |
-| `PORTAL_TOKEN_SECRET` | both | Signs new candidate portal links. At least 32 characters. Must differ from the other secrets. Cloud Run secret: `prod-careers-portal-token-secret` / `stg-careers-portal-token-secret`. |
-| `PORTAL_TOKEN_LEGACY_UNTIL` | optional, 7 days | ISO date or timestamp. Until that moment, portal links already sent (signed with `ADMIN_SECRET`) still verify. After it, or if unset, only `PORTAL_TOKEN_SECRET` works. A date-only value includes that UTC day. |
+| `ADMIN_SCRIPTS_SECRET` | optional | Only the three script routes below. The Cloud Run YAML does not reference it, so the service starts without the secret. Add `prd-careers-admin-scripts-secret` or `stg-careers-admin-scripts-secret` only when those jobs run. Unset, short, or equal to another secret: those calls fail closed. |
+| `PORTAL_TOKEN_SECRET` | both, required before a candidate-facing deploy | Signs new portal links. At least 32 characters. Missing, short, or duplicated: same FATAL startup exit and health 503 as the session secret, and `POST /api/applications` refuses before inserting. Cloud Run secret: `prd-careers-portal-token-secret` / `stg-careers-portal-token-secret`. |
+| `PORTAL_TOKEN_LEGACY_UNTIL` | placeholder until cutover | Only `YYYY-MM-DD`, and at most 14 days after the check. The YAML value `SET_AT_CUTOVER_YYYY-MM-DD` is ignored, so legacy links stay off until the cutover date is set. `ADMIN_SECRET` must be at least 16 characters for those old links. |
 | `GOOGLE_MAILBOX_ALLOWED_EMAILS` | both | Cloud Run sets `jointheteam@tradingsolutions.com`. The mailbox the careers service may send as. |
 | `IAP_AUDIENCE` | Cloud Run only | Expected `aud` of the IAP JWT. The service YAML ships `REPLACE_WITH_IAP_AUDIENCE` until the load balancer id is filled in. Leave unset on Vercel. |
 | `NEXT_PUBLIC_APP_URL` | already set | Public origin. Redirect URI is `{origin}/api/hr-admin/login/google/callback`. |
 
 `HR_ADMIN_SESSION_SECRET`, `ADMIN_SECRET`, `ADMIN_SCRIPTS_SECRET`, and `PORTAL_TOKEN_SECRET` must all be different values. If any two match, the ones that match are refused. On Cloud Run (`K_SERVICE`) and on Vercel production, a missing or reused session secret also throws at startup after the `[hr-admin] FATAL` line. `GET /api/health` returns 503 in that case.
 
-Google OAuth client secrets on both Cloud Run services are `prod-careers-google-admin-oauth-client-id` and `prod-careers-google-admin-oauth-client-secret`.
+Production OAuth secrets: `prd-careers-google-admin-oauth-client-id` and `prd-careers-google-admin-oauth-client-secret`. Staging needs its own pair, `stg-careers-google-admin-oauth-client-id` and `stg-careers-google-admin-oauth-client-secret`, with redirect URI `https://stg-careers-gcp-z4sq5ztzyq-uw.a.run.app/api/hr-admin/login/google/callback`. The image gets that origin from `_APP_URL` in `infra/gcp/careers.cloudbuild.yaml`. Production builds pass `_APP_URL=https://careers.tradingsolutions.com`.
+
+Load `HR_ADMIN_SESSION_SECRET` and `PORTAL_TOKEN_SECRET` in Vercel Production before this revision is deployed. Without them the production server exits at startup and `/api/health` stays 503.
 
 ### Who calls `ADMIN_SCRIPTS_SECRET`
 

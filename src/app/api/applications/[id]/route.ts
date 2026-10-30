@@ -24,14 +24,15 @@ async function ensureDB() {
 // decidiendo, pero NO tiene que escribir el correo de cada candidato.
 async function sendStatusTransitionEmail(
   appRow: { id: number; full_name: string; email: string; job_title: string; job_id: number | null },
-  newStatus: string
+  newStatus: string,
+  portalToken: string,
 ) {
   if (!appRow.email) return;
   // Determinar qué template usar según status
   let subject = "";
   let html = "";
   const firstName = appRow.full_name.split(" ")[0];
-  const portalLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://trading-solutions-careers.vercel.app'}/portal/${generatePortalToken(appRow.id, appRow.email)}`;
+  const portalLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://trading-solutions-careers.vercel.app'}/portal/${portalToken}`;
 
   // Kelly: no BCC on candidate mail. Reply-To and the booking link still come from config.
   const bcc = candidateMailBcc();
@@ -165,13 +166,6 @@ export async function PATCH(
     }
     const prev = before[0] as { id: number; full_name: string; email: string; job_title: string; job_id: number | null; status: string };
 
-    const result = await sql`
-      UPDATE applications
-      SET status = ${status}, updated_at = NOW()
-      WHERE id = ${id}
-      RETURNING id, status, updated_at
-    `;
-
     // Rejection has its own flag. Interview, offer and hired use
     // APPLICATION_STATUS_EMAILS_ENABLED, which stays off until it is set.
     const wantsEmail = !skipEmail && prev.status !== status;
@@ -182,8 +176,25 @@ export async function PATCH(
         ? rejectionEmailsEnabled()
         : statusMail && applicationStatusEmailsEnabled()
     );
+    let portalToken = "";
     if (emailTriggered) {
-      await sendStatusTransitionEmail(prev, status);
+      try {
+        portalToken = generatePortalToken(prev.id, prev.email);
+      } catch (err) {
+        console.error("[hr-admin] FATAL: PORTAL_TOKEN_SECRET is not usable; status was not changed");
+        return NextResponse.json(publicStepBody(), { status: 503 });
+      }
+    }
+
+    const result = await sql`
+      UPDATE applications
+      SET status = ${status}, updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING id, status, updated_at
+    `;
+
+    if (emailTriggered) {
+      await sendStatusTransitionEmail(prev, status, portalToken);
     }
 
     return NextResponse.json({ success: true, application: result[0], emailTriggered });

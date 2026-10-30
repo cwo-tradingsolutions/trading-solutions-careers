@@ -1,10 +1,9 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  if (process.env.NEXT_PHASE === "phase-production-build") return;
-  const { logSessionSecretFailure } = await import("./lib/hr-admin-secrets");
-  const problem = logSessionSecretFailure();
-  if (!problem) return;
-  if (process.env.K_SERVICE || process.env.VERCEL_ENV === "production") {
-    throw new Error(problem);
-  }
+  const { logStartupSecretFailure, shouldExitOnStartupFailure } = await import("./lib/hr-admin-secrets");
+  const problem = logStartupSecretFailure();
+  if (!problem || !shouldExitOnStartupFailure()) return;
+  // Next 14.2 keeps the process listening if register() throws. Exit so the
+  // TCP port never stays up for a bad candidate-facing host. Never at build time.
+  process.exit(1);
 }

@@ -6,6 +6,37 @@ import { loginCopy, loginErrorText, type LoginLang } from "@/lib/hr-admin-login-
 
 const HELP_EMAIL = "jointheteam@tradingsolutions.com";
 export const LOGIN_LANG_KEY = "hr-admin-lang";
+const TS_HERO = "https://cdn.prod.website-files.com/68fb7b9474bf8f90808cd50f/691645b652c1e9091b25f59c_FotosWeb_TradingSolutions-14_4_11zon.webp";
+const TS_LOGO_WHITE = "https://cdn.prod.website-files.com/68fb7b9474bf8f90808cd50f/6913594489519813fe9e620e_logo%20web-03.png";
+
+function Hero({ lang }: { lang: LoginLang }) {
+  const copy = loginCopy(lang);
+  return (
+    <div className="hidden md:flex md:w-1/2 lg:w-3/5 relative overflow-hidden">
+      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${TS_HERO})`, transform: "scale(1.05)" }} />
+      <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, rgba(var(--ts-ink-rgb),0.72) 0%, rgba(var(--ts-ink-rgb),0.28) 50%, rgba(var(--ts-ink-rgb),0.78) 100%)" }} />
+      <div className="relative z-10 flex flex-col justify-between p-10 text-white w-full">
+        <div className="flex items-center gap-3">
+          <img src={TS_LOGO_WHITE} alt="Trading Solutions" className="h-9 w-auto" />
+        </div>
+        <div>
+          <div className="ts-kicker ts-kicker-on-dark mb-3">
+            <span className="ts-mark" aria-hidden />
+            {copy.toolLine}
+          </div>
+          <h1 className="font-light text-5xl lg:text-6xl tracking-[-0.03em] leading-[0.95]">
+            {copy.heroLead}<br />{copy.heroRest}
+          </h1>
+          <div className="flex items-center gap-3 mt-5 max-w-md">
+            <div className="h-[1px] flex-1 bg-white/30" />
+            <p className="text-sm font-medium opacity-80">{copy.tagline}</p>
+          </div>
+        </div>
+        <div className="text-[11px] opacity-60 font-medium">© Trading Solutions · 2026</div>
+      </div>
+    </div>
+  );
+}
 
 export function persistLoginLang(lang: LoginLang) {
   try {
@@ -48,14 +79,18 @@ export function LoginPanel({
 }) {
   const [lang, setLang] = useState<LoginLang>(initialLang);
   const copy = loginCopy(lang);
+  const [banner, setBanner] = useState<"bad_password" | "password_off" | "network" | "not_allowed" | "iap_invalid" | null>(null);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [passwordEnabled, setPasswordEnabled] = useState(false);
-  const [err, setErr] = useState<string | null>(loginErrorText(lang, errorCode));
-
-  useEffect(() => {
-    setErr(loginErrorText(lang, errorCode));
-  }, [lang, errorCode]);
+  const bannerText =
+    banner === "bad_password" ? copy.badPassword
+    : banner === "password_off" ? copy.passwordOff
+    : banner === "network" ? copy.network
+    : banner === "not_allowed" ? copy.notAllowed
+    : banner === "iap_invalid" ? copy.iapInvalid
+    : null;
+  const err = loginErrorText(lang, errorCode) ?? bannerText;
 
   useEffect(() => {
     try {
@@ -87,8 +122,8 @@ export function LoginPanel({
           return;
         }
         if (cfg && cfg.passwordEnabled === true) setPasswordEnabled(true);
-        if (!errorCode && iapRes.status === 403) setErr(loginCopy(lang).notAllowed);
-        else if (!errorCode && iap?.error === "iap_invalid") setErr(loginCopy(lang).iapInvalid);
+        if (!errorCode && iapRes.status === 403) setBanner("not_allowed");
+        else if (!errorCode && iap?.error === "iap_invalid") setBanner("iap_invalid");
       } catch {
         // The Google button still works. The password form stays hidden.
       }
@@ -96,12 +131,12 @@ export function LoginPanel({
     return () => {
       cancelled = true;
     };
-  }, [next, errorCode, lang]);
+  }, [next, errorCode]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setErr(null);
+    setBanner(null);
     try {
       const response = await fetch("/api/hr-admin/login", {
         method: "POST",
@@ -112,17 +147,20 @@ export function LoginPanel({
         window.location.assign(next);
         return;
       }
-      if (response.status === 401) setErr(copy.badPassword);
-      else if (response.status === 403) setErr(copy.passwordOff);
-      else setErr(copy.network);
+      if (response.status === 401) setBanner("bad_password");
+      else if (response.status === 403) setBanner("password_off");
+      else setBanner("network");
     } catch {
-      setErr(copy.network);
+      setBanner("network");
     } finally {
       setLoading(false);
     }
   };
 
   return (
+    <div className="min-h-screen flex font-sans bg-ts-ink">
+      <Hero lang={lang} />
+      <div className="flex-1 flex items-center justify-center p-6 bg-ts-canvas">
     <div className="w-full max-w-sm">
       <div className="flex justify-end gap-2 text-xs mb-4">
         <button
@@ -206,6 +244,8 @@ export function LoginPanel({
             {HELP_EMAIL}
           </a>
         </p>
+      </div>
+    </div>
       </div>
     </div>
   );

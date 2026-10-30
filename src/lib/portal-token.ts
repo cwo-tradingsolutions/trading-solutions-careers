@@ -10,7 +10,12 @@
  * ADMIN_SECRET, para que los links ya enviados sigan abriendo.
  */
 import crypto from "crypto";
-import { readPortalSecret } from "./hr-admin-secrets";
+import { MIN_AUTH_SECRET_LENGTH, readPortalSecret } from "./hr-admin-secrets";
+
+/** Legacy window cannot run longer than this, measured from the check time. */
+export const PORTAL_LEGACY_MAX_DAYS = 14;
+
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 function hmac16(secret: string, applicationId: number, email: string): string {
   const data = `${applicationId}|${email.toLowerCase().trim()}`;
@@ -22,23 +27,31 @@ function timingSafeHex(expected: string, provided: string): boolean {
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(provided));
 }
 
-/** Date-only values include that UTC day. A full timestamp is used as given. */
-export function legacyPortalUntilMs(raw: string | undefined | null): number | null {
+/**
+ * Only `YYYY-MM-DD`. The day is included, and it cannot sit more than
+ * PORTAL_LEGACY_MAX_DAYS after `now`. Anything else is ignored.
+ */
+export function legacyPortalUntilMs(raw: string | undefined | null, now = Date.now()): number | null {
   const value = (raw ?? "").trim();
-  if (!value) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const end = Date.parse(`${value}T23:59:59.999Z`);
-    return Number.isFinite(end) ? end : null;
+  const match = ISO_DATE.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const end = Date.UTC(year, month - 1, day, 23, 59, 59, 999);
+  const check = new Date(end);
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) {
+    return null;
   }
-  const end = Date.parse(value);
-  return Number.isFinite(end) ? end : null;
+  if (end > now + PORTAL_LEGACY_MAX_DAYS * 24 * 60 * 60 * 1000) return null;
+  return end;
 }
 
 export function legacyPortalSecret(now = Date.now(), env: NodeJS.ProcessEnv = process.env): string | null {
-  const until = legacyPortalUntilMs(env.PORTAL_TOKEN_LEGACY_UNTIL);
+  const until = legacyPortalUntilMs(env.PORTAL_TOKEN_LEGACY_UNTIL, now);
   if (until === null || now > until) return null;
   const admin = (env.ADMIN_SECRET ?? "").trim();
-  if (admin.length < 8) return null;
+  if (admin.length < MIN_AUTH_SECRET_LENGTH) return null;
   return admin;
 }
 
