@@ -11,7 +11,7 @@
  *
  * Sin paquete `googleapis` — usamos fetch directo. Más liviano, sin deps extra.
  */
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 import { ATS_FROM_NAME } from "@/lib/ats-from";
 
 export { ATS_FROM_NAME, ATS_FROM_NAME_EN } from "@/lib/ats-from";

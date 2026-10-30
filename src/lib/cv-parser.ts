@@ -11,13 +11,12 @@
  * Costo estimado: ~$0.03 USD por CV con claude-haiku-4-5 · ~$0.15 con sonnet-4-6
  */
 import Anthropic from "@anthropic-ai/sdk";
+import { crearAnthropic } from "@/lib/anthropic";
 
 let _client: Anthropic | null = null;
 function getClient(): Anthropic {
   if (_client) return _client;
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new Error("ANTHROPIC_API_KEY is not configured");
-  _client = new Anthropic({ apiKey: key });
+  _client = crearAnthropic();
   return _client;
 }
 

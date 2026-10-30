@@ -8,7 +8,7 @@
  * false, se devuelve solo el link + un `mailto:` para que el HR Admin
  * lo dispare manualmente.
  */
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";

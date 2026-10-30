@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { almacen } from "@/lib/almacen";
 import { supabaseAdmin } from '@/lib/supabase';
 import { requireAdmin } from '@/lib/admin-auth';
 
@@ -21,9 +22,7 @@ export async function GET(
     }
 
     // List all files under the candidate's folder
-    const { data: files, error: listError } = await supabaseAdmin
-      .storage
-      .from('proctoring-snapshots')
+    const { data: files, error: listError } = await almacen('proctoring-snapshots')
       .list(candidateId, {
         limit: 500,
         sortBy: { column: 'name', order: 'asc' },
@@ -39,9 +38,7 @@ export async function GET(
     }
 
     const paths = files.map((f) => `${candidateId}/${f.name}`);
-    const { data: signed, error: signError } = await supabaseAdmin
-      .storage
-      .from('proctoring-snapshots')
+    const { data: signed, error: signError } = await almacen('proctoring-snapshots')
       .createSignedUrls(paths, 3600);
 
     if (signError) {

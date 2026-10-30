@@ -2,6 +2,7 @@
 // Uses Claude API to analyze role-play responses and generate psychometric scores
 
 import Anthropic from '@anthropic-ai/sdk';
+import { crearAnthropic } from "@/lib/anthropic";
 import {
   SYSTEM_PROMPT,
   ROLE_PLAY_SCORING_PROMPT,
@@ -25,9 +26,7 @@ import type {
 let _anthropic: Anthropic | null = null;
 function getAnthropic(): Anthropic {
   if (_anthropic) return _anthropic;
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new Error('ANTHROPIC_API_KEY is not configured');
-  _anthropic = new Anthropic({ apiKey: key });
+  _anthropic = crearAnthropic();
   return _anthropic;
 }
 const anthropic = new Proxy({} as Anthropic, {

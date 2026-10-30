@@ -11,7 +11,7 @@
  * Si force=false (default) y cv_parsed_at existe, devuelve el cache.
  * Si force=true, re-parsea.
  */
-import { neon } from "@neondatabase/serverless";
+import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { parseCV, buildCandidateText } from "@/lib/cv-parser";
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       UPDATE talent_pool
          SET cv_parsed_data = ${JSON.stringify(parsed)}::jsonb,
              cv_parsed_at = NOW(),
-             current_role = COALESCE(NULLIF(current_role, ''), ${parsed.current_title ?? null}),
+             "current_role" = COALESCE(NULLIF("current_role", ''), ${parsed.current_title ?? null}),
              years_experience = COALESCE(years_experience, ${parsed.years_experience ?? null}),
              education = COALESCE(NULLIF(education, ''), ${parsed.education_field ?? null}),
              updated_at = NOW()

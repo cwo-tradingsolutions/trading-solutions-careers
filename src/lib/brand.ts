@@ -37,3 +37,11 @@ export const LOGO_TS_SIMBOLO = "/logo-trading-solutions-simbolo.png";
  * origen, así que sigue funcionando si mañana cambia el archivo.
  */
 export const LOGO_TS_CLASE_EN_OSCURO = "brightness-0 invert";
+
+/**
+ * Símbolo del shell Universe (portal público, pack rev F): el mismo SVG que
+ * usan Universe About y el clon de Clara, junto a la palabra
+ * "Trading Solutions." en texto.
+ */
+export const UNIVERSE_SIMBOLO =
+  "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2232%22%20height%3D%2232%22%20viewBox%3D%220%200%2032%2032%22%20fill%3D%22none%22%3E%3Cpath%20fill%3D%22%23111111%22%20d%3D%22M3%203h12c.7%200%201.3.3%201.8.8L28%2015c1%201%201%202.6%200%203.5l-4%204c-.5.5-1.1.8-1.8.8H19v-3.2h3.5L28%2014.3%2015.7%202H3v14h3.2V3z%22/%3E%3Cpath%20fill%3D%22%23111111%22%20d%3D%22M29%2029H17c-.7%200-1.3-.3-1.8-.8L4%2017c-1-1-1-2.6%200-3.5l4-4c.5-.5%201.1-.8%201.8-.8H13v3.2H9.5L4%2017.7%2016.3%2030H29V16h-3.2V29z%22/%3E%3C/svg%3E";

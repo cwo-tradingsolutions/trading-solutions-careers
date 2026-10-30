@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import Anthropic from "@anthropic-ai/sdk";
+import { crearAnthropic } from "@/lib/anthropic";
 
 // Permitir hasta 90s — los 3 agentes Claude en paralelo con transcripts de
 // 14K chars pueden tardar 40-60s. Vercel Pro permite hasta 90s.
@@ -21,9 +22,7 @@ export const runtime = "nodejs";
 let _anthropic: Anthropic | null = null;
 function getAnthropic(): Anthropic {
   if (_anthropic) return _anthropic;
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new Error("ANTHROPIC_API_KEY no configurado");
-  _anthropic = new Anthropic({ apiKey: key });
+  _anthropic = crearAnthropic();
   return _anthropic;
 }
 
