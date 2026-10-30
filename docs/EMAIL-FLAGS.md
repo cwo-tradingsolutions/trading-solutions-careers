@@ -12,7 +12,7 @@ Each on/off flag stays off unless the value is `1`, `true`, `yes`, or `on`. Miss
 | `REJECTION_EMAILS_ENABLED` | Rejection mail with the approved general ES/EN text. A stage move to `rechazado`, reject-with-reason, and resend (draft mode) create a Gmail draft. `PATCH /api/applications/[id]` with status `rejected` sends that same copy. | off | `1` (on) |
 | `INTERVIEW_TEST_RECIPIENTS` | Interview-invite allowlist. Missing or empty refuses the send. Only `cwo@tradingsolutions.com` and `jointheteam@tradingsolutions.com` can receive. | unset (send refused) | `cwo@tradingsolutions.com,jointheteam@tradingsolutions.com` (approved) |
 | `INTERVIEW_INVITES_UNRESTRICTED` | The only lift that mails the real candidate and the interviewer. | off | not set |
-| `EMAIL_BCC` | BCC for the public application acknowledgement (`POST /api/applications`), the assessment invite when `send_email` is set (`POST /api/assessments`), and status mail from `PATCH /api/applications/[id]`. Each path uses `recruiter_config.email_bcc` when that field is set, and otherwise this variable. | empty | removed / empty |
+| `EMAIL_BCC` | Not read. The acknowledgement (`POST /api/applications`), the assessment invite when `send_email` is set (`POST /api/assessments`), and status mail from `PATCH /api/applications/[id]` call `candidateMailBcc()` and send with no BCC. `recruiter_config.email_bcc` is not selected on those paths. | empty | removed / empty |
 
 `INTERVIEW_INVITES_ENABLED` does not gate the send. `decideDelivery` ignores it. The invite GET reports `production_enabled` from it. Planned prod value: not set.
 

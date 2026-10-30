@@ -8,6 +8,7 @@ import { candidateSignatureHtml } from "@/lib/ats-from";
 import { applicationStatusEmailsEnabled } from "@/lib/application-status-email";
 import { buildRejectionHtml, REJECTION_REPLY_TO, rejectionEmailsEnabled, rejectionSubject } from "@/lib/rejection-email";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
+import { candidateMailBcc } from "@/lib/candidate-bcc";
 
 let dbInitialized = false;
 
@@ -31,14 +32,13 @@ async function sendStatusTransitionEmail(
   const firstName = appRow.full_name.split(" ")[0];
   const portalLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://trading-solutions-careers.vercel.app'}/portal/${generatePortalToken(appRow.id, appRow.email)}`;
 
-  // Pull config dinámica (bcc, reply_to, booking_url)
-  let bcc: string | null = process.env.EMAIL_BCC ?? null;
+  // Kelly: no BCC on candidate mail. Reply-To and the booking link still come from config.
+  const bcc = candidateMailBcc();
   let replyTo: string | null = null;
   let bookingUrl: string | null = null;
   try {
-    const cfgRows = await sql`SELECT email_bcc, email_reply_to, booking_url FROM recruiter_config WHERE id = 1`;
+    const cfgRows = await sql`SELECT email_reply_to, booking_url FROM recruiter_config WHERE id = 1`;
     if (cfgRows.length > 0) {
-      bcc = (cfgRows[0].email_bcc as string) || bcc;
       replyTo = (cfgRows[0].email_reply_to as string) || null;
       bookingUrl = (cfgRows[0].booking_url as string) || null;
     }

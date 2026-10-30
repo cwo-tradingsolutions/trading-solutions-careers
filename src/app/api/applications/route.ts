@@ -12,6 +12,7 @@ import { resolverVacante } from "@/lib/vacancy-map";
 import { isEnglishTemplate, resolveCandidateLang } from "@/lib/candidate-lang";
 import { candidateSignatureHtml } from "@/lib/ats-from";
 import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
+import { candidateMailBcc } from "@/lib/candidate-bcc";
 import { canalPostulacionPublica } from "@/lib/candidate-source";
 import { publicStepBody } from "@/lib/candidate-public-error";
 
@@ -207,16 +208,15 @@ export async function POST(request: NextRequest) {
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://trading-solutions-careers.vercel.app';
         const portalLink = `${baseUrl}/portal/${portalToken}`;
 
-        // Pull config de bcc/reply_to dinámicos
-        let bcc: string | null = process.env.EMAIL_BCC ?? null;
+        // Kelly: no BCC on candidate mail. Reply-To still comes from config.
+        const bcc = candidateMailBcc();
         let replyTo: string | null = null;
         try {
-          const cfgRows = await sql`SELECT email_bcc, email_reply_to FROM recruiter_config WHERE id = 1`;
+          const cfgRows = await sql`SELECT email_reply_to FROM recruiter_config WHERE id = 1`;
           if (cfgRows.length > 0) {
-            bcc = (cfgRows[0].email_bcc as string) || bcc;
             replyTo = (cfgRows[0].email_reply_to as string) || null;
           }
-        } catch { /* config no existe aún — usa defaults */ }
+        } catch { /* config no existe aún — el acuse sale sin Reply-To */ }
 
         const firstName = full_name.split(' ')[0];
         // Las vacantes de China corren en inglés · mandarles el acuse en
