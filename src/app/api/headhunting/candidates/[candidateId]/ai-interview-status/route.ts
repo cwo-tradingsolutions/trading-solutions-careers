@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { visibleRecommendation } from "@/lib/ai-recommendation";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export async function GET(
@@ -28,5 +29,9 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ interview: data || null });
+  return NextResponse.json({
+    interview: data
+      ? { ...data, ai_recommendation: visibleRecommendation(data.ai_recommendation) }
+      : null,
+  });
 }

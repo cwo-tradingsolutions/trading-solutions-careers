@@ -3254,6 +3254,10 @@ function AIInterviewBlock({ candidateId, candidateEmail }: { candidateId: string
         </>
       ) : interview && interview.status === "completed" && interview.conversation_id && interview.ai_score == null ? (
         <PendingScoringPanel interview={interview} onScored={() => load()} candidateEmail={candidateEmail} />
+      ) : interview && interview.status === "failed" ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 text-xs text-amber-950">
+          Requiere revisión. No se reenvía sola.
+        </div>
       ) : interview && interview.status === "in_progress" ? (
         <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-3 text-xs text-blue-900">
           ⏳ Candidato en entrevista — esperando que termine. Iniciada: {new Date(interview.started_at).toLocaleString("es-CO")}
@@ -3269,17 +3273,19 @@ function AIInterviewBlock({ candidateId, candidateEmail }: { candidateId: string
       )}
 
       <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={sendInterview}
-          disabled={sending || (interview && interview.status === "in_progress")}
-          className="text-xs font-semibold px-3 py-1.5 rounded-full bg-pink-600 text-white hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {sending ? "…" :
-            interview && interview.status === "completed" ? "🔄 Reenviar entrevista" :
-            interview && interview.status === "invited" ? "🔄 Reenviar enlace" :
-            "🎙️ Enviar entrevista IA"}
-        </button>
-        {interview?.token && (
+        {interview?.status !== "failed" && (
+          <button
+            onClick={sendInterview}
+            disabled={sending || (interview && interview.status === "in_progress")}
+            className="text-xs font-semibold px-3 py-1.5 rounded-full bg-pink-600 text-white hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {sending ? "…" :
+              interview && interview.status === "completed" ? "🔄 Reenviar entrevista" :
+              interview && interview.status === "invited" ? "🔄 Reenviar enlace" :
+              "🎙️ Enviar entrevista IA"}
+          </button>
+        )}
+        {interview?.token && interview.status !== "failed" && (
           <a
             href={`/entrevista-ia/${interview.token}`}
             target="_blank"

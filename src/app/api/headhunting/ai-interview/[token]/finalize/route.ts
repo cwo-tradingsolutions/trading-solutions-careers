@@ -22,7 +22,8 @@ import {
   fetchElevenConversation,
   runCandidateFinalize,
 } from "@/lib/ai-interview-finalize";
-import { cronAuthorized, cronPresentedSecret, readCronSecret } from "@/lib/cron-auth";
+import { readCronSecret } from "@/lib/cron-auth";
+import { cronAuthorized, cronPresentedSecret } from "@/lib/cron-request-auth";
 import { scoringClaimTtlMs } from "@/lib/ai-interview-rescore";
 
 // Permitir hasta 90s — los 3 agentes Claude en paralelo con transcripts de
@@ -259,13 +260,6 @@ export async function POST(
     );
     const claimAt = interview.scoring_claimed_at ? new Date(interview.scoring_claimed_at).getTime() : NaN;
     const scoringClaimActive = Number.isFinite(claimAt) && Date.now() - claimAt < scoringClaimTtlMs();
-    if (wantsRescore && !cronSecret && interview.status === "completed" && interview.ai_score == null) {
-      await supabaseAdmin
-        .from("ht_ai_interviews")
-        .update({ scoring_claimed_at: null })
-        .eq("id", interview.id);
-      return NextResponse.json({ status: "in_progress" });
-    }
     const rescoreNullScore = serverRescore && interview.status === "completed" && interview.ai_score == null;
     const result = await runCandidateFinalize({
       interview: {
@@ -291,13 +285,11 @@ export async function POST(
         await supabaseAdmin
           .from("ht_ai_interviews")
           .update({
-            status: "needs_review",
+            status: "failed",
             completed_at: new Date().toISOString(),
-            ai_recommendation: "REVISION_MANUAL",
           })
           .eq("id", interview.id)
-          .neq("status", "completed")
-          .select("id");
+          .neq("status", "completed");
       },
       scoreServerTranscript: async (conversationId, transcript) => {
         const transcriptText = buildTranscriptText(transcript);
@@ -328,32 +320,31 @@ export async function POST(
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://trading-solutions-careers.vercel.app";
         const finalAudioUrl = `${baseUrl}/api/headhunting/ai-interview/${token}/audio?cid=${conversationId}`;
 
-        const { error: writeError } = await supabaseAdmin
-          .from("ht_ai_interviews")
-          .update({
-            status: "completed",
-            completed_at: new Date().toISOString(),
-            conversation_id: conversationId,
-            transcript,
-            audio_url: finalAudioUrl,
-            ai_score: generalAnalysis.score ?? null,
-            overall_score: generalAnalysis.score ?? null,
-            ai_recommendation: generalAnalysis.recommendation ?? "PENDIENTE",
-            ai_summary: generalAnalysis.summary ?? null,
-            ai_strengths: generalAnalysis.strengths ?? [],
-            ai_gaps: generalAnalysis.gaps ?? [],
-            ai_red_flags: generalAnalysis.red_flags ?? [],
-            competencies_scores: competencyAnalysis.competencies ?? null,
-            competency_score: competencyAnalysis.average_score ?? null,
-            english_level: englishAnalysis.cefr_level ?? "no_evaluated",
-            english_score: englishAnalysis.overall_score ?? null,
-            english_detail: englishAnalysis,
-          })
-          .eq("id", interview.id)
-          .or("status.neq.completed,ai_score.is.null")
-          .select("id");
+        const scoreRow = {
+          completed_at: new Date().toISOString(),
+          conversation_id: conversationId,
+          transcript,
+          audio_url: finalAudioUrl,
+          ai_score: generalAnalysis.score ?? null,
+          overall_score: generalAnalysis.score ?? null,
+          ai_recommendation: generalAnalysis.recommendation ?? "PENDIENTE",
+          ai_summary: generalAnalysis.summary ?? null,
+          ai_strengths: generalAnalysis.strengths ?? [],
+          ai_gaps: generalAnalysis.gaps ?? [],
+          ai_red_flags: generalAnalysis.red_flags ?? [],
+          competencies_scores: competencyAnalysis.competencies ?? null,
+          competency_score: competencyAnalysis.average_score ?? null,
+          english_level: englishAnalysis.cefr_level ?? "no_evaluated",
+          english_score: englishAnalysis.overall_score ?? null,
+          english_detail: englishAnalysis,
+          scoring_claimed_at: interview.scoring_claimed_at,
+        };
+        const { data: wroteId, error: writeError } = await supabaseAdmin.rpc(
+          "complete_ht_ai_interview_score",
+          { p_id: interview.id, p_row: scoreRow },
+        );
         if (writeError) throw writeError;
-        return true;
+        return Boolean(wroteId);
       },
     });
 

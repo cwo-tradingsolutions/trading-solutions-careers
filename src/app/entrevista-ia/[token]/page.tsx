@@ -72,6 +72,8 @@ export default function AiInterviewPage() {
                 ? loadRetryBoth()
                 : j.error === "already_completed"
                 ? `Ya completaste esta entrevista. Si necesitas ayuda, escríbenos a ${CANDIDATE_MAIL}. You already completed this interview. If you need help, write to us at ${CANDIDATE_MAIL}.`
+                : j.error === "needs_review"
+                ? `Esta entrevista requiere revisión. Talent Acquisition te contactará. This interview needs review. Talent Acquisition will contact you.`
                 : invalidLinkBoth()
             );
             setPhase("error");

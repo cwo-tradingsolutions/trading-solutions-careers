@@ -14,9 +14,18 @@ import {
   type ConversationDetail,
   type InterviewBind,
 } from "./ai-interview-finalize.ts";
-import { rescoreAction, rescoreBaseUrl, rescoreRowEligible, validConversationId } from "./ai-interview-rescore.ts";
+import {
+  STALE_CONVERSATION_MS,
+  conversationIsStale,
+  rescoreAction,
+  rescoreBaseUrl,
+  rescoreRowEligible,
+  scoringClaimTtlMs,
+  validConversationId,
+} from "./ai-interview-rescore.ts";
 import { aiInterviewEnabled } from "./ai-interview-flag.ts";
-import { cronAuthorized, readCronSecret } from "./cron-auth.ts";
+import { readCronSecret } from "./cron-auth.ts";
+import { cronAuthorized } from "./cron-request-auth.ts";
 import { visibleRecommendation } from "./ai-recommendation.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -318,7 +327,33 @@ test("the AI interview flag, cron secret, and rescore url stay closed", () => {
   assert.equal(rescoreBaseUrl({}), null);
   assert.equal(readCronSecret({ CRON_SECRET: "short" }), null);
   assert.equal(readCronSecret({ CRON_SECRET: "a".repeat(16), ADMIN_SECRET: "a".repeat(16) }), null);
+  assert.equal(readCronSecret({ CRON_SECRET: "p".repeat(16), PORTAL_TOKEN_SECRET: "p".repeat(16) }), null);
+  assert.equal(readCronSecret({ CRON_SECRET: "w".repeat(16), WXM_SERVICE_SECRET: "w".repeat(16) }), null);
   assert.equal(readCronSecret({ CRON_SECRET: "c".repeat(16), ADMIN_SECRET: "a".repeat(16) }), "c".repeat(16));
+  const ttlWarnings: string[] = [];
+  const warn = console.warn;
+  console.warn = (message?: unknown) => {
+    ttlWarnings.push(String(message));
+  };
+  try {
+    assert.equal(scoringClaimTtlMs({ SCORING_CLAIM_TTL_MS: "60000" }), 60000);
+    assert.equal(scoringClaimTtlMs({ SCORING_CLAIM_TTL_MS: "120000.5" }), 120000);
+    assert.equal(scoringClaimTtlMs({ SCORING_CLAIM_TTL_MS: "1e5" }), 120000);
+    assert.match(ttlWarnings.join("\n"), /SCORING_CLAIM_TTL_MS is invalid: 120000\.5/);
+    assert.match(ttlWarnings.join("\n"), /SCORING_CLAIM_TTL_MS is invalid: 1e5/);
+  } finally {
+    console.warn = warn;
+  }
+  assert.equal(conversationIsStale({
+    conversation_id: "conv_old",
+    started_at: new Date(0).toISOString(),
+    scoring_attempts: 0,
+  }, STALE_CONVERSATION_MS + 1), true);
+  assert.equal(conversationIsStale({
+    conversation_id: "conv_live",
+    started_at: new Date(5_000).toISOString(),
+    scoring_attempts: 0,
+  }, 5_000), false);
   assert.equal(visibleRecommendation("SCORING:1"), null);
   assert.equal(visibleRecommendation("  SCORING:99"), null);
   assert.equal(visibleRecommendation("AVANZA"), "AVANZA");
@@ -334,6 +369,30 @@ test("the AI interview flag, cron secret, and rescore url stay closed", () => {
   for (let i = 1; i < FINALIZE_LOOKUP_MAX; i++) allowFinalizeLookup("tok-bucket", 5_000, "candidate");
   assert.equal(allowFinalizeLookup("tok-bucket", 5_000, "candidate"), false);
   assert.equal(allowFinalizeLookup("tok-bucket", 5_000, "server"), true);
+});
+
+test("claim and score writes do not use or() with select()", () => {
+  const finalize = readFileSync(
+    join(root, "src/app/api/headhunting/ai-interview/[token]/finalize/route.ts"),
+    "utf8",
+  );
+  const rescore = readFileSync(join(root, "src/lib/ai-interview-rescore.ts"), "utf8");
+  const migration = readFileSync(
+    join(root, "supabase/migrations/20261030_ai_interview_scoring_claim.sql"),
+    "utf8",
+  );
+  const funnel = readFileSync(join(root, "src/components/PipelineFunnel.tsx"), "utf8");
+  assert.match(rescore, /claim_ht_ai_interview_scoring/);
+  assert.match(finalize, /complete_ht_ai_interview_score/);
+  assert.doesNotMatch(finalize, /\.or\(/);
+  assert.doesNotMatch(rescore, /\.select\("id"\)/);
+  assert.match(migration, /claim_ht_ai_interview_scoring/);
+  assert.match(migration, /scoring_claimed_at, started_at/);
+  assert.match(migration, /migration before/);
+  assert.doesNotMatch(finalize, /REVISION_MANUAL/);
+  assert.match(funnel, /Requiere revisión/);
+  assert.doesNotMatch(readFileSync(join(root, "src/lib/cron-auth.ts"), "utf8"), /next\/server/);
+  assert.doesNotMatch(readFileSync(join(root, "src/lib/cron-request-auth.ts"), "utf8"), /next\/server/);
 });
 
 test("cron GET does not accept the admin cookie", () => {

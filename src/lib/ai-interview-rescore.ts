@@ -5,12 +5,34 @@ import { supabaseAdmin } from "./supabase";
 
 export const RESCORE_BATCH_LIMIT = 3;
 export const SCORING_MAX_ATTEMPTS = 5;
+/** A bound conversation older than this is a retry, not the live call. */
+export const STALE_CONVERSATION_MS = 2 * 60 * 60 * 1000;
 const DEFAULT_CLAIM_TTL_MS = 2 * 60 * 1000;
+const MIN_CLAIM_TTL_MS = 30_000;
+const MAX_CLAIM_TTL_MS = 10 * 60_000;
 
+/**
+ * PostgREST v14.3 and earlier raises 42703 when a PATCH combines or() with
+ * select(), and also returns an empty body when the filter columns are
+ * added, because it reapplies or() to the updated row. Claims and the final
+ * score write go through SQL functions instead.
+ */
+
+/** Integer decimal only. Anything else keeps the default and is logged. */
 export function scoringClaimTtlMs(env: NodeJS.ProcessEnv = process.env): number {
-  const raw = Number(env.SCORING_CLAIM_TTL_MS);
-  if (Number.isFinite(raw) && raw >= 30_000 && raw <= 10 * 60_000) return raw;
-  return DEFAULT_CLAIM_TTL_MS;
+  const raw = env.SCORING_CLAIM_TTL_MS;
+  if (raw == null || raw.trim() === "") return DEFAULT_CLAIM_TTL_MS;
+  const text = raw.trim();
+  if (!/^[0-9]+$/.test(text)) {
+    console.warn(`SCORING_CLAIM_TTL_MS is invalid: ${text}`);
+    return DEFAULT_CLAIM_TTL_MS;
+  }
+  const parsed = Number(text);
+  if (parsed < MIN_CLAIM_TTL_MS || parsed > MAX_CLAIM_TTL_MS) {
+    console.warn(`SCORING_CLAIM_TTL_MS is invalid: ${text}`);
+    return DEFAULT_CLAIM_TTL_MS;
+  }
+  return parsed;
 }
 
 /** Null when the URL is missing or not https. Never falls back to a public host. */
@@ -32,6 +54,22 @@ export function rescoreRowEligible(
     if (Number.isFinite(at) && now - at < ttl) return "claimed";
   }
   return "eligible";
+}
+
+/** True when a stored conversation must not be scored on a later visit. */
+export function conversationIsStale(
+  row: {
+    conversation_id?: string | null;
+    started_at?: string | null;
+    scoring_attempts?: number | null;
+  },
+  now = Date.now(),
+): boolean {
+  if (!row.conversation_id) return false;
+  if ((row.scoring_attempts ?? 0) >= SCORING_MAX_ATTEMPTS) return true;
+  if (!row.started_at) return false;
+  const started = new Date(row.started_at).getTime();
+  return Number.isFinite(started) && now - started >= STALE_CONVERSATION_MS;
 }
 
 export function rescoreAction(
@@ -56,52 +94,53 @@ export type RescoreResult = {
   http_status?: number;
 };
 
+export type ScoringClaim = { claimedAt: string; attempts: number };
+
 /**
  * Scores in-progress interviews, and completed ones that never received a score,
  * once ElevenLabs marks the conversation done. The claim lives on
- * scoring_claimed_at, not on ai_recommendation.
+ * scoring_claimed_at, not on ai_recommendation. status "failed" is the
+ * existing value for a row that needs a person (the check does not allow
+ * needs_review).
  */
-async function releaseClaim(id: string): Promise<void> {
+async function releaseOwnClaim(id: string, claimedAt: string): Promise<void> {
   await supabaseAdmin
     .from("ht_ai_interviews")
     .update({ scoring_claimed_at: null })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("scoring_claimed_at", claimedAt);
 }
 
-async function markNeedsManual(id: string): Promise<void> {
+async function markFailed(id: string, claimedAt: string): Promise<void> {
   await supabaseAdmin
     .from("ht_ai_interviews")
-    .update({ status: "needs_review", scoring_claimed_at: null })
+    .update({ status: "failed", scoring_claimed_at: null })
     .eq("id", id)
+    .eq("scoring_claimed_at", claimedAt)
     .is("ai_score", null);
 }
 
 async function claimForScoring(row: {
   id: string;
   scoring_attempts?: number | null;
-  scoring_claimed_at?: string | null;
-}): Promise<boolean> {
+}): Promise<ScoringClaim | null> {
   const attempts = row.scoring_attempts ?? 0;
-  if (attempts >= SCORING_MAX_ATTEMPTS) {
-    await markNeedsManual(row.id);
-    return false;
-  }
-  const now = new Date().toISOString();
+  if (attempts >= SCORING_MAX_ATTEMPTS) return null;
+  const claimedAt = new Date().toISOString();
   const cutoff = new Date(Date.now() - scoringClaimTtlMs()).toISOString();
-  const attemptFilter = attempts === 0
-    ? "scoring_attempts.is.null,scoring_attempts.eq.0"
-    : `scoring_attempts.eq.${attempts}`;
-  const { data } = await supabaseAdmin
-    .from("ht_ai_interviews")
-    .update({
-      scoring_claimed_at: now,
-      scoring_attempts: attempts + 1,
-    })
-    .eq("id", row.id)
-    .is("ai_score", null)
-    .or(`and(or(scoring_claimed_at.is.null,scoring_claimed_at.lt.${cutoff}),or(${attemptFilter}))`)
-    .select("id");
-  return (data?.length ?? 0) > 0;
+  const nextAttempts = attempts + 1;
+  const { data, error } = await supabaseAdmin.rpc("claim_ht_ai_interview_scoring", {
+    p_id: row.id,
+    p_claimed_at: claimedAt,
+    p_next_attempts: nextAttempts,
+    p_cutoff: cutoff,
+  });
+  if (error) {
+    console.warn("scoring claim failed", error.code || "error");
+    return null;
+  }
+  if (!data) return null;
+  return { claimedAt, attempts: nextAttempts };
 }
 
 export async function runInProgressRescore(input: {
@@ -113,6 +152,7 @@ export async function runInProgressRescore(input: {
 
   const baseUrl = rescoreBaseUrl();
   if (!baseUrl) {
+    console.warn("rescore skipped: APP_URL or NEXT_PUBLIC_APP_URL is missing or not https");
     return {
       pending: 0,
       results: [{
@@ -125,13 +165,15 @@ export async function runInProgressRescore(input: {
   }
 
   const cutoff = new Date(Date.now() - scoringClaimTtlMs()).toISOString();
-  await supabaseAdmin
-    .from("ht_ai_interviews")
-    .update({ status: "needs_review", scoring_claimed_at: null })
-    .in("status", ["in_progress", "completed"])
-    .is("ai_score", null)
-    .gte("scoring_attempts", SCORING_MAX_ATTEMPTS)
-    .or(`scoring_claimed_at.is.null,scoring_claimed_at.lt.${cutoff}`);
+  const retire = () =>
+    supabaseAdmin
+      .from("ht_ai_interviews")
+      .update({ status: "failed", scoring_claimed_at: null })
+      .in("status", ["in_progress", "completed"])
+      .is("ai_score", null)
+      .gte("scoring_attempts", SCORING_MAX_ATTEMPTS);
+  await retire().is("scoring_claimed_at", null);
+  await retire().lt("scoring_claimed_at", cutoff);
 
   let query = supabaseAdmin
     .from("ht_ai_interviews")
@@ -141,6 +183,7 @@ export async function runInProgressRescore(input: {
     .is("ai_score", null)
     .or(`and(or(scoring_claimed_at.is.null,scoring_claimed_at.lt.${cutoff}),or(scoring_attempts.is.null,scoring_attempts.lt.${SCORING_MAX_ATTEMPTS}))`)
     .order("started_at", { ascending: true, nullsFirst: false })
+    .order("id", { ascending: true })
     .limit(RESCORE_BATCH_LIMIT);
 
   if (input.interviewIds && input.interviewIds.length > 0) {
@@ -166,39 +209,34 @@ export async function runInProgressRescore(input: {
       },
       detail?.status ?? null,
     );
-    if (action === "wait") {
-      results.push({
-        interview_id: interview.id,
-        success: false,
-        error_kind: "still_processing",
-      });
-      continue;
-    }
-    if (action !== "score") continue;
-    const gate = rescoreRowEligible(interview);
-    if (gate === "exhausted") {
-      await markNeedsManual(interview.id);
-      results.push({ interview_id: interview.id, success: false, error_kind: "needs_manual" });
-      continue;
-    }
-    if (gate === "claimed") {
+    if (action === "skip") continue;
+
+    const claim = await claimForScoring(interview);
+    if (!claim) {
       results.push({ interview_id: interview.id, success: false, error_kind: "claimed" });
       continue;
     }
+
+    if (action === "wait") {
+      if (claim.attempts >= SCORING_MAX_ATTEMPTS) {
+        await markFailed(interview.id, claim.claimedAt);
+        results.push({ interview_id: interview.id, success: false, error_kind: "needs_manual" });
+      } else {
+        await releaseOwnClaim(interview.id, claim.claimedAt);
+        results.push({ interview_id: interview.id, success: false, error_kind: "still_processing" });
+      }
+      continue;
+    }
+
     const secret = readCronSecret();
     if (!secret) {
-      if (interview.status === "completed") await releaseClaim(interview.id);
+      await releaseOwnClaim(interview.id, claim.claimedAt);
       results.push({
         interview_id: interview.id,
         success: false,
         error: "CRON_SECRET is missing, too short, or not distinct",
         error_kind: "cron_secret",
       });
-      continue;
-    }
-    const claimed = await claimForScoring(interview);
-    if (!claimed) {
-      results.push({ interview_id: interview.id, success: false, error_kind: "claimed" });
       continue;
     }
 
@@ -220,7 +258,7 @@ export async function runInProgressRescore(input: {
       if (body.rescored === true) {
         results.push({ interview_id: interview.id, success: true });
       } else if (response.status === 401 || response.status === 403) {
-        await releaseClaim(interview.id);
+        await releaseOwnClaim(interview.id, claim.claimedAt);
         results.push({
           interview_id: interview.id,
           success: false,
@@ -229,6 +267,7 @@ export async function runInProgressRescore(input: {
           http_status: response.status,
         });
       } else if (body.status === "in_progress") {
+        await releaseOwnClaim(interview.id, claim.claimedAt);
         results.push({
           interview_id: interview.id,
           success: false,

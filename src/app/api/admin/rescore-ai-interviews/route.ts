@@ -26,6 +26,9 @@ export async function POST(req: NextRequest) {
     if (disabled) {
       return NextResponse.json({ status: "disabled" }, { status: 503 });
     }
+    if (results.some((row) => row.error_kind === "bad_base_url")) {
+      return NextResponse.json({ success: false, error: "bad_base_url" }, { status: 500 });
+    }
 
     if (pending === 0) {
       return NextResponse.json({

@@ -20,7 +20,7 @@ import {
   fetchElevenConversation,
 } from "@/lib/ai-interview-finalize";
 import { aiInterviewEnabled } from "@/lib/ai-interview-flag";
-import { validConversationId } from "@/lib/ai-interview-rescore";
+import { conversationIsStale, validConversationId } from "@/lib/ai-interview-rescore";
 
 export async function GET(
   _req: NextRequest,
@@ -40,6 +40,23 @@ export async function GET(
 
   if (interview.status === "completed") {
     return NextResponse.json({ error: "already_completed" }, { status: 409 });
+  }
+
+  if (interview.status === "failed") {
+    return NextResponse.json({ error: "needs_review" }, { status: 409 });
+  }
+
+  if (
+    !isPreviewTestMode()
+    && interview.status === "in_progress"
+    && conversationIsStale(interview)
+  ) {
+    await supabaseAdmin
+      .from("ht_ai_interviews")
+      .update({ conversation_id: null, scoring_claimed_at: null, scoring_attempts: null })
+      .eq("id", interview.id)
+      .eq("conversation_id", interview.conversation_id);
+    interview.conversation_id = null;
   }
 
   // Token evergreen · si el candidato hace click, extendemos 7 días más.
@@ -150,6 +167,9 @@ export async function POST(
   }
   if (interview.status === "completed") {
     return NextResponse.json({ status: "completed" });
+  }
+  if (interview.status === "failed") {
+    return NextResponse.json({ error: "needs_review" }, { status: 409 });
   }
   if (interview.conversation_id && interview.conversation_id !== conversationId) {
     return NextResponse.json({ ok: false }, { status: 409 });

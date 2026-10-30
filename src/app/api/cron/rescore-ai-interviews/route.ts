@@ -9,7 +9,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { aiInterviewEnabled } from "@/lib/ai-interview-flag";
-import { cronAuthorized, cronPresentedSecret, readCronSecret } from "@/lib/cron-auth";
+import { readCronSecret } from "@/lib/cron-auth";
+import { cronAuthorized, cronPresentedSecret } from "@/lib/cron-request-auth";
 import { runInProgressRescore } from "@/lib/ai-interview-rescore";
 
 export const runtime = "nodejs";
@@ -32,6 +33,10 @@ async function run() {
     const { pending, results, disabled } = await runInProgressRescore();
     if (disabled) {
       return NextResponse.json({ status: "disabled" }, { status: 503 });
+    }
+    if (results.some((row) => row.error_kind === "bad_base_url")) {
+      console.warn("rescore skipped: APP_URL or NEXT_PUBLIC_APP_URL is missing or not https");
+      return NextResponse.json({ success: false, error: "bad_base_url" }, { status: 500 });
     }
     return NextResponse.json({
       success: true,
