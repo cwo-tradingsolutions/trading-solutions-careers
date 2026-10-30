@@ -48,7 +48,10 @@ export async function POST(req: NextRequest) {
     .insert({ key: forma.key, label: forma.label, active: true, sort_order: sort })
     .select("key, label, active, sort_order")
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("[recruitment-sources] alta:", error.message);
+    return NextResponse.json({ error: "No se pudo guardar la fuente." }, { status: 500 });
+  }
   return NextResponse.json({ success: true, fuente: data });
 }
 
@@ -70,7 +73,10 @@ export async function PATCH(req: NextRequest) {
     .eq("key", cambio.key)
     .select("key, label, active, sort_order")
     .maybeSingle();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("[recruitment-sources] cambio:", error.message);
+    return NextResponse.json({ error: "No se pudo guardar la fuente." }, { status: 500 });
+  }
   if (!data) return NextResponse.json({ error: "No está esa fuente." }, { status: 404 });
   return NextResponse.json({ success: true, fuente: data });
 }

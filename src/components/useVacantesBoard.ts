@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { clasificarConteo, contarTarjetas, type ConteoClave, type FilaConteo } from "@/lib/requisition-board";
+import { clasificarConteo, contarTarjetas, etiquetaOculta, type ConteoClave, type FilaConteo } from "@/lib/requisition-board";
 import type { FuenteLista, LlegadaFila } from "@/lib/recruitment-sources";
 
 type VacanteRow = {
@@ -11,7 +11,13 @@ type VacanteRow = {
   llegada: LlegadaFila[];
 };
 
-type ReqRow = FilaConteo & { web_vacancy_id?: number | null };
+type ReqRow = FilaConteo & {
+  id?: string;
+  title?: string;
+  web_vacancy_id?: number | null;
+};
+
+export type FilaSinVacante = { id: string; title: string; detalle: string };
 
 export function useVacantesBoard() {
   const [fuentes, setFuentes] = useState<FuenteLista[]>([]);
@@ -51,10 +57,23 @@ export function useVacantesBoard() {
     const row = porWeb(webId);
     if (fuenteFiltro && !(row?.sources || []).includes(fuenteFiltro)) return false;
     if (!filtro) return true;
+    // Cerradas y Ocultas no tienen vacante web. No se cruzan con esta lista.
+    if (filtro === "cerradas" || filtro === "ocultas") return false;
     const req = (reqs || []).find((r) => r.web_vacancy_id === webId);
     if (!req) return false;
     return clasificarConteo(req) === filtro;
   }
+
+  const filasSinVacante: FilaSinVacante[] =
+    filtro === "cerradas" || filtro === "ocultas"
+      ? (reqs || [])
+          .filter((r) => clasificarConteo(r) === filtro)
+          .map((r, i) => ({
+            id: r.id || `req-${i}`,
+            title: r.title || "Requisición",
+            detalle: filtro === "ocultas" ? etiquetaOculta(r.hidden_reason) || "Oculta" : "Rechazada",
+          }))
+      : [];
 
   async function alternar(vacancyId: string, key: string, publicada: boolean) {
     const r = publicada
@@ -90,6 +109,7 @@ export function useVacantesBoard() {
     setAdmin,
     porWeb,
     pasa,
+    filasSinVacante,
     alternar,
     guardarFuente,
   };

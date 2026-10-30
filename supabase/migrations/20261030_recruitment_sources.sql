@@ -12,7 +12,15 @@
 -- de crear la FK.
 --
 -- Una fuente no se borra. Se desactiva (active = false) desde hr-admin.
+-- Careers no se desactiva: es la página donde la gente aplica.
+--
+-- Transacción: si la FK no se puede crear, no queda la tabla a medias.
+-- Sin policy para anon ni authenticated. Solo el service role.
+--
+-- Este archivo corre ANTES del deploy del código que escribe arrival_source.
 -- ============================================================================
+
+begin;
 
 create table if not exists ht_recruitment_sources (
   key        text primary key,
@@ -20,6 +28,9 @@ create table if not exists ht_recruitment_sources (
   active     boolean not null default true,
   sort_order integer not null default 0
 );
+
+alter table ht_recruitment_sources enable row level security;
+revoke all on table ht_recruitment_sources from anon, authenticated;
 
 insert into ht_recruitment_sources (key, label, active, sort_order) values
   ('careers',   'Careers',   true, 10),
@@ -74,3 +85,5 @@ select
   (select count(*) from information_schema.columns
      where table_name = 'ht_candidates' and column_name = 'arrival_source') as columna_llegada;
 -- Esperado: fuentes_semilla = 6 · check_viejo = 0 · fk_postings = 1 · columna_llegada = 1
+
+commit;

@@ -175,24 +175,33 @@ export async function POST(request: NextRequest) {
             if (arrivalErr) console.error("[applications] arrival_source:", arrivalErr.message);
           }
         } else {
+          // arrival_source solo si hay valor. Mandarla en null exige la columna;
+          // si la migración todavía no corrió, PostgREST rechaza el insert y
+          // el candidato no entra al funnel.
+          const filaCandidato: Record<string, unknown> = {
+            client_id: TS_CLIENT_ID,
+            vacancy_id: vacancyId,
+            name: full_name,
+            email: emailNormalized,
+            phone: phone || null,
+            stage: "aplico",
+            source: isInternal ? "public_form_internal" : canalPublico,
+            notes: why_ts ? `[Public form] ${why_ts}` : `[Public form] · application_id=${newId}`,
+            preferred_language: isEnglishTemplate(vacTemplate) ? "en" : "es",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          if (arrivalSource) filaCandidato.arrival_source = arrivalSource;
+
           const { data: created, error: insertErr } = await supabaseAdmin
             .from("ht_candidates")
-            .insert({
-              client_id: TS_CLIENT_ID,
-              vacancy_id: vacancyId,
-              name: full_name,
-              email: emailNormalized,
-              phone: phone || null,
-              stage: "aplico",
-              source: isInternal ? "public_form_internal" : canalPublico,
-              arrival_source: arrivalSource,
-              notes: why_ts ? `[Public form] ${why_ts}` : `[Public form] · application_id=${newId}`,
-              preferred_language: isEnglishTemplate(vacTemplate) ? "en" : "es",
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
+            .insert(filaCandidato)
             .select("id")
             .maybeSingle();
+
+          if (insertErr) {
+            console.error("[applications] insert ht_candidates:", insertErr.message);
+          }
 
           // La entrada al funnel es el primer evento del candidato: sin él
           // "días en aplicó" no tiene punto de partida real.

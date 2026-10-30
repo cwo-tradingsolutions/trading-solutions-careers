@@ -109,6 +109,9 @@ export function validarCambioFuente(input: {
   if (out.label === undefined && out.active === undefined) {
     return { ok: false, error: "No hay nada que cambiar." };
   }
+  if (out.key === "careers" && out.active === false) {
+    return { ok: false, error: "Careers no se desactiva: es la página donde la gente aplica." };
+  }
   return out;
 }
 

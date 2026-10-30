@@ -345,7 +345,7 @@ export default function RequisitionsInbox({
           <button
             type="button"
             onClick={() => setAdminFuentes((v) => !v)}
-            className="text-sm px-4 py-2 rounded-full border border-[color:var(--ts-line)] text-[var(--ts-ink)]"
+            className="min-h-11 text-sm px-4 rounded-full border border-[color:var(--ts-line)] text-[var(--ts-ink)]"
           >
             Fuentes
           </button>
@@ -374,7 +374,7 @@ export default function RequisitionsInbox({
           <select
             value={fuenteFiltro}
             onChange={(e) => setFuenteFiltro(e.target.value)}
-            className="rounded-full border border-[color:var(--ts-line)] bg-white px-3 py-1 text-[13px] text-[var(--ts-ink)]"
+            className="min-h-11 rounded-full border border-[color:var(--ts-line)] bg-white px-3 text-[13px] text-[var(--ts-ink)]"
           >
             <option value="">Todas</option>
             {fuentes.filter((f) => f.active).map((f) => (
@@ -417,16 +417,22 @@ export default function RequisitionsInbox({
         </div>
       )}
 
+      {items.length > 0 && secciones(visibles, filtro).every((g) => g.filas.length === 0) && (
+        <p className="mt-8 text-[13px] text-[var(--ts-muted)] text-center bg-white rounded-2xl border border-[color:var(--ts-line)] py-8 px-4">
+          No hay requisiciones con ese filtro.
+        </p>
+      )}
+
       {secciones(visibles, filtro).map((g) => {
         if (g.filas.length === 0) return null;
         return (
           <section key={g.titulo} className="mt-8">
             <div className="flex items-baseline gap-3 mb-3">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--ts-muted)]">
                 {g.titulo}
               </h3>
-              <span className="text-sm text-gray-400">{g.filas.length}</span>
-              {g.nota && <span className="text-xs text-gray-400 ml-auto">{g.nota}</span>}
+              <span className="text-sm text-[var(--ts-muted)]">{g.filas.length}</span>
+              {g.nota && <span className="text-xs text-[var(--ts-muted)] ml-auto">{g.nota}</span>}
             </div>
             <div className="space-y-3">
               {g.filas.map((r) => {
@@ -578,8 +584,6 @@ function Tarjeta({
     setPublicando(true);
   }
 
-  const acciones = accionesDisponibles(req.status);
-
   /**
    * Manda el perfil que está en pantalla a la base. Devuelve `true` si quedó
    * guardado; si no, deja el motivo en `problema` y devuelve `false`.
@@ -657,11 +661,16 @@ function Tarjeta({
     hidden_at: req.hidden_at,
     hidden_reason: req.hidden_reason,
   });
-  const editable = req.status === "pedida" || req.status === "con_perfil" || req.status === "devuelta";
+  const archivada = clasificarConteo(req) === "archivadas";
+  const chip = archivada
+    ? { label: "Archivada", hint: null as string | null, neutro: true }
+    : { label: etiqueta.label, hint: etiqueta.hint, neutro: etiqueta.oculta };
+  const acciones = etiqueta.oculta ? [] : accionesDisponibles(req.status);
+  const editable = !etiqueta.oculta && (req.status === "pedida" || req.status === "con_perfil" || req.status === "devuelta");
   // Los datos de publicación no son parte de lo aprobado, y encima se
   // necesitan DESPUÉS de aprobar. Bloquearlos junto con el perfil dejaba la
   // vacante aprobada sin poder publicarse nunca.
-  const editablePublicacion = editable || req.status === "aprobada" || req.status === "publicada";
+  const editablePublicacion = !etiqueta.oculta && (editable || req.status === "aprobada" || req.status === "publicada");
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -681,20 +690,20 @@ function Tarjeta({
             </p>
           </div>
           <div className="ml-auto flex items-center gap-3">
-            {!etiqueta.oculta && <Alerta dias={req.dias_en_estado} estado={req.status} />}
+            {!etiqueta.oculta && !archivada && <Alerta dias={req.dias_en_estado} estado={req.status} />}
             <span
               className={
-                etiqueta.oculta
+                chip.neutro
                   ? "text-xs font-semibold px-2.5 py-1 rounded-full bg-[var(--ts-canvas)] text-[var(--ts-ink)] border border-[color:var(--ts-line)]"
                   : `text-xs font-semibold px-2.5 py-1 rounded-full ${COLOR[req.status]}`
               }
             >
-              {etiqueta.label}
+              {chip.label}
             </span>
           </div>
         </div>
-        {etiqueta.hint && (
-          <p className="text-xs text-gray-400 mt-2">{etiqueta.hint}</p>
+        {chip.hint && (
+          <p className="text-xs text-[var(--ts-muted)] mt-2">{chip.hint}</p>
         )}
       </button>
 

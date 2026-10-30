@@ -13,6 +13,7 @@ import {
   decidirIncludeHidden,
   etiquetaTarjeta,
   textoConteo,
+  transicionBloqueadaPorOculta,
 } from "./requisition-board.ts";
 import {
   enlaceConSrc,
@@ -50,6 +51,23 @@ describe("ocultar", () => {
     assert.equal(et.label === STATUS_HINT.rechazada, false);
     assert.equal(String(et.hint ?? "").includes(RECHAZO), false);
     assert.equal(et.label.includes("Rechazada"), false);
+  });
+
+  it("hidden_reason sin hidden_at no cuenta como oculta ni cambia el chip", () => {
+    const row = { status: "rechazada" as const, hidden_at: null, hidden_reason: "duplicada" };
+    assert.equal(clasificarConteo(row), "cerradas");
+    const et = etiquetaTarjeta(row);
+    assert.equal(et.oculta, false);
+    assert.equal(et.label, "Rechazada");
+  });
+
+  it("una oculta no se aprueba", () => {
+    assert.equal(
+      transicionBloqueadaPorOculta({ hidden_at: "2026-10-30" }, "aprobar"),
+      "Esta requisición está oculta. No se aprueba ni se mueve de estado.",
+    );
+    assert.equal(transicionBloqueadaPorOculta({ hidden_at: null }, "aprobar"), null);
+    assert.equal(transicionBloqueadaPorOculta({ hidden_at: "2026-10-30" }, ""), null);
   });
 
   it("flota oculta dice Fuera del ATS y sigue clasificada como oculta", () => {
@@ -166,6 +184,8 @@ describe("fuentes", () => {
     assert.equal(validarCambioFuente({ key: "turpial", active: false }).ok, true);
     assert.equal(validarCambioFuente({ key: "turpial", label: "Turpial Jobs" }).ok, true);
     assert.equal(validarCambioFuente({ key: "turpial" }).ok, false);
+    assert.equal(validarCambioFuente({ key: "careers", active: false }).ok, false);
+    assert.equal(validarCambioFuente({ key: "careers", label: "Página de empleo" }).ok, true);
   });
 });
 
@@ -207,6 +227,10 @@ describe("migraciones", () => {
     assert.match(oculta, /cwo@tradingsolutions.com/);
     assert.match(oculta, /hidden_reason in \('duplicada','fuera_del_ats'\)/);
     assert.match(oculta, /ht_requisitions_backup_20261030/);
+    assert.match(oculta, /^begin;/m);
+    assert.match(oculta, /^commit;/m);
+    assert.match(oculta, /enable row level security/);
+    assert.match(oculta, /revoke all on table ht_requisitions_backup_20261030 from anon, authenticated/);
     assert.equal(/delete\s+from\s+ht_requisitions\b/i.test(oculta), false);
     assert.equal(/delete\s+from\s+ht_requisition_events\b/i.test(oculta), false);
 
@@ -223,6 +247,10 @@ describe("migraciones", () => {
     assert.match(fuentes, /drop constraint if exists ht_vacancy_postings_source_check/);
     assert.match(fuentes, /foreign key \(source\) references ht_recruitment_sources \(key\)/);
     assert.match(fuentes, /arrival_source/);
+    assert.match(fuentes, /^begin;/m);
+    assert.match(fuentes, /^commit;/m);
+    assert.match(fuentes, /enable row level security/);
+    assert.match(fuentes, /revoke all on table ht_recruitment_sources from anon, authenticated/);
     for (const key of ["careers", "linkedin", "turpial", "magneto", "referidos", "otro"]) {
       assert.match(fuentes, new RegExp(`'${key}'`));
     }

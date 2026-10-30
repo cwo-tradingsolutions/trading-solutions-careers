@@ -33,7 +33,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .eq("vacancy_id", params.id)
     .order("posted_at", { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("[postings] lectura:", error.message);
+    return NextResponse.json({ error: "No se pudieron leer las fuentes." }, { status: 500 });
+  }
 
   const publicadas = new Set((data || []).map((p: any) => p.source));
   const { fuentes, desde } = await cargarFuentes();
@@ -85,7 +88,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .select("id, source, posted_at, external_url")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      console.error("[postings] alta:", error.message);
+      return NextResponse.json({ error: "No se pudo guardar la fuente." }, { status: 500 });
+    }
 
     // Si la vacante nació de una requisición aprobada, publicarla cierra el
     // circuito: la requisición pasa a "publicada".
@@ -144,6 +150,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     .eq("vacancy_id", params.id)
     .eq("source", source);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("[postings] baja:", error.message);
+    return NextResponse.json({ error: "No se pudo guardar la fuente." }, { status: 500 });
+  }
   return NextResponse.json({ success: true });
 }

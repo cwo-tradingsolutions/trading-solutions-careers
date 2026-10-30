@@ -17,7 +17,12 @@
 -- Es idempotente: se puede correr más de una vez. El backup conserva la
 -- foto de la primera corrida (antes de ocultar). El UPDATE no pisa una fila
 -- que ya tiene hidden_at. El evento no se duplica.
+--
+-- Va en una transacción: si el assert del paso 5 falla, los UPDATE se
+-- revierten. Las tablas nuevas no tienen policy para anon ni authenticated.
 -- ============================================================================
+
+begin;
 
 -- ─── 1) Columnas ────────────────────────────────────────────────────────────
 alter table ht_requisitions add column if not exists hidden_at timestamptz;
@@ -63,6 +68,9 @@ where r.id in (
 )
 on conflict (requisition_id) do nothing;
 
+alter table ht_requisitions_backup_20261030 enable row level security;
+revoke all on table ht_requisitions_backup_20261030 from anon, authenticated;
+
 -- ─── 3) Conteos ANTES, una sola vez ─────────────────────────────────────────
 -- Esperado en la línea base del 30-oct-2026 ~12:25 Bogotá:
 --   ht_requisitions 11 (publicada 9, pedida 1, rechazada 1)
@@ -75,6 +83,9 @@ create table if not exists ht_migration_verify_20261030 (
   captured_at timestamptz not null default now(),
   primary key (phase, metric)
 );
+
+alter table ht_migration_verify_20261030 enable row level security;
+revoke all on table ht_migration_verify_20261030 from anon, authenticated;
 
 insert into ht_migration_verify_20261030 (phase, metric, n)
 select 'before', x.metric, x.n
@@ -222,3 +233,5 @@ select
   end as coincide
 from ht_migration_verify_20261030 v
 order by v.phase, v.metric;
+
+commit;

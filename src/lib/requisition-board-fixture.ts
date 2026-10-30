@@ -51,8 +51,8 @@ export type RequisicionVista = {
 
 function base(partial: Partial<RequisicionVista> & Pick<RequisicionVista, "id" | "title" | "status">): RequisicionVista {
   return {
-    lead_email: "lider@tradingsolutions.com",
-    lead_name: "Líder de Operaciones",
+    lead_email: "persona@example.com",
+    lead_name: "Persona de ejemplo",
     area: "Operaciones",
     requisition_type: "incremental",
     reason: "Ejemplo para la pantalla.",
@@ -95,8 +95,8 @@ export const FIXTURE_FUENTES: FuenteLista[] = fuentesFallback();
 
 export const FIXTURE_REQUISICIONES: RequisicionVista[] = [
   base({
-    id: "req-publicada-abierta",
-    title: "Operations Specialist",
+    id: "ej-abierta",
+    title: "Cargo de muestra abierto",
     status: "publicada",
     vacancy_id: "vac-ops",
     vacancy_status: "open",
@@ -104,8 +104,8 @@ export const FIXTURE_REQUISICIONES: RequisicionVista[] = [
     approved_at: "2026-10-27T20:00:00.000Z",
   }),
   base({
-    id: "req-archivada",
-    title: "Customer Documentation Specialist",
+    id: "ej-archivada",
+    title: "Cargo de muestra archivado",
     status: "publicada",
     vacancy_id: "vac-docs",
     vacancy_status: "closed",
@@ -113,33 +113,33 @@ export const FIXTURE_REQUISICIONES: RequisicionVista[] = [
     area: "Customer Experience",
   }),
   base({
-    id: "req-cerrada",
-    title: "Analista de costos",
+    id: "ej-cerrada",
+    title: "Cargo de muestra rechazado",
     status: "rechazada",
     decision_note: "El cupo de este trimestre ya está usado.",
     hidden_at: null,
   }),
   base({
-    id: "22c60d38-590b-4789-a1df-fe3d8f77d2ec",
-    title: "Operations Specialist",
+    id: "ej-oculta-duplicada",
+    title: "Cargo de muestra duplicado",
     status: "rechazada",
     hidden_at: "2026-10-30T17:00:00.000Z",
     hidden_reason: "duplicada",
-    hidden_by: "cwo@tradingsolutions.com",
-    decision_note: "Duplicada de la requisición canónica.",
+    hidden_by: "persona@example.com",
+    decision_note: "Fila de ejemplo, marcada como duplicada.",
   }),
   base({
-    id: "8e597f02-a1dd-47ba-94f6-db4521224077",
-    title: "Coordinador de Flota",
+    id: "ej-oculta-fuera",
+    title: "Cargo de muestra fuera del circuito",
     status: "pedida",
     hidden_at: "2026-10-30T17:00:00.000Z",
     hidden_reason: "fuera_del_ats",
-    hidden_by: "cwo@tradingsolutions.com",
-    reason: "Armada por fuera del ATS.",
+    hidden_by: "persona@example.com",
+    reason: "Fila de ejemplo, armada fuera del circuito.",
   }),
   base({
-    id: "req-pedida",
-    title: "Asistente de comercio exterior",
+    id: "ej-pedida",
+    title: "Cargo de muestra pedido",
     status: "pedida",
     dias_en_estado: 1,
   }),
@@ -151,10 +151,10 @@ export const FIXTURE_TABLERO = {
   vacantes: [
     {
       vacancy_id: "vac-ops",
-      title: "Operations Specialist",
+      title: "Cargo de muestra abierto",
       status: "open",
       web_vacancy_id: 20,
-      requisition_id: "req-publicada-abierta",
+      requisition_id: "ej-abierta",
       sources: ["careers", "linkedin"],
       llegada: [
         { arrival_source: "linkedin", n: 4 },
@@ -163,10 +163,10 @@ export const FIXTURE_TABLERO = {
     },
     {
       vacancy_id: "vac-docs",
-      title: "Customer Documentation Specialist",
+      title: "Cargo de muestra archivado",
       status: "closed",
       web_vacancy_id: 14,
-      requisition_id: "req-archivada",
+      requisition_id: "ej-archivada",
       sources: ["careers"],
       llegada: [] as { arrival_source: string | null; n: number }[],
     },

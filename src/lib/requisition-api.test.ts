@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import test from "node:test";
 
 process.env.ADMIN_SECRET = "test-admin-secret-for-401";
+process.env.HR_ADMIN_SESSION_SECRET = "test-session-secret-0123456789";
 process.env.WXM_SERVICE_SECRET = "test-wxm-secret";
 
 function request(url: string, opts?: { cookie?: string; authorization?: string; body?: unknown }) {
@@ -31,11 +32,25 @@ function request(url: string, opts?: { cookie?: string; authorization?: string; 
   };
 }
 
-function adminCookie(): string {
-  const secret = process.env.ADMIN_SECRET as string;
-  const ts = Date.now().toString();
-  const sig = crypto.createHmac("sha256", secret).update(ts).digest("hex");
-  return `hr_admin_session=${ts}.${sig}`;
+/**
+ * Cookie de hr-admin. Con #29 la firma es signAdminSession(HR_ADMIN_SESSION_SECRET, email).
+ * En esta base, antes de ese merge, el módulo no está y la cookie sigue siendo ts.hmac
+ * con ADMIN_SECRET. Las dos formas pasan requireAdmin del lado que corresponda.
+ */
+async function adminCookie(): Promise<string> {
+  try {
+    const mod = await import("./hr-admin-session.ts");
+    const token = mod.signAdminSession(
+      process.env.HR_ADMIN_SESSION_SECRET as string,
+      "qa@tradingsolutions.com",
+    );
+    return `hr_admin_session=${token}`;
+  } catch {
+    const secret = process.env.ADMIN_SECRET as string;
+    const ts = Date.now().toString();
+    const sig = crypto.createHmac("sha256", secret).update(ts).digest("hex");
+    return `hr_admin_session=${ts}.${sig}`;
+  }
 }
 
 test("GET /api/requisitions sin sesión responde 401 y no lista ocultas", async () => {
@@ -74,7 +89,7 @@ test("POST /api/vacancies/[id]/postings rechaza una fuente con forma inválida",
   const { POST } = await import("../app/api/vacancies/[id]/postings/route.ts");
   const res = await POST(
     request("http://localhost/api/vacancies/vac/postings", {
-      cookie: adminCookie(),
+      cookie: await adminCookie(),
       body: { source: "No Existe!" },
     }) as never,
     { params: { id: "vac" } },
@@ -87,7 +102,7 @@ test("POST /api/vacancies/[id]/postings rechaza una fuente con forma inválida",
 test("POST /api/recruitment-sources rechaza una clave inválida antes de escribir", async () => {
   const { POST } = await import("../app/api/recruitment-sources/route.ts");
   const res = await POST(request("http://localhost/api/recruitment-sources", {
-    cookie: adminCookie(),
+    cookie: await adminCookie(),
     body: { key: "CON ESPACIO", label: "Elempleo" },
   }) as never);
   assert.equal(res.status, 400);
@@ -98,7 +113,7 @@ test("DELETE /api/recruitment-sources no borra", async () => {
   const anon = await DELETE(request("http://localhost/api/recruitment-sources") as never);
   assert.equal(anon.status, 401);
   const admin = await DELETE(request("http://localhost/api/recruitment-sources", {
-    cookie: adminCookie(),
+    cookie: await adminCookie(),
   }) as never);
   assert.equal(admin.status, 405);
 });

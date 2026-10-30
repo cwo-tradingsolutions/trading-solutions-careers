@@ -82,7 +82,9 @@ export function etiquetaTarjeta(row: {
   hidden_at?: string | null;
   hidden_reason?: string | null;
 }): { label: string; hint: string | null; oculta: boolean } {
-  if (estaOculta(row) || (row.hidden_reason != null && String(row.hidden_reason).trim() !== "")) {
+  // Oculta solo con hidden_at. Un hidden_reason suelto no esconde la fila:
+  // el listado y el conteo usan la misma señal.
+  if (estaOculta(row)) {
     return {
       label: etiquetaOculta(row.hidden_reason) ?? "Oculta",
       hint: null,
@@ -159,4 +161,14 @@ export function aplicarVisibilidad<Q extends { is(column: string, value: null): 
 
 export function quiereIncludeHidden(valor: string | null): boolean {
   return valor === "1";
+}
+
+/** Una oculta no entra al circuito. Aprobarla crearía una vacante de una fila escondida. */
+export function transicionBloqueadaPorOculta(
+  row: { hidden_at?: string | null },
+  accion: string,
+): string | null {
+  if (!String(accion || "").trim()) return null;
+  if (!estaOculta(row)) return null;
+  return "Esta requisición está oculta. No se aprueba ni se mueve de estado.";
 }

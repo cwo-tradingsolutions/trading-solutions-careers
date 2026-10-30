@@ -3136,7 +3136,11 @@ function Vacantes() {
 
   const active = vacancies.filter((v) => !v.status || v.status === 'open' || v.status === 'active');
   const closed = vacancies.filter((v) => v.status === 'closed' || v.status === 'filled' || v.status === 'paused');
-  const list = (tab === 'active' ? active : closed).filter((v) => board.pasa(v.id));
+  const muestraRequisiciones = board.filtro === "cerradas" || board.filtro === "ocultas";
+  // Con una tarjeta elegida se miran activas y cerradas. Si no, Archivadas
+  // (vacante ya cerrada) queda vacía mientras el tab es «Activas».
+  const universo = board.filtro ? [...active, ...closed] : (tab === 'active' ? active : closed);
+  const list = muestraRequisiciones ? [] : universo.filter((v) => board.pasa(v.id));
   const totalApplications = Object.values(statsByVacancy).reduce((s, x) => s + x.total, 0);
 
   function exportToExcel() {
@@ -3236,7 +3240,7 @@ function Vacantes() {
           <select
             value={board.fuenteFiltro}
             onChange={(e) => board.setFuenteFiltro(e.target.value)}
-            className="rounded-full border border-[color:var(--ts-line)] bg-white px-3 py-1 text-[13px] text-[var(--ts-ink)]"
+            className="min-h-11 rounded-full border border-[color:var(--ts-line)] bg-white px-3 text-[13px] text-[var(--ts-ink)]"
           >
             <option value="">Todas</option>
             {board.fuentes.filter((f) => f.active).map((f) => (
@@ -3247,7 +3251,7 @@ function Vacantes() {
         <button
           type="button"
           onClick={() => board.setAdmin((v) => !v)}
-          className="rounded-full border border-[color:var(--ts-line)] px-3 py-1 text-[13px]"
+          className="min-h-11 rounded-full border border-[color:var(--ts-line)] px-3 text-[13px]"
         >
           Fuentes
         </button>
@@ -3285,9 +3289,30 @@ function Vacantes() {
         </div>
       )}
 
-      {!loading && list.length === 0 && (
-        <div className="text-sm text-gray-500 py-6 text-center bg-white rounded-xl border border-gray-200">
-          {tab === 'active' ? 'Sin vacantes activas.' : 'Sin vacantes cerradas aún.'}
+      {muestraRequisiciones && (
+        <div className="space-y-3 mb-4">
+          {board.filasSinVacante.length === 0 ? (
+            <p className="text-[13px] text-[var(--ts-muted)] py-6 text-center bg-white rounded-2xl border border-[color:var(--ts-line)]">
+              No hay requisiciones con ese filtro.
+            </p>
+          ) : board.filasSinVacante.map((fila) => (
+            <div key={fila.id} className="bg-white border border-[color:var(--ts-line)] rounded-2xl px-4 py-3 flex items-center gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[var(--ts-ink)]">{fila.title}</p>
+              </div>
+              <span className="ml-auto text-xs font-medium px-2.5 py-1 rounded-full bg-[var(--ts-canvas)] text-[var(--ts-ink)] border border-[color:var(--ts-line)]">
+                {fila.detalle}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && !muestraRequisiciones && list.length === 0 && (
+        <div className="text-sm text-[var(--ts-muted)] py-6 text-center bg-white rounded-xl border border-[color:var(--ts-line)]">
+          {board.filtro || board.fuenteFiltro
+            ? "No hay vacantes con ese filtro."
+            : tab === 'active' ? 'Sin vacantes activas.' : 'Sin vacantes cerradas aún.'}
         </div>
       )}
 

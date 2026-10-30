@@ -21,6 +21,7 @@ import {
 } from "@/lib/requisitions";
 import { modeloDeCompetencias, nivelDeJerarquia, TS_CLIENT_ID } from "@/lib/competency-model";
 import { guardarFechasVacante, validarFechasAts } from "@/lib/vacancy-dates-store";
+import { transicionBloqueadaPorOculta } from "@/lib/requisition-board";
 
 export const runtime = "nodejs";
 
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json({
     requisicion: { ...data, dias_en_estado: diasEnEstado(data.updated_at) },
     historial: eventos || [],
-    acciones: accionesDisponibles(data.status as RequisitionStatus),
+    acciones: data.hidden_at ? [] : accionesDisponibles(data.status as RequisitionStatus),
   });
 }
 
@@ -74,6 +75,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const actual = actualRaw as any;
 
     const estadoActual = actual.status as RequisitionStatus;
+    const bloqueo = transicionBloqueadaPorOculta(actual, accion);
+    if (bloqueo) return NextResponse.json({ error: bloqueo }, { status: 400 });
 
     // Los campos del perfil se guardan aunque la acción no sea "armar_perfil":
     // Wellness puede ir completando y guardar sin mandar todavía al CWO.

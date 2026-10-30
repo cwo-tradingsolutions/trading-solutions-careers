@@ -40,6 +40,27 @@ export async function cargarFuentes(): Promise<{ fuentes: FuenteLista[]; desde: 
   }
 }
 
+const PAGINA = 1000;
+
+/** PostgREST corta en 1000 filas. Se pide de a páginas hasta que una venga corta. */
+async function leerCandidatosPorPagina(): Promise<{ vacancy_id: string; arrival_source: string | null }[] | null> {
+  const todos: { vacancy_id: string; arrival_source: string | null }[] = [];
+  for (let desde = 0; desde < 50_000; desde += PAGINA) {
+    const { data, error } = await supabaseAdmin
+      .from("ht_candidates")
+      .select("vacancy_id, arrival_source")
+      .range(desde, desde + PAGINA - 1);
+    if (error) {
+      console.error("[vacancy-sources] llegada:", error.message);
+      return null;
+    }
+    const lote = (data || []) as { vacancy_id: string; arrival_source: string | null }[];
+    todos.push(...lote);
+    if (lote.length < PAGINA) return todos;
+  }
+  return todos;
+}
+
 export async function clavesFuenteActivas(): Promise<string[]> {
   const { fuentes } = await cargarFuentes();
   return fuentes.filter((f) => f.active).map((f) => f.key);
@@ -79,13 +100,9 @@ export async function cargarTableroFuentes(): Promise<{
     }
 
     let llegadaPorVacante = new Map<string, LlegadaFila[]>();
-    const { data: cands, error: candErr } = await supabaseAdmin
-      .from("ht_candidates")
-      .select("vacancy_id, arrival_source");
-    if (!candErr && cands) {
-      llegadaPorVacante = agruparLlegada(
-        (cands as { vacancy_id: string; arrival_source: string | null }[]).filter((c) => c.vacancy_id),
-      );
+    const cands = await leerCandidatosPorPagina();
+    if (cands) {
+      llegadaPorVacante = agruparLlegada(cands.filter((c) => c.vacancy_id));
     }
 
     const vacantes: VacanteFuentes[] = ((vacs || []) as {

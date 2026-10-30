@@ -2,6 +2,14 @@
 
 Archivos. No se aplicaron contra ninguna base desde este PR. Se aplican en el deploy, con GO de Kelly.
 
+## Orden
+
+`20261030_recruitment_sources.sql` corre **antes** de desplegar el código. El formulario de Careers escribe `ht_candidates.arrival_source` solo cuando hay un `?src=` válido. Si esa columna no existe y el insert la manda, PostgREST rechaza la fila y el candidato no entra al funnel. Por eso la migración va primero.
+
+`20261030_requisicion_oculta.sql` va en el mismo paso, también antes de servir el código que filtra `hidden_at`.
+
+El backup `ht_requisitions_backup_20261030` no se borra acá. Se deja hasta que Kelly pida dropearlo, después de verificar el GO.
+
 - `20261030_requisicion_oculta.sql` — `hidden_at`, `hidden_reason`, `hidden_by`. Oculta dos filas. No cambia `status`. No borra.
 - `20261030_recruitment_sources.sql` — tabla `ht_recruitment_sources`, FK en `ht_vacancy_postings.source`, columna `ht_candidates.arrival_source`.
 

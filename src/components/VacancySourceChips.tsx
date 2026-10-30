@@ -21,7 +21,7 @@ export function SourceChips({
       {visibles.map((f) => {
         const on = activas.includes(f.key);
         const clase =
-          "rounded-full border px-2.5 py-0.5 text-[12px] " +
+          "inline-flex items-center min-h-11 rounded-full border px-3 text-[12px] " +
           (on
             ? "bg-[var(--ts-ink)] text-white border-[color:var(--ts-ink)]"
             : "bg-white text-[var(--ts-ink)] border-[color:var(--ts-line)]");
@@ -79,7 +79,7 @@ export function ArrivalCross({
       <div>
         <p className="text-[var(--ts-muted)] mb-1">Llegaron por</p>
         {llegada.length === 0 ? (
-          <p className="text-[var(--ts-ink)]">{POR_CONSTRUIR}</p>
+          <p className="text-[var(--ts-ink)]">Aún sin postulaciones</p>
         ) : (
           <ul className="text-[var(--ts-ink)] space-y-0.5">
             {llegada.map((fila) => (

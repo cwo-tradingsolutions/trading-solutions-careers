@@ -66,18 +66,20 @@ export default function FuentesAdmin({
               type="button"
               disabled={ocupado}
               onClick={() => correr("cambio", { key: f.key, label: nombres[f.key] ?? f.label })}
-              className="rounded-full border border-[color:var(--ts-line)] px-3 py-1 text-[12px]"
+              className="min-h-11 rounded-full border border-[color:var(--ts-line)] px-3 text-[12px]"
             >
               Renombrar
             </button>
-            <button
-              type="button"
-              disabled={ocupado}
-              onClick={() => correr("cambio", { key: f.key, active: !f.active })}
-              className="rounded-full bg-[var(--ts-ink)] text-white px-3 py-1 text-[12px]"
-            >
-              {f.active ? "Desactivar" : "Activar"}
-            </button>
+            {f.key !== "careers" && (
+              <button
+                type="button"
+                disabled={ocupado}
+                onClick={() => correr("cambio", { key: f.key, active: !f.active })}
+                className="min-h-11 rounded-full border border-[color:var(--ts-line)] bg-white px-3 text-[12px] text-[var(--ts-ink)]"
+              >
+                {f.active ? "Desactivar" : "Activar"}
+              </button>
+            )}
             {!f.active && <span className="text-[11px] text-[var(--ts-muted)]">inactiva</span>}
           </li>
         ))}
@@ -103,7 +105,7 @@ export default function FuentesAdmin({
           className="rounded-full border border-[color:var(--ts-line)] px-3 py-1 text-[13px] flex-1 min-w-[8rem]"
           aria-label="Nombre de la fuente nueva"
         />
-        <button type="submit" disabled={ocupado} className="rounded-full bg-[var(--ts-ink)] text-white px-4 py-1 text-[13px]">
+        <button type="submit" disabled={ocupado} className="min-h-11 rounded-full bg-[var(--ts-ink)] text-white px-4 text-[13px]">
           Agregar
         </button>
       </form>
