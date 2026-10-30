@@ -25,6 +25,11 @@ import { getResend, EMAIL_FROM, EMAIL_BCC } from "@/lib/resend";
 import { buildIcs, buildGoogleCalendarUrl } from "@/lib/ics";
 import crypto from "crypto";
 
+/** Fase 0 deja el cuerpo de esta ruta, pero no lo ejecuta. */
+function agendarEntrevistaHabilitado(): boolean {
+  return false;
+}
+
 const TYPE_LABEL: Record<string, string> = {
   recruiter: 'Entrevista con Recruiter',
   cwo: 'Entrevista con CWO',
@@ -49,6 +54,18 @@ export async function POST(
 ) {
   const authError = requireAdmin(req);
   if (authError) return authError;
+
+  // No escribe ts_interviews ni manda el correo. El código de abajo queda
+  // para que la Fase 1 lo reemplace.
+  if (!agendarEntrevistaHabilitado()) {
+    return NextResponse.json(
+      {
+        error: "Agendar entrevista está deshabilitado. Próximamente.",
+        code: "schedule_interview_disabled",
+      },
+      { status: 410 },
+    );
+  }
 
   try {
     const { candidateId } = params;

@@ -14,7 +14,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { supabaseAdmin } from "@/lib/supabase";
+import { supabaseAdmin, supabaseFromIncludingDeleted } from "@/lib/supabase";
 import seedData from "@/data/linkedin_apps_2026_05_03.json";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
@@ -46,9 +46,8 @@ export async function POST(req: NextRequest) {
     let existing: any[] = [];
     if (emails.length > 0) {
       const orFilter = emails.map(e => `email.ilike.${e}`).join(',');
-      const { data } = await supabaseAdmin
-        .from("ht_candidates")
-        .select("email")
+      const { data } = await supabaseFromIncludingDeleted("ht_candidates")
+        .select("email, deleted_at")
         .or(orFilter);
       existing = data || [];
     }
@@ -200,9 +199,8 @@ export async function GET(req: NextRequest) {
 
   const cands = seedData as SeedRow[];
   const emails = cands.map(c => c.email.toLowerCase());
-  const { data: existing } = await supabaseAdmin
-    .from("ht_candidates")
-    .select("email, vacancy_id, stage")
+  const { data: existing } = await supabaseFromIncludingDeleted("ht_candidates")
+    .select("email, vacancy_id, stage, deleted_at")
     .in("email", emails);
 
   const existingByEmail: Record<string, any> = {};

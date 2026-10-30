@@ -126,7 +126,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 }
 
-/** Elimina un adjunto: primero el objeto, después la fila. */
+/** Oculta un adjunto. La fila y el objeto en storage se conservan. */
 export async function DELETE(req: NextRequest, { params }: Ctx) {
   if (!isAdminRequest(req)) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
@@ -134,7 +134,7 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
   if (!fileId) return NextResponse.json({ error: 'Falta fileId' }, { status: 400 });
 
   // Se exige que el archivo sea de ESTE candidato: un id suelto no debe poder
-  // borrar el adjunto de otra persona.
+  // ocultar el adjunto de otra persona.
   const { data: fila } = await supabaseAdmin
     .from('ht_candidate_files')
     .select('id, storage_path')
@@ -143,11 +143,18 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
     .single();
   if (!fila) return NextResponse.json({ error: 'Adjunto no encontrado' }, { status: 404 });
 
-  const { error: rmErr } = await supabaseAdmin.storage.from(BUCKET).remove([fila.storage_path]);
-  if (rmErr) console.error('candidates/files remove', rmErr);
-
-  const { error } = await supabaseAdmin.from('ht_candidate_files').delete().eq('id', fila.id);
+  const { data, error } = await supabaseAdmin
+    .from('ht_candidate_files')
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by: 'hr-admin',
+      delete_reason: 'adjunto oculto desde HR Admin',
+    })
+    .eq('id', fila.id)
+    .select('id')
+    .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data) return NextResponse.json({ error: 'Adjunto no encontrado' }, { status: 404 });
 
-  return NextResponse.json({ eliminado: true });
+  return NextResponse.json({ eliminado: true, oculto: true });
 }

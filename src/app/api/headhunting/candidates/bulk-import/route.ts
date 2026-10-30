@@ -23,7 +23,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { supabaseAdmin } from "@/lib/supabase";
+import { supabaseAdmin, supabaseFromIncludingDeleted } from "@/lib/supabase";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -101,9 +101,8 @@ export async function POST(req: NextRequest) {
       // Pero con 100s de emails sería frágil · mejor traer todos y filtrar en JS
       // por (a) email exact match lowercase O (b) email ilike de uno por uno.
       const orFilter = emails.map(e => `email.ilike.${e}`).join(',');
-      const { data } = await supabaseAdmin
-        .from("ht_candidates")
-        .select("id, email, name, vacancy_id, stage, status")
+      const { data } = await supabaseFromIncludingDeleted("ht_candidates")
+        .select("id, email, name, vacancy_id, stage, status, deleted_at")
         .or(orFilter);
       existing = data || [];
     }

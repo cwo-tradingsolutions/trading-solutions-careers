@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin, supabaseFromIncludingDeleted } from '@/lib/supabase';
 
 // GET /api/headhunting/candidates?vacancy_id=xxx&client_id=xxx
 export async function GET(req: NextRequest) {
@@ -52,12 +52,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Check for duplicate email in same vacancy
-    const { data: existing } = await supabaseAdmin
-      .from('ht_candidates')
+    // Incluye ocultos: si no, un alta con el mismo correo crea un segundo registro.
+    const { data: existing } = await supabaseFromIncludingDeleted('ht_candidates')
       .select('id')
       .eq('vacancy_id', vacancy_id)
       .eq('email', email)
-      .single();
+      .limit(1)
+      .maybeSingle();
 
     if (existing) {
       return NextResponse.json(
@@ -126,7 +127,7 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-// DELETE /api/headhunting/candidates?id=xxx — delete a candidate and related data
+// DELETE /api/headhunting/candidates?id=xxx — borrado lógico. No toca hijos.
 export async function DELETE(req: NextRequest) {
   const authError = requireAdmin(req);
   if (authError) return authError;
@@ -134,15 +135,24 @@ export async function DELETE(req: NextRequest) {
   try {
     const id = req.nextUrl.searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'id es requerido' }, { status: 400 });
+    const reason = req.nextUrl.searchParams.get('reason');
+    const deletedAt = new Date().toISOString();
 
-    // Delete related data first
-    await supabaseAdmin.from('ht_responses').delete().eq('candidate_id', id);
-    await supabaseAdmin.from('ht_results').delete().eq('candidate_id', id);
-
-    const { error } = await supabaseAdmin.from('ht_candidates').delete().eq('id', id);
+    const { data, error } = await supabaseAdmin
+      .from('ht_candidates')
+      .update({
+        deleted_at: deletedAt,
+        deleted_by: 'hr-admin',
+        delete_reason: reason,
+        updated_at: deletedAt,
+      })
+      .eq('id', id)
+      .select('id')
+      .maybeSingle();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!data) return NextResponse.json({ error: 'Candidato no encontrado' }, { status: 404 });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, soft_deleted: true, id });
   } catch (err) {
     console.error('Delete candidate error:', err);
     return NextResponse.json(

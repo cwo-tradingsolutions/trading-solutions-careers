@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { hideSoftDeleted, SOFT_DELETE_TABLES } from './soft-delete';
 
 // ─── Lazy init para que el build de Next.js no requiera las env vars ─
 // Se crean los clients al primer uso (request time), no al importar el módulo.
@@ -51,21 +52,32 @@ function getAnonClient(): SupabaseClient {
   return _anon;
 }
 
+function wrapClient(getClient: () => SupabaseClient): SupabaseClient {
+  return new Proxy({} as SupabaseClient, {
+    get(_t, prop) {
+      const c = getClient() as unknown as Record<PropertyKey, unknown>;
+      if (prop === 'from') {
+        return (table: string) => {
+          const builder = (c.from as (name: string) => object).call(c, table);
+          if (!SOFT_DELETE_TABLES.has(table)) return builder;
+          return hideSoftDeleted(builder);
+        };
+      }
+      const v = c[prop];
+      return typeof v === 'function' ? (v as (...args: unknown[]) => unknown).bind(c) : v;
+    },
+  });
+}
+
 // ─── Proxies exportados ─────────────────────────────────────────────
 // Se mantiene la API antigua (supabaseAdmin.from(...), supabase.from(...))
 // pero se resuelve el cliente real al primer acceso en runtime.
-export const supabaseAdmin: SupabaseClient = new Proxy({} as SupabaseClient, {
-  get(_t, prop) {
-    const c = getAdminClient() as unknown as Record<PropertyKey, unknown>;
-    const v = c[prop];
-    return typeof v === 'function' ? (v as (...args: unknown[]) => unknown).bind(c) : v;
-  },
-});
+// from() de las tablas de candidato esconde deleted_at IS NOT NULL.
+export const supabaseAdmin: SupabaseClient = wrapClient(getAdminClient);
 
-export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
-  get(_t, prop) {
-    const c = getAnonClient() as unknown as Record<PropertyKey, unknown>;
-    const v = c[prop];
-    return typeof v === 'function' ? (v as (...args: unknown[]) => unknown).bind(c) : v;
-  },
-});
+export const supabase: SupabaseClient = wrapClient(getAnonClient);
+
+/** Lecturas que tienen que ver también lo oculto: dedup por email y restaurar. */
+export function supabaseFromIncludingDeleted(table: string) {
+  return getAdminClient().from(table);
+}

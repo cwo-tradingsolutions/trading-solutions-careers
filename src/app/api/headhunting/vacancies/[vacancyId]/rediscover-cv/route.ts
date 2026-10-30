@@ -181,8 +181,16 @@ export async function POST(
     }));
 
     if (upsertPayloads.length > 0) {
-      // Borrar matches viejos de esta vacante
-      await supabaseAdmin.from("ts_cv_bank_matches").delete().eq("vacancy_id", vacancyId);
+      // Oculta el cruce anterior. El índice único solo mira filas vivas,
+      // así que el insert de abajo no pisa el historial.
+      await supabaseAdmin
+        .from("ts_cv_bank_matches")
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: "rediscover-cv",
+          delete_reason: "recomputo de matches",
+        })
+        .eq("vacancy_id", vacancyId);
       // Insertar nuevos
       const { error: insErr } = await supabaseAdmin.from("ts_cv_bank_matches").insert(upsertPayloads);
       if (insErr) console.error('cv_bank_matches insert:', insErr);

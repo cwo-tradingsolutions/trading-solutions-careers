@@ -4,7 +4,7 @@ import { prefilter, toPrefilterData } from "@/lib/agent/prefilter";
 import { generatePortalToken } from "@/lib/portal-token";
 import { getResend, EMAIL_FROM } from "@/lib/resend";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
-import { supabaseAdmin } from "@/lib/supabase";
+import { supabaseAdmin, supabaseFromIncludingDeleted } from "@/lib/supabase";
 import { recordStageEvent } from "@/lib/stage-events";
 // La resolución job_id → vacancy_id es compartida con
 // /api/admin/sync-applications-to-funnel · no duplicarla acá.
@@ -96,19 +96,18 @@ export async function POST(request: NextRequest) {
         // lo único que pasaba era que se le tocaba la fecha: su postulación
         // nueva no entraba a ninguna parte. El 8 de octubre fueron diez de
         // quince, y dos de ellos figuraban rechazados de un proceso de abril.
-        const { data: existing } = await supabaseAdmin
-          .from("ht_candidates")
-          .select("id")
+        const { data: existing } = await supabaseFromIncludingDeleted("ht_candidates")
+          .select("id, deleted_at")
           .ilike("email", emailNormalized)
           .eq("vacancy_id", vacancyId)
           .maybeSingle();
 
-        if (existing?.id) {
+        if (existing?.id && !existing.deleted_at) {
           await supabaseAdmin
             .from("ht_candidates")
             .update({ updated_at: new Date().toISOString() })
             .eq("id", existing.id);
-        } else {
+        } else if (!existing?.id) {
           const { data: created, error: insertErr } = await supabaseAdmin
             .from("ht_candidates")
             .insert({
