@@ -11,6 +11,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { fetchAllRows } from "@/lib/fetch-all-rows";
 import { supabaseAdmin } from "@/lib/supabase";
 import { fechaIso } from "@/lib/vacancy-dates";
 
@@ -61,12 +62,14 @@ export async function GET(req: NextRequest) {
     (milestones || []).forEach((m: any) => { milestoneByVacancy[m.vacancy_id] = m; });
 
     // 2. Candidates per vacancy by stage (incluye updated_at para aging)
-    let candQuery = supabaseAdmin
-      .from("ht_candidates")
-      .select("id, name, vacancy_id, stage, status, email, updated_at, created_at")
-      .not("email", "ilike", "%@tradingsolutions.com");
-    if (filterByVacancy) candQuery = candQuery.eq("vacancy_id", vacancyId);
-    const { data: cands } = await candQuery;
+    const cands = await fetchAllRows(() => {
+      let candQuery = supabaseAdmin
+        .from("ht_candidates")
+        .select("id, name, vacancy_id, stage, status, email, updated_at, created_at")
+        .not("email", "ilike", "%@tradingsolutions.com");
+      if (filterByVacancy) candQuery = candQuery.eq("vacancy_id", vacancyId);
+      return candQuery;
+    });
 
     function daysSince(dt?: string | null) {
       if (!dt) return 0;

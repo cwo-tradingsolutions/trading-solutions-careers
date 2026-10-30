@@ -11,6 +11,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { fetchAllRows } from "@/lib/fetch-all-rows";
 import { supabaseAdmin } from "@/lib/supabase";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
@@ -81,12 +82,14 @@ export async function GET(req: NextRequest) {
     (milestones || []).forEach((m: any) => { milestoneByVac[m.vacancy_id] = m; });
 
     // Candidates (excluding internos)
-    let candQuery = supabaseAdmin
-      .from("ht_candidates")
-      .select("id, vacancy_id, stage, status, updated_at, created_at")
-      .not("email", "ilike", "%@tradingsolutions.com");
-    if (vacancyFilter) candQuery = candQuery.eq('vacancy_id', vacancyFilter);
-    const { data: cands } = await candQuery;
+    const cands = await fetchAllRows(() => {
+      let candQuery = supabaseAdmin
+        .from("ht_candidates")
+        .select("id, vacancy_id, stage, status, updated_at, created_at")
+        .not("email", "ilike", "%@tradingsolutions.com");
+      if (vacancyFilter) candQuery = candQuery.eq('vacancy_id', vacancyFilter);
+      return candQuery;
+    });
 
     // ─── Funnel conversion: cuántos llegaron a cada stage ───
     // Un candidato "llegó al stage X" si su rank actual >= rank(X) o si fue rechazado en/después
@@ -228,11 +231,13 @@ export async function GET(req: NextRequest) {
     // Esto requiere join a tabla de scores — best-effort, retornamos placeholder si no aplica
     let avgElevare: number | null = null;
     try {
-      const { data: scores } = await supabaseAdmin
-        .from("ht_candidates")
-        .select("overall_score")
-        .not("overall_score", "is", null);
-      if (scores && scores.length > 0) {
+      const scores = await fetchAllRows(() =>
+        supabaseAdmin
+          .from("ht_candidates")
+          .select("overall_score")
+          .not("overall_score", "is", null),
+      );
+      if (scores.length > 0) {
         avgElevare = Math.round(scores.reduce((s: number, c: any) => s + (c.overall_score || 0), 0) / scores.length);
       }
     } catch {}

@@ -16,6 +16,8 @@ type PageResult = { data: unknown[] | null; error: { message: string } | null };
 async function pages(make: (from: number, to: number) => PromiseLike<PageResult>): Promise<Record<string, unknown>[]> {
   const size = 1000;
   const all: Record<string, unknown>[] = [];
+  // `make` tiene que ordenar por una clave total (created_at, luego id; o id).
+  // Sin eso el offset repite o salta filas cuando hay más de `size`.
   for (let i = 0; i < 40; i++) {
     const { data, error } = await make(i * size, i * size + size - 1);
     if (error) throw new Error(error.message);
@@ -34,6 +36,8 @@ export async function loadDashboardInput(clientId: string, filters: DashFilters)
         .from("ht_candidates")
         .select("id, name, vacancy_id, stage, source, created_at, status")
         .eq("client_id", clientId)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
         .range(from, to),
     );
   } catch (err) {
@@ -44,6 +48,8 @@ export async function loadDashboardInput(clientId: string, filters: DashFilters)
         .from("ht_candidates")
         .select("id, name, vacancy_id, stage, created_at, status")
         .eq("client_id", clientId)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
         .range(from, to),
     );
     candRows = candRows.map((r) => ({ ...r, source: null }));
@@ -54,6 +60,8 @@ export async function loadDashboardInput(clientId: string, filters: DashFilters)
       .from("ht_vacancies")
       .select("id, title, area, country, status, owner_recruiter_id")
       .eq("client_id", clientId)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
       .range(from, to),
   );
 
@@ -83,6 +91,7 @@ export async function loadDashboardInput(clientId: string, filters: DashFilters)
         .from("ht_candidate_stage_events")
         .select("candidate_id, to_stage, changed_at, source")
         .in("candidate_id", slice)
+        .order("id", { ascending: true })
         .range(from, to),
     );
     events.push(...rows);
