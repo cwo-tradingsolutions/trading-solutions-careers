@@ -229,7 +229,7 @@ export default function AiInterviewPage() {
             Gracias por tu tiempo, <strong>{config?.candidate.name?.split(" ")[0]}</strong>. Estamos analizando tu entrevista.
           </p>
           <p style={{ marginTop: 12, color: "#374151", lineHeight: 1.6 }}>
-            Kelly Castañeda te contactará en los próximos <strong>2-3 días hábiles</strong> con la siguiente etapa del proceso.
+            Talent Acquisition Team te contactará en los próximos <strong>2-3 días hábiles</strong> con la siguiente etapa del proceso.
           </p>
           <p style={{ marginTop: 24, fontSize: 12, color: "#9ca3af", textAlign: "center" }}>
             Puedes cerrar esta ventana.

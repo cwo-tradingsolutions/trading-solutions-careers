@@ -17,46 +17,20 @@ import crypto from "crypto";
 
 // Las etapas válidas (v4 + legacy) viven en la fuente única de verdad.
 // No declarar listas de etapas acá.
-import { VALID_STAGES } from "@/lib/stage-labels";
+import { VALID_STAGES, KELLY_GATES, normalizeStage, STAGE_RANK } from "@/lib/stage-labels";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
-
-const TS_LINKEDIN_URL = "https://www.linkedin.com/company/trading-sol/";
-
-function buildRejectionHtmlEn(name: string, vacancyTitle: string): string {
-  const firstName = (name || "").split(" ")[0] || "candidate";
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-  body { font-family: Inter, -apple-system, sans-serif; line-height: 1.6; color: #1a1a1a; padding: 24px; background: #f9f9f9; }
-  .container { max-width: 600px; margin: 0 auto; background: white; padding: 32px; border-radius: 12px; }
-  a { color: #2C64ED; }
-</style></head><body>
-  <div class="container">
-    <p>Hi <strong>${firstName}</strong>,</p>
-    <p>Thank you for taking the time to apply for the <strong>${vacancyTitle}</strong> position at Trading Solutions. After reviewing your application, we have decided to move forward with other candidates whose profile is a closer match for the position at this time. Trading Solutions keeps growing, and we would love to stay in touch.</p>
-    <p>Your information stays in our database for future opportunities. We also invite you to follow us on LinkedIn to hear about new openings: <a href="${TS_LINKEDIN_URL}">${TS_LINKEDIN_URL}</a></p>
-    <p>We appreciate your interest in Trading Solutions and wish you all the best in your next steps.</p>
-    <p>Best regards,<br><strong>Talent Team</strong><br>Trading Solutions</p>
-  </div>
-</body></html>`;
-}
-
-function buildRejectionHtml(name: string, vacancyTitle: string): string {
-  const firstName = (name || "").split(" ")[0] || "candidato";
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-  body { font-family: Inter, -apple-system, sans-serif; line-height: 1.6; color: #1a1a1a; padding: 24px; background: #f9f9f9; }
-  .container { max-width: 600px; margin: 0 auto; background: white; padding: 32px; border-radius: 12px; }
-  a { color: #2C64ED; }
-</style></head><body>
-  <div class="container">
-    <p>Hola <strong>${firstName}</strong>,</p>
-    <p>Gracias por tomarte el tiempo de aplicar a la posición de <strong>${vacancyTitle}</strong> en Trading Solutions. Después de revisar tu aplicación, hemos decidido avanzar con otros candidatos cuyo perfil se ajusta más a la posición en este momento. Sin embargo, Trading Solutions sigue creciendo y nos encantaría mantenernos en contacto.</p>
-    <p>Tu información queda en nuestra base de datos para futuras oportunidades. También te invitamos a seguirnos en LinkedIn para enterarte de nuevas vacantes: <a href="${TS_LINKEDIN_URL}">${TS_LINKEDIN_URL}</a></p>
-    <p>Apreciamos tu interés en Trading Solutions y te deseamos mucho éxito en tus próximos pasos.</p>
-    <p>Un abrazo,<br><strong>Kelly Castañeda</strong><br>Talent Acquisition and Development Lead<br>Trading Solutions</p>
-  </div>
-</body></html>`;
-}
+import { recordStageEvent } from "@/lib/stage-events";
+import { enviarBateriaAuto } from "@/lib/bateria/invitar";
+import { batteryAutoSendEnabled, NOTA_BATERIA_PENDIENTE } from "@/lib/battery-auto-send";
+import { stageDraftsEnabled } from "@/lib/stage-drafts";
+import { ATS_FROM_NAME, candidateSignatureHtml } from "@/lib/ats-from";
+import { validarRechazo, MSG_RECHAZO_SILENCIOSO } from "@/lib/rejection-rules";
+import {
+  buildRejectionHtml,
+  rejectionEmailsEnabled,
+  rejectionSubject,
+  REJECTION_REPLY_TO,
+} from "@/lib/rejection-email";
 
 export async function POST(
   req: NextRequest,
@@ -68,20 +42,26 @@ export async function POST(
   try {
     const { candidateId } = params;
     const body = await req.json();
-    const targetStage = String(body.stage || "");
+    const requestedStage = String(body.stage || "");
     const createRejectionDraft = body.create_rejection_draft !== false;
 
-    if (!VALID_STAGES.includes(targetStage)) {
+    if (!VALID_STAGES.includes(requestedStage)) {
       return NextResponse.json(
         { error: `Stage inválida. Válidas: ${VALID_STAGES.join(", ")}` },
         { status: 400 }
       );
     }
 
+    // Se escribe el code v4. Los únicos históricos que se conservan son los
+    // que sostienen un gate de Kelly sin code propio (Psicométricas,
+    // Entrevista HM): normalizarlos los mandaría a Batería TS o Terna.
+    const GATE_LEGACY = KELLY_GATES.flatMap((g) => g.legacy);
+    const targetStage = GATE_LEGACY.includes(requestedStage) ? requestedStage : normalizeStage(requestedStage);
+
     // Cargar candidato
     const { data: candidate, error: fetchErr } = await supabaseAdmin
       .from("ht_candidates")
-      .select("id, name, email, vacancy_id, stage, status, preferred_language, ht_vacancies(title, form_template_key, country)")
+      .select("id, name, email, vacancy_id, stage, status, source, preferred_language, ht_vacancies(title, form_template_key, country)")
       .eq("id", candidateId)
       .single();
 
@@ -94,9 +74,20 @@ export async function POST(
       updated_at: new Date().toISOString(),
     };
 
-    // Si se mueve a rechazado, también actualizar status
+    // Si se mueve a rechazado, también actualizar status.
+    // Sin categoría no se escribe: el descarte silencioso queda prohibido.
     if (targetStage === "rechazado") {
+      const rechazo = validarRechazo({
+        category_key: body.category_key ?? body.rejection_category,
+        note: body.note ?? body.rejection_note ?? body.note_private,
+      });
+      if (!rechazo.ok) {
+        return NextResponse.json({ error: rechazo.error || MSG_RECHAZO_SILENCIOSO }, { status: 400 });
+      }
       updates.status = "rejected";
+      updates.rejection_category = rechazo.category_key;
+      updates.rejection_note_private = rechazo.note;
+      updates.rejected_at = new Date().toISOString();
     }
 
     // Si se mueve a contratado, status también
@@ -108,7 +99,7 @@ export async function POST(
     let elevareUrl: string | null = null;
 
     // Si se mueve a assessment_invitado: generar token + draft de Elevare
-    if (targetStage === "assessment_invitado") {
+    if (requestedStage === "assessment_invitado") {
       const token = crypto.randomUUID();
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 72);
@@ -122,7 +113,7 @@ export async function POST(
 
       try {
         const gmail = await isGmailConnected();
-        if (gmail.connected) {
+        if (gmail.connected && stageDraftsEnabled()) {
           // @ts-expect-error supabase relation
           const vacancyTitle = candidate.ht_vacancies?.title || "la vacante";
           const firstName = (candidate.name as string).split(" ")[0] || "candidato";
@@ -137,26 +128,26 @@ export async function POST(
 </style></head><body>
   <div class="container">
     <p>Hola <strong>${firstName}</strong>,</p>
-    <p>Pasaste a la siguiente etapa del proceso para <strong>${vacancyTitle}</strong>. El próximo paso es un Assessment virtual que nos ayuda a conocerte mejor · cómo pensás, cómo decidís, qué te mueve.</p>
+    <p>Pasaste a la siguiente etapa del proceso para <strong>${vacancyTitle}</strong>. El próximo paso es un Assessment virtual que nos ayuda a conocerte mejor · cómo piensas, cómo decides, qué te mueve.</p>
     <p>No es un examen · no hay respuestas correctas. Es solo entender tu forma de ver las cosas.</p>
     <p style="text-align:center"><a href="${elevareUrl}" class="cta">Iniciar Assessment</a></p>
     <p>Algunos detalles para que estés cómoda/o:</p>
     <ul>
-      <li>Toma alrededor de 55 minutos · podés guardarlo y retomar</li>
-      <li>Necesitás computador con internet estable y cámara web (la usamos solo para validar identidad)</li>
-      <li>Buscá un espacio tranquilo, sin interrupciones</li>
+      <li>Toma alrededor de 55 minutos · puedes guardarlo y retomar</li>
+      <li>Necesitas computador con internet estable y cámara web (la usamos solo para validar identidad)</li>
+      <li>Busca un espacio tranquilo, sin interrupciones</li>
       <li>El enlace queda activo 72 horas</li>
       <li>Tus respuestas se guardan automáticamente</li>
     </ul>
-    <p>Si te queda alguna duda, contestame este correo.</p>
-    <p>Un abrazo,<br><strong>Kelly Castañeda</strong><br>Talent Acquisition and Development Lead<br>Trading Solutions</p>
+    <p>Si te queda alguna duda, contéstanos este correo.</p>
+    ${candidateSignatureHtml("es")}
   </div>
 </body></html>`;
           const draftRes = await createDraftViaGmail({
             to: candidate.email as string,
             subject: `Trading Solutions · Assessment virtual para ${vacancyTitle}`,
             html,
-            fromName: "Kelly Castañeda",
+            fromName: ATS_FROM_NAME,
           });
           if (draftRes.ok) {
             draftId = draftRes.draft_id;
@@ -168,13 +159,12 @@ export async function POST(
     }
 
     // Crear draft de rechazo si aplica
-    if (targetStage === "rechazado" && createRejectionDraft) {
+    if (targetStage === "rechazado" && createRejectionDraft && rejectionEmailsEnabled()) {
       try {
         const gmail = await isGmailConnected();
         if (gmail.connected) {
           // @ts-expect-error supabase relation
           const rawVacancyTitle = candidate.ht_vacancies?.title as string | undefined;
-          // El proceso de China corre en inglés · también el descarte.
           const rejLang = resolveCandidateLang({
             formTemplateKey: (candidate as any).ht_vacancies?.form_template_key,
             preferredLanguage: (candidate as any).preferred_language,
@@ -182,15 +172,13 @@ export async function POST(
             country: (candidate as any).ht_vacancies?.country,
           });
           const vacancyTitle = rawVacancyTitle || (rejLang === "en" ? "the position" : "la posición");
+          const firstName = ((candidate.name as string) || "").split(" ")[0] || (rejLang === "en" ? "there" : "candidato");
           const draftRes = await createDraftViaGmail({
             to: candidate.email as string,
-            subject: rejLang === "en"
-              ? `Trading Solutions · About your application`
-              : `Trading Solutions · Sobre tu aplicación`,
-            html: rejLang === "en"
-              ? buildRejectionHtmlEn(candidate.name as string, vacancyTitle)
-              : buildRejectionHtml(candidate.name as string, vacancyTitle),
-            fromName: rejLang === "en" ? "Trading Solutions Talent Team" : "Kelly Castañeda",
+            subject: rejectionSubject(vacancyTitle, rejLang),
+            html: buildRejectionHtml(firstName, vacancyTitle, rejLang),
+            fromName: ATS_FROM_NAME,
+            replyTo: REJECTION_REPLY_TO,
           });
           if (draftRes.ok) {
             draftId = draftRes.draft_id;
@@ -215,20 +203,34 @@ export async function POST(
     // Sin esto los "días en etapa" del dashboard vuelven a depender de
     // updated_at, que se pisa con cualquier edición del candidato.
     // Es best-effort: si falla, el movimiento igual quedó guardado.
-    if (candidate.stage !== targetStage) {
-      const { error: eventErr } = await supabaseAdmin
-        .from("ht_candidate_stage_events")
-        .insert({
-          candidate_id: candidateId,
-          vacancy_id: candidate.vacancy_id ?? null,
-          from_stage: candidate.stage ?? null,
-          to_stage: targetStage,
-          changed_at: new Date().toISOString(),
-          source: "ui",
-        });
-      if (eventErr) {
-        console.error("[stage] no se pudo registrar el evento de etapa:", eventErr.message);
-      }
+    // recordStageEvent también emite candidate.stage_changed para los agentes.
+    const veniaDeAntes = (STAGE_RANK[normalizeStage(candidate.stage)] ?? 0) < (STAGE_RANK["pruebas"] ?? 0);
+    const batteryPending =
+      targetStage === "prefiltro_pasado" &&
+      veniaDeAntes &&
+      body.auto_bateria !== false &&
+      !batteryAutoSendEnabled();
+    await recordStageEvent({
+      candidateId,
+      fromStage: candidate.stage ?? null,
+      toStage: targetStage,
+      vacancyId: candidate.vacancy_id ?? null,
+      source: "ui",
+      note: batteryPending ? NOTA_BATERIA_PENDIENTE : undefined,
+    });
+
+    // ─── Listo para batería → Batería TS automática ───────────────
+    // El reclutador aprueba a alguien que estaba en revisión: es el mismo
+    // "prefiltro pasado" que el automático, así que recibe la batería igual.
+    // `auto_bateria: false` lo apaga para quien solo quiera reclasificar.
+    let bateriaAuto: Awaited<ReturnType<typeof enviarBateriaAuto>> | null = null;
+    let finalStage = targetStage;
+    // Solo desde antes de la batería: a quien se devuelve a Prefiltro desde
+    // más adelante no se le reenvía nada ni se le vuelve a mover.
+    if (targetStage === "prefiltro_pasado" && veniaDeAntes && body.auto_bateria !== false) {
+      const origin = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+      bateriaAuto = await enviarBateriaAuto(candidateId, origin);
+      if (bateriaAuto.enviado) finalStage = "pruebas";
     }
 
     // ─── Auto-create People + Onboarding when hired ───
@@ -239,7 +241,7 @@ export async function POST(
       // Welcome email · primer contacto post-oferta firmada
       try {
         const gmail = await isGmailConnected();
-        if (gmail.connected && candidate.email) {
+        if (gmail.connected && candidate.email && stageDraftsEnabled()) {
           const firstName = (candidate.name as string).split(" ")[0] || "";
           // @ts-expect-error supabase relation
           const vacancyTitle = candidate.ht_vacancies?.title || "tu nuevo rol";
@@ -256,7 +258,7 @@ export async function POST(
   <div class="container">
     <div class="eyebrow">Bienvenida/o a Trading Solutions</div>
     <h1>${firstName}, qué bueno tenerte con nosotros.</h1>
-    <p>Cerramos el proceso para <strong>${vacancyTitle}</strong> y ya estás dentro. Antes de tu primer día queremos hacerte el camino corto · te paso lo que viene.</p>
+    <p>Cerramos el proceso para <strong>${vacancyTitle}</strong> y ya estás dentro. Antes de tu primer día queremos hacerte el camino corto · te pasamos lo que viene.</p>
     <p><strong>En los próximos días te vamos a enviar:</strong></p>
     <ul>
       <li>Tu carta oferta firmada y los documentos para HR</li>
@@ -264,16 +266,16 @@ export async function POST(
       <li>Tu plan de los primeros 30/60/90 días con el equipo</li>
       <li>Quién será tu buddy para tus primeras semanas</li>
     </ul>
-    <p>Si tenés alguna duda mientras tanto · sobre tu fecha de inicio, lo logístico, lo que sea · contestame este correo y resolvemos.</p>
+    <p>Si tienes alguna duda mientras tanto · sobre tu fecha de inicio, lo logístico, lo que sea · contéstanos este correo y resolvemos.</p>
     <p>Nos vemos muy pronto.</p>
-    <p>Un abrazo,<br><strong>Kelly Castañeda</strong><br>Talent Acquisition and Development Lead<br>Trading Solutions</p>
+    ${candidateSignatureHtml("es")}
   </div>
 </body></html>`;
           const welcomeRes = await createDraftViaGmail({
             to: candidate.email as string,
             subject: `Bienvenida/o a Trading Solutions, ${firstName}`,
             html: welcomeHtml,
-            fromName: "Kelly Castañeda",
+            fromName: ATS_FROM_NAME,
             replyTo: "jointheteam@tradingsolutions.com",
           });
           if (welcomeRes.ok) {
@@ -355,7 +357,8 @@ export async function POST(
       success: true,
       candidate_id: candidateId,
       from_stage: candidate.stage,
-      to_stage: targetStage,
+      to_stage: finalStage,
+      bateria_auto: bateriaAuto,
       draft_id: draftId,
       welcome_draft_id: welcomeDraftId,
       elevare_url: elevareUrl,

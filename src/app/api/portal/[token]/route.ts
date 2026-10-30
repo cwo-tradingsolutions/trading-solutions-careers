@@ -7,6 +7,7 @@
  */
 import { neon } from "@/lib/sql";
 import { NextRequest, NextResponse } from "next/server";
+import { publicStepBody } from "@/lib/candidate-public-error";
 import { verifyPortalToken, isValidSignatureFor } from "@/lib/portal-token";
 import { resolveCandidateLang, type CandidateLang } from "@/lib/candidate-lang";
 
@@ -171,9 +172,6 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     );
   } catch (e) {
     console.error("portal GET error:", e);
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "unknown" },
-      { status: 500, headers: corsHeaders }
-    );
+    return NextResponse.json(publicStepBody(), { status: 500, headers: corsHeaders });
   }
 }

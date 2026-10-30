@@ -14,6 +14,8 @@
  *    siguientes con tiempo.
  */
 
+import { candidateSignatureHtml, candidateSignatureText } from "./ats-from";
+
 export type DatosCitacion = {
   nombre: string | null;
   vacante: string | null;
@@ -109,8 +111,7 @@ export function textoCitacion(d: DatosCitacion): string {
     '',
     'Confírmanos tu asistencia respondiendo este correo.',
     '',
-    d.firma ?? FIRMA_CITACION,
-    'Trading Solutions',
+    candidateSignatureText("es"),
   ].filter((l) => l !== '').join('\n');
 }
 
@@ -181,10 +182,7 @@ export function htmlCitacion(d: DatosCitacion): string {
         <strong>Confírmanos tu asistencia respondiendo este correo.</strong>
       </p>
 
-      <p style="margin:0;font-size:15px;line-height:1.6">
-        ${d.firma ?? FIRMA_CITACION}<br>
-        <span style="color:#6B7280;font-size:13.5px">Trading Solutions</span>
-      </p>
+      ${candidateSignatureHtml("es")}
     </div>
 
     <div style="padding:18px 32px 26px;border-top:1px solid #E5E7EB">

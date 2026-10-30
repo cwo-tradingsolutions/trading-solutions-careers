@@ -13,6 +13,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import Anthropic from "@anthropic-ai/sdk";
 import { crearAnthropic } from "@/lib/anthropic";
+import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
+import { publicStepBody } from "@/lib/candidate-public-error";
 
 // Permitir hasta 90s — los 3 agentes Claude en paralelo con transcripts de
 // 14K chars pueden tardar 40-60s. Vercel Pro permite hasta 90s.
@@ -238,6 +240,10 @@ export async function POST(
       return NextResponse.json({ error: "invalid_token" }, { status: 401 });
     }
 
+    if (isPreviewTestMode()) {
+      return previewTestJson("POST /api/headhunting/ai-interview/[token]/finalize");
+    }
+
     // ─── Optimización: si la BD ya tiene transcript cacheado, usarlo ───
     // Evita refetch a ElevenLabs cuando se invoca /finalize otra vez para
     // correr scoring que falló antes (caso típico: rescore-ai-interviews).
@@ -379,9 +385,6 @@ export async function POST(
     });
   } catch (err) {
     console.error("ai-interview finalize error:", err);
-    return NextResponse.json(
-      { error: "Error interno", detail: (err as Error).message },
-      { status: 500 }
-    );
+    return NextResponse.json(publicStepBody(), { status: 500 });
   }
 }

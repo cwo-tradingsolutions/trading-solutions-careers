@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
+import { ATS_FROM_NAME, candidateSignatureHtml } from "@/lib/ats-from";
 
 export const runtime = "nodejs";
 
@@ -85,7 +86,7 @@ function buildEmailHtml(opts: {
 
     <p>Cuando tengas todo, nos avisas para coordinar entrevista final con Hiring Manager + CWO.</p>
 
-    <p>Gracias!<br><strong>Kelly Castañeda</strong><br>Talent Acquisition and Development Lead<br>Trading Solutions</p>
+    ${candidateSignatureHtml("es")}
     <div class="footer">Generado desde el ATS al mover al candidato a "Pruebas Psicométricas".</div>
   </div>
 </body></html>`;
@@ -190,7 +191,7 @@ export async function POST(
           to: MARY_EMAIL,
           subject: `Pruebas psicométricas · ${candidate.name} · ${vacancyTitle}`,
           html,
-          fromName: "Kelly Castañeda",
+          fromName: ATS_FROM_NAME,
           replyTo: "jointheteam@tradingsolutions.com",
         });
         if (draftRes.ok) draftId = draftRes.draft_id;

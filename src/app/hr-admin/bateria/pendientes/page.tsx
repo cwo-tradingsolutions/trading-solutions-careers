@@ -99,7 +99,7 @@ export default function PendientesBateria() {
       `Este es tu enlace personal:\n\n${f.urlPrueba}\n\n` +
       `Si ya intentaste presentarla y la plataforma no cargó, se detuvo o no registró tus respuestas, por favor respóndenos este correo y habilitaremos un nuevo enlace el mismo día. Hemos identificado esta situación en otros procesos y queremos asegurarnos de que no afecte tu participación.\n\n` +
       `Si por el contrario has decidido no continuar, te agradecemos informarnos para cerrar tu proceso de manera formal. Tu perfil permanecerá en nuestra base de datos para futuras oportunidades.\n\n` +
-      `Cordialmente,\n\nTalent Team · Trading Solutions`;
+      `Cordialmente,\n\nTalent Acquisition Team · Trading Solutions`;
     try {
       await navigator.clipboard.writeText(cuerpo);
       setCopiado(f.urlPrueba);

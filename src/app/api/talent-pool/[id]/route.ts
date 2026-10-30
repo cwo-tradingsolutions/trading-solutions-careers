@@ -1,5 +1,6 @@
 import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
+import { publicStepBody } from "@/lib/candidate-public-error";
 import { NextRequest, NextResponse } from 'next/server';
 
 const corsHeaders = {
@@ -16,6 +17,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const authError = requireAdmin(request);
+  if (authError) return authError;
+
   try {
     const candidateId = parseInt(params.id);
 
@@ -42,10 +46,7 @@ export async function GET(
     return NextResponse.json(candidate[0], { headers: corsHeaders });
   } catch (error) {
     console.error('GET /api/talent-pool/[id] error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch candidate' },
-      { status: 500, headers: corsHeaders }
-    );
+    return NextResponse.json(publicStepBody(), { status: 500, headers: corsHeaders });
   }
 }
 

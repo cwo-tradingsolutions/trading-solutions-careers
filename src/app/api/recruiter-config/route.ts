@@ -11,6 +11,8 @@
  */
 import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
+import { ATS_FROM_EMAIL, ATS_FROM_NAME } from "@/lib/ats-from";
+import { publicStepBody } from "@/lib/candidate-public-error";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -55,20 +57,23 @@ async function ensureTable() {
   `;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authError = requireAdmin(req);
+  if (authError) return authError;
+
   try {
     await ensureTable();
     const sql = neon(process.env.DATABASE_URL!);
     const rows = await sql`SELECT * FROM recruiter_config WHERE id = 1`;
     const row = rows[0] ?? {};
 
-    const emailFrom = process.env.EMAIL_FROM ?? "Elevare Careers <orders@elevarecareer.com>";
+    const emailFrom = process.env.EMAIL_FROM ?? `${ATS_FROM_NAME} <${ATS_FROM_EMAIL}>`;
     const isTSDomain = /tradingsolutions\.com/i.test(emailFrom);
 
     return NextResponse.json(
       {
         email_from: emailFrom,
-        email_bcc: row.email_bcc ?? process.env.EMAIL_BCC ?? "",
+        email_bcc: row.email_bcc ?? "",
         email_reply_to: row.email_reply_to ?? "",
         booking_url: row.booking_url ?? "",
         resend_domain_status: isTSDomain ? "verified_ts" : "default_elevare",
@@ -76,10 +81,8 @@ export async function GET() {
       { headers: corsHeaders }
     );
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "unknown" },
-      { status: 500, headers: corsHeaders }
-    );
+    console.error("/api/recruiter-config", e);
+    return NextResponse.json(publicStepBody(), { status: 500, headers: corsHeaders });
   }
 }
 
@@ -108,9 +111,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true }, { headers: corsHeaders });
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "unknown" },
-      { status: 500, headers: corsHeaders }
-    );
+    console.error("/api/recruiter-config", e);
+    return NextResponse.json(publicStepBody(), { status: 500, headers: corsHeaders });
   }
 }

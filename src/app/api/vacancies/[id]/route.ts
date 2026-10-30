@@ -1,6 +1,8 @@
 import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from 'next/server';
+import { columnaCierreWebExiste, validarFechasWeb } from "@/lib/vacancy-web-dates";
+import { publicStepBody } from "@/lib/candidate-public-error";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -44,10 +46,7 @@ export async function GET(
     return NextResponse.json(vacancy[0], { headers: corsHeaders });
   } catch (error) {
     console.error('GET /api/vacancies/[id] error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch vacancy' },
-      { status: 500, headers: corsHeaders }
-    );
+    return NextResponse.json(publicStepBody(), { status: 500, headers: corsHeaders });
   }
 }
 
@@ -87,6 +86,23 @@ export async function PATCH(
     } = body;
 
     const sql = neon(process.env.DATABASE_URL!);
+    const tocaFechas = ["fecha_apertura", "posted_at", "fecha_objetivo", "target_close_date"]
+      .some((k) => body[k] !== undefined);
+    let avisoFechas: string | null = null;
+    const cierreExiste = tocaFechas ? await columnaCierreWebExiste() : false;
+    if (tocaFechas) {
+      const fechas = await validarFechasWeb(
+        body.fecha_apertura ?? body.posted_at,
+        body.fecha_objetivo ?? body.target_close_date,
+      );
+      if (!fechas.ok) {
+        return NextResponse.json({ error: fechas.error }, { status: 400, headers: corsHeaders });
+      }
+      body.posted_at = fechas.apertura;
+      if (fechas.objetivo && cierreExiste) body.target_close_date = fechas.objetivo;
+      else delete body.target_close_date;
+      avisoFechas = fechas.aviso;
+    }
 
     // Build dynamic update query
     const updates: string[] = [];
@@ -141,6 +157,14 @@ export async function PATCH(
       updates.push(`linkedin_url = $${paramCount++}`);
       values.push(linkedin_url);
     }
+    if (body.posted_at !== undefined && tocaFechas) {
+      updates.push(`posted_at = $${paramCount++}`);
+      values.push(body.posted_at);
+    }
+    if (cierreExiste && body.target_close_date !== undefined && tocaFechas) {
+      updates.push(`target_close_date = $${paramCount++}`);
+      values.push(body.target_close_date);
+    }
 
     updates.push(`updated_at = NOW()`);
 
@@ -163,7 +187,7 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json(result[0], { headers: corsHeaders });
+    return NextResponse.json({ ...result[0], aviso_fechas: avisoFechas }, { headers: corsHeaders });
   } catch (error) {
     console.error('PATCH /api/vacancies/[id] error:', error);
     return NextResponse.json(

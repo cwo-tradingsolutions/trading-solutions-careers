@@ -11,7 +11,9 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { fetchAllRows } from "@/lib/fetch-all-rows";
 import { supabaseAdmin } from "@/lib/supabase";
+import { fechaIso } from "@/lib/vacancy-dates";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -60,12 +62,14 @@ export async function GET(req: NextRequest) {
     (milestones || []).forEach((m: any) => { milestoneByVacancy[m.vacancy_id] = m; });
 
     // 2. Candidates per vacancy by stage (incluye updated_at para aging)
-    let candQuery = supabaseAdmin
-      .from("ht_candidates")
-      .select("id, name, vacancy_id, stage, status, email, updated_at, created_at")
-      .not("email", "ilike", "%@tradingsolutions.com");
-    if (filterByVacancy) candQuery = candQuery.eq("vacancy_id", vacancyId);
-    const { data: cands } = await candQuery;
+    const cands = await fetchAllRows(() => {
+      let candQuery = supabaseAdmin
+        .from("ht_candidates")
+        .select("id, name, vacancy_id, stage, status, email, updated_at, created_at")
+        .not("email", "ilike", "%@tradingsolutions.com");
+      if (filterByVacancy) candQuery = candQuery.eq("vacancy_id", vacancyId);
+      return candQuery;
+    });
 
     function daysSince(dt?: string | null) {
       if (!dt) return 0;
@@ -177,8 +181,10 @@ export async function GET(req: NextRequest) {
           linkedin_active_date: m.linkedin_active_date,
           vacancy_started_date: m.vacancy_started_date,
           hire_date: m.hire_date,
+          target_fill_date: m.target_fill_date ?? null,
           notes: m.notes,
         },
+        fechas_faltantes: !fechaIso(m.hr_request_date) || !fechaIso(m.target_fill_date),
         metrics: {
           days_active: daysActive,
           target_days: target,

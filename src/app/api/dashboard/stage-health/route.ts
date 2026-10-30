@@ -15,6 +15,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { fetchAllRows } from "@/lib/fetch-all-rows";
 import { supabaseAdmin } from "@/lib/supabase";
 import { STAGE_SLA_DAYS, STAGE_LABEL_SHORT, STAGE_CATEGORY } from "@/lib/stage-labels";
 
@@ -40,12 +41,14 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const vacancyFilter = url.searchParams.get('vacancy_id');
 
-    let candQuery = supabaseAdmin
-      .from("ht_candidates")
-      .select("id, vacancy_id, stage, status, updated_at, created_at, name")
-      .not("email", "ilike", "%@tradingsolutions.com");
-    if (vacancyFilter && vacancyFilter !== 'all') candQuery = candQuery.eq('vacancy_id', vacancyFilter);
-    const { data: cands } = await candQuery;
+    const cands = await fetchAllRows(() => {
+      let candQuery = supabaseAdmin
+        .from("ht_candidates")
+        .select("id, vacancy_id, stage, status, updated_at, created_at, name")
+        .not("email", "ilike", "%@tradingsolutions.com");
+      if (vacancyFilter && vacancyFilter !== 'all') candQuery = candQuery.eq('vacancy_id', vacancyFilter);
+      return candQuery;
+    });
 
     // Filtrar a candidatos en vacantes abiertas (excluir cerradas/rechazados)
     let vacQuery = supabaseAdmin

@@ -80,13 +80,41 @@ export async function GET(
 
   const { vacancyId } = params;
 
-  const { data: matches } = await supabaseAdmin
+  const { data: matches, error: matchErr } = await supabaseAdmin
     .from("ts_cv_bank_matches")
     .select("*, candidate:ht_candidates(id, name, email, current_job_role, current_company, headline, location, salary_aspiration_cop, english_level, stage, status)")
     .eq("vacancy_id", vacancyId)
     .order("match_score", { ascending: false });
 
-  return NextResponse.json({ matches: matches || [], total: matches?.length || 0 });
+  if (matchErr) {
+    return NextResponse.json({ error: matchErr.message, matches: [] }, { status: 500 });
+  }
+
+  const rows = matches || [];
+  const activeByEmail = new Map<string, string>();
+  if (rows.length > 0) {
+    const { data: onVacancy } = await supabaseAdmin
+      .from("ht_candidates")
+      .select("id, email, stage")
+      .eq("vacancy_id", vacancyId);
+    for (const row of onVacancy || []) {
+      const email = String(row.email || "").trim().toLowerCase();
+      const stage = String(row.stage || "");
+      // Activo = ya está en el funnel de ESTA vacante y no está cerrado.
+      if (email && stage !== "rechazado" && stage !== "contratado") activeByEmail.set(email, row.id as string);
+    }
+  }
+
+  const enriched = rows.map((m: { candidate?: { email?: string | null } | null }) => {
+    const email = (m.candidate?.email || "").trim().toLowerCase();
+    return {
+      ...m,
+      active_on_vacancy: activeByEmail.has(email),
+      active_candidate_id: activeByEmail.get(email) || null,
+    };
+  });
+
+  return NextResponse.json({ matches: enriched, total: enriched.length });
 }
 
 export async function POST(
@@ -123,8 +151,11 @@ export async function POST(
     if (!pool || pool.length === 0) {
       return NextResponse.json({
         success: true,
-        message: "No hay candidatos en el banco elegibles para rediscovery",
+        empty_pool: true,
+        message: "No hay candidatos en el banco elegibles para rediscovery (rechazados o contratados de otras vacantes, abiertos a redescubrimiento).",
         matches: [],
+        total_pool: 0,
+        total_matches: 0,
       });
     }
 
@@ -164,8 +195,13 @@ export async function POST(
       return NextResponse.json({ error: "AI no devolvió JSON", raw: text.slice(0, 400) }, { status: 502 });
     }
 
-    const result = JSON.parse(m[0]);
-    const matches = result.matches || [];
+    let result: { matches?: unknown };
+    try {
+      result = JSON.parse(m[0]);
+    } catch {
+      return NextResponse.json({ error: "No se pudo leer la respuesta del modelo", raw: m[0].slice(0, 400) }, { status: 502 });
+    }
+    const matches = Array.isArray(result.matches) ? result.matches : [];
 
     // 5. Upsert matches en cache
     const upsertPayloads = matches.map((mt: any) => ({
@@ -180,11 +216,28 @@ export async function POST(
     }));
 
     if (upsertPayloads.length > 0) {
-      // Borrar matches viejos de esta vacante
-      await supabaseAdmin.from("ts_cv_bank_matches").delete().eq("vacancy_id", vacancyId);
-      // Insertar nuevos
-      const { error: insErr } = await supabaseAdmin.from("ts_cv_bank_matches").insert(upsertPayloads);
-      if (insErr) console.error('cv_bank_matches insert:', insErr);
+      // Upsert por UNIQUE(vacancy_id, candidate_id). No se borra antes:
+      // un insert fallido dejaba el cache vacío.
+      const { error: upErr } = await supabaseAdmin
+        .from("ts_cv_bank_matches")
+        .upsert(upsertPayloads, { onConflict: "vacancy_id,candidate_id" });
+      if (upErr) {
+        return NextResponse.json(
+          { error: `No se pudieron guardar los matches: ${upErr.message}` },
+          { status: 500 },
+        );
+      }
+      const keepIds = upsertPayloads
+        .map((p: { candidate_id?: string }) => p.candidate_id)
+        .filter((id: string | undefined): id is string => Boolean(id));
+      if (keepIds.length > 0) {
+        const { error: staleErr } = await supabaseAdmin
+          .from("ts_cv_bank_matches")
+          .delete()
+          .eq("vacancy_id", vacancyId)
+          .not("candidate_id", "in", `(${keepIds.join(",")})`);
+        if (staleErr) console.error("cv_bank_matches stale delete:", staleErr);
+      }
     }
 
     return NextResponse.json({

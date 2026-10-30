@@ -1,7 +1,9 @@
 /**
  * Gmail API helper — envía correos desde la cuenta Google Workspace de Kelly
- * (jointheteam@tradingsolutions.com). Una sola fila singleton en
- * `google_oauth_tokens` (id=1) guarda refresh_token + access_token + expiry.
+ * (jointheteam@tradingsolutions.com).
+ * Producción: una fila singleton en `google_oauth_tokens` (id=1).
+ * preview y development: su propia fila en `google_oauth_tokens_env`.
+ * Un preview sin fila no lee el token de producción.
  *
  * Flujo:
  *   1) Kelly autoriza una vez en /api/google/auth → /api/google/callback
@@ -12,48 +14,43 @@
  * Sin paquete `googleapis` — usamos fetch directo. Más liviano, sin deps extra.
  */
 import { neon } from "@/lib/sql";
+import { ATS_FROM_EMAIL, atsFromHeader } from "@/lib/ats-from";
+import { googleOAuthEnvironment, PREVIEW_GOOGLE_CONNECT_LABEL } from "@/lib/google-oauth-env";
+import {
+  deleteStoredTokens,
+  readStoredTokens,
+  writeStoredTokens,
+  type GoogleTokens,
+} from "@/lib/google-oauth-store";
+
+export type { GoogleTokens };
+export { PREVIEW_GOOGLE_CONNECT_LABEL };
+
+export { ATS_FROM_NAME, ATS_FROM_NAME_EN, atsFromHeader, encodeMailboxDisplayName } from "@/lib/ats-from";
+
+/**
+ * Every draft and send uses the team mailbox. `fromName` and the connected
+ * account's display name are ignored so Gmail cannot store Kelly or mojibake.
+ */
+function formatFrom(_name: string | undefined, _accountEmail: string): string {
+  return atsFromHeader(ATS_FROM_EMAIL);
+}
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
 const GMAIL_DRAFTS_URL = "https://gmail.googleapis.com/gmail/v1/users/me/drafts";
 const GMAIL_LIST_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages";
 
-export type GoogleTokens = {
-  email: string;
-  access_token: string;
-  refresh_token: string;
-  expires_at: string; // ISO timestamp
-  scope: string;
-};
+function sqlClient() {
+  return neon(process.env.DATABASE_URL!);
+}
 
-async function ensureTable() {
-  const sql = neon(process.env.DATABASE_URL!);
-  await sql`
-    CREATE TABLE IF NOT EXISTS google_oauth_tokens (
-      id INTEGER PRIMARY KEY DEFAULT 1,
-      email TEXT,
-      access_token TEXT,
-      refresh_token TEXT,
-      expires_at TIMESTAMP WITH TIME ZONE,
-      scope TEXT,
-      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-      CONSTRAINT singleton CHECK (id = 1)
-    )
-  `;
+function currentEnvironment() {
+  return googleOAuthEnvironment(process.env.VERCEL_ENV);
 }
 
 export async function getStoredTokens(): Promise<GoogleTokens | null> {
-  await ensureTable();
-  const sql = neon(process.env.DATABASE_URL!);
-  const rows = await sql`SELECT * FROM google_oauth_tokens WHERE id = 1 LIMIT 1`;
-  if (rows.length === 0 || !rows[0].refresh_token) return null;
-  return {
-    email: (rows[0].email as string) ?? "",
-    access_token: (rows[0].access_token as string) ?? "",
-    refresh_token: rows[0].refresh_token as string,
-    expires_at: (rows[0].expires_at as string) ?? new Date(0).toISOString(),
-    scope: (rows[0].scope as string) ?? "",
-  };
+  return readStoredTokens(sqlClient(), currentEnvironment());
 }
 
 export async function saveTokens(tokens: {
@@ -63,26 +60,11 @@ export async function saveTokens(tokens: {
   expires_in: number; // seconds
   scope?: string;
 }) {
-  await ensureTable();
-  const sql = neon(process.env.DATABASE_URL!);
-  const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
-  await sql`
-    INSERT INTO google_oauth_tokens (id, email, access_token, refresh_token, expires_at, scope, updated_at)
-    VALUES (1, ${tokens.email}, ${tokens.access_token}, ${tokens.refresh_token}, ${expiresAt}, ${tokens.scope ?? ""}, NOW())
-    ON CONFLICT (id) DO UPDATE SET
-      email = EXCLUDED.email,
-      access_token = EXCLUDED.access_token,
-      refresh_token = COALESCE(EXCLUDED.refresh_token, google_oauth_tokens.refresh_token),
-      expires_at = EXCLUDED.expires_at,
-      scope = EXCLUDED.scope,
-      updated_at = NOW()
-  `;
+  await writeStoredTokens(sqlClient(), currentEnvironment(), tokens);
 }
 
 export async function clearTokens() {
-  await ensureTable();
-  const sql = neon(process.env.DATABASE_URL!);
-  await sql`DELETE FROM google_oauth_tokens WHERE id = 1`;
+  await deleteStoredTokens(sqlClient(), currentEnvironment());
 }
 
 async function refreshAccessToken(refreshToken: string): Promise<{ access_token: string; expires_in: number; scope?: string }> {
@@ -130,13 +112,26 @@ export async function getValidAccessToken(): Promise<{ access_token: string; ema
   return { access_token: stored.access_token, email: stored.email };
 }
 
-export async function isGmailConnected(): Promise<{ connected: boolean; email?: string }> {
+export type GmailConnection = {
+  connected: boolean;
+  email?: string;
+  environment: ReturnType<typeof googleOAuthEnvironment>;
+  connect_label?: string;
+};
+
+export async function isGmailConnected(): Promise<GmailConnection> {
+  const environment = currentEnvironment();
+  const disconnected: GmailConnection = {
+    connected: false,
+    environment,
+    ...(environment === "preview" ? { connect_label: PREVIEW_GOOGLE_CONNECT_LABEL } : {}),
+  };
   try {
     const stored = await getStoredTokens();
-    if (!stored) return { connected: false };
-    return { connected: true, email: stored.email };
+    if (!stored) return disconnected;
+    return { connected: true, email: stored.email, environment };
   } catch {
-    return { connected: false };
+    return disconnected;
   }
 }
 
@@ -180,10 +175,8 @@ export async function createDraftViaGmail(opts: {
     return { ok: false, error: "Gmail no conectado. Pide a Kelly que vaya a Settings → Conectar Gmail." };
   }
 
-  const fromDisplay = opts.fromName ?? "Trading Solutions Recruiting";
-  const fromHeader = `${fromDisplay} <${valid.email}>`;
   const rfc822 = buildRfc822({
-    from: fromHeader,
+    from: formatFrom(opts.fromName, valid.email),
     to: opts.to,
     subject: opts.subject,
     html: opts.html,
@@ -214,17 +207,15 @@ export async function sendViaGmail(opts: {
   html: string;
   replyTo?: string;
   bcc?: string;
-  fromName?: string; // Display name (defaults to "Trading Solutions Recruiting")
+  fromName?: string; // Display name (defaults to ATS_FROM_NAME when empty)
 }): Promise<{ ok: true; gmail_id: string } | { ok: false; error: string }> {
   const valid = await getValidAccessToken();
   if (!valid) {
     return { ok: false, error: "Gmail no conectado. Pide a Kelly que vaya a Settings → Conectar Gmail." };
   }
 
-  const fromDisplay = opts.fromName ?? "Trading Solutions Recruiting";
-  const fromHeader = `${fromDisplay} <${valid.email}>`;
   const rfc822 = buildRfc822({
-    from: fromHeader,
+    from: formatFrom(opts.fromName, valid.email),
     to: opts.to,
     subject: opts.subject,
     html: opts.html,
@@ -455,7 +446,7 @@ export async function createDraftWithAttachmentsViaGmail(opts: {
   const b64 = (b: Buffer) => b.toString("base64").replace(/.{1,76}/g, "$&\r\n").trimEnd();
 
   const l: string[] = [];
-  l.push(`From: ${enc(opts.fromName ?? "Trading Solutions")} <${valid.email}>`);
+  l.push(`From: ${formatFrom(opts.fromName, valid.email)}`);
   if (opts.to) l.push(`To: ${opts.to}`);
   if (opts.replyTo) l.push(`Reply-To: ${opts.replyTo}`);
   l.push(`Subject: ${enc(opts.subject)}`);
