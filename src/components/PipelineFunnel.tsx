@@ -1759,6 +1759,7 @@ function BulkActionBar({
     setRunning(true);
     setProgress({ done: 0, total: n, ok: 0, fail: 0 });
     let ok = 0, fail = 0;
+    const errors: string[] = [];
 
     for (let i = 0; i < selectedCands.length; i++) {
       const c = selectedCands[i];
@@ -1784,11 +1785,25 @@ function BulkActionBar({
           headers: { "Content-Type": "application/json" },
           body: body ? JSON.stringify(body) : undefined,
         });
-        if (r.ok) ok++; else fail++;
-      } catch { fail++; }
+        if (r.ok) ok++;
+        else {
+          fail++;
+          let msg = `HTTP ${r.status}`;
+          try {
+            const j = await r.json();
+            if (j?.error) msg = String(j.error);
+          } catch { /* the status is enough */ }
+          if (!errors.includes(msg)) errors.push(msg);
+        }
+      } catch (e: any) {
+        fail++;
+        const msg = e?.message ?? "error";
+        if (!errors.includes(msg)) errors.push(msg);
+      }
       setProgress({ done: i + 1, total: n, ok, fail });
     }
 
+    if (errors.length) setBatMsg(errors.join(" · "));
     setRunning(false);
     setTimeout(() => {
       setProgress(null);

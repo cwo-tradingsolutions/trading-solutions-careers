@@ -28,7 +28,7 @@ export async function POST(
     // Get candidate + vacancy
     const { data: cand, error: cErr } = await supabaseAdmin
       .from("ht_candidates")
-      .select("id, name, email, stage, status, vacancy_id, preferred_language, ht_vacancies(title, form_template_key, country)")
+      .select("id, name, email, stage, status, vacancy_id, preferred_language, rejection_sent_at, ht_vacancies(title, form_template_key, country)")
       .eq("id", candidateId)
       .single();
 
@@ -49,6 +49,13 @@ export async function POST(
     if (cand.stage === 'rechazado') outcome = 'rejected';
     else if (cand.stage === 'contratado') outcome = 'hired';
     else if (cand.status === 'withdrew') outcome = 'withdrew';
+
+    if (send && outcome === 'rejected' && !cand.rejection_sent_at) {
+      return NextResponse.json(
+        { error: "No se envió la encuesta NPS: el correo de rechazo todavía no consta como enviado." },
+        { status: 409 },
+      );
+    }
 
     // Check si ya hay encuesta activa no-completa
     const { data: existing } = await supabaseAdmin
