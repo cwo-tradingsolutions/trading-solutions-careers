@@ -83,6 +83,13 @@ describe("salario usable", () => {
       "2000-3000 USD per annum",
       "2,000-3,000 USD yearly",
       "USD 2000-3000 /yr",
+      "USD 60,000-80,000 a year",
+      "USD 60,000-80,000 A YEAR",
+      "2000-3000 USD annually",
+      "2000-3000 USD ANNUAL",
+      "COP 48.000.000 - 60.000.000 año",
+      "COP 48.000.000 - 60.000.000 AÑO",
+      "48.000.000 - 60.000.000 COP /año",
       "3k-4k USD",
       "3 k - 4 k USD",
     ]) {

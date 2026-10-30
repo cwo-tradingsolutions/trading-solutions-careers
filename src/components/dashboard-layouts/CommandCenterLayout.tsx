@@ -52,11 +52,8 @@ function fmtPct(n: number | null): string {
 }
 
 function fmtMoney(n: number, currency: "COP" | "USD"): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(Math.round(n));
+  const amount = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(Math.round(n));
+  return `${amount} ${currency}`;
 }
 
 function fmtDelta(d: number | null, unit: "days" | "pct"): string {
@@ -306,7 +303,7 @@ export default function CommandCenterLayout({
                         <th className="font-medium">Vacante</th>
                         <th className="font-medium">Dueño</th>
                         <th className="font-medium">Días</th>
-                        <th className="font-medium">$/día</th>
+                        <th className="font-medium">Diario</th>
                         <th className="font-medium">Acumulado</th>
                       </tr>
                     </thead>
@@ -364,11 +361,11 @@ export default function CommandCenterLayout({
                 <table className="w-full text-[12px]">
                   <thead>
                     <tr className="text-left text-[11px] text-[var(--ts-muted)]">
-                      <th className="py-1 font-medium">Estado</th>
+                      <th className="py-1 font-medium">Antigüedad vacante</th>
                       <th className="font-medium">Vacante</th>
                       <th className="font-medium">Dueño</th>
                       <th className="font-medium">Días</th>
-                      <th className="font-medium">$/día</th>
+                      <th className="font-medium">Diario</th>
                       <th className="font-medium">Acumulado</th>
                       <th className="font-medium">Cuello</th>
                     </tr>

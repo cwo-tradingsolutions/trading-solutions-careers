@@ -96,7 +96,17 @@ function amount(token: string): number | null {
   return null;
 }
 
-const ANNUAL = /\banual(?:es)?\b|\b(?:yearly|per\s+annum|per\s+year|al\s+año|al\s+ano)\b|\/yr\b/i;
+/** Sin tildes, para que año/ano y ANNUAL/annual coincidan. */
+function sinTildes(text: string): string {
+  return text.normalize("NFD").replace(/\p{M}/gu, "");
+}
+
+/**
+ * Salario anual, en cualquier caja y con o sin tilde:
+ * a year, annually, annual, año, /año, y las formas que ya estaban.
+ */
+const ANNUAL =
+  /\b(?:anual(?:es)?|annual(?:ly)?|yearly|per\s+annum|per\s+year|a\s+year|al\s+ano|anos?)\b|\/(?:yr|ano)\b/i;
 const KILO = /\d(?:[.,]\d+)?\s*k\b/i;
 const RANGE_SEP = String.raw`[–\-\u2013]|y|a|hasta`;
 
@@ -139,7 +149,7 @@ export function parseTwoEndedRange(
   raw: string | null | undefined,
 ): { min: number; max: number; currency: SalaryCurrency } | null {
   const text = String(raw ?? "").trim();
-  if (!text || ANNUAL.test(text) || KILO.test(text)) return null;
+  if (!text || ANNUAL.test(sinTildes(text)) || KILO.test(text)) return null;
   const currency = currencyOf(text);
   if (!currency) return null;
   const nums = extractNumbers(text);
