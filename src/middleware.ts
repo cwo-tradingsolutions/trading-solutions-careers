@@ -2,24 +2,26 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { hasMaskedCredentialConfig } from './lib/credential-config';
 import { previewReadOnlyBlock } from '@/lib/preview-readonly';
+import {
+  emailFromToken,
+  HR_ADMIN_SESSION_COOKIE,
+  sessionIssuedAtOk,
+  sessionSigningInput,
+} from './lib/hr-admin-session-format';
+import { adminSessionEmailAllowed } from './lib/hr-admin-session-policy';
+import { MIN_AUTH_SECRET_LENGTH, sessionSecretFailure } from './lib/hr-admin-secrets';
 
 /**
  * Middleware combinado:
  *  1) /api/*        -> CORS preflight + headers
- *  2) /hr-admin/*   -> requiere cookie de sesión HMAC válida, si no → /hr-admin/login
+ *  2) /hr-admin/*   -> requiere cookie de sesión HMAC válida (8h), si no → /hr-admin/login
  */
 
-const SESSION_COOKIE = 'hr_admin_session';
-const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 12; // 12 h
-
-// Validación HMAC con Web Crypto (Edge runtime)
-async function isValidSession(token: string | undefined, secret: string | undefined): Promise<boolean> {
-  if (!token || !secret) return false;
-  const parts = token.split('.');
-  if (parts.length !== 2) return false;
-  const [ts, sig] = parts;
-  const ageMs = Date.now() - parseInt(ts, 10);
-  if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > SESSION_MAX_AGE_MS) return false;
+// Validación HMAC con Web Crypto (Edge runtime). Mismo formato que readAdminSession.
+async function sessionEmail(token: string | undefined, secret: string | undefined): Promise<string | null> {
+  if (!token || !secret) return null;
+  const parsed = sessionSigningInput(token);
+  if (!parsed || !sessionIssuedAtOk(parsed.issuedAt, Date.now())) return null;
 
   try {
     const key = await crypto.subtle.importKey(
@@ -27,19 +29,22 @@ async function isValidSession(token: string | undefined, secret: string | undefi
       new TextEncoder().encode(secret),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
-      ['sign', 'verify']
+      ['sign']
     );
-    const expected = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(ts));
+    const expected = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(parsed.payload));
     const expectedHex = Array.from(new Uint8Array(expected))
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
-    // Comparación en tiempo constante manual
-    if (expectedHex.length !== sig.length) return false;
+    if (expectedHex.length !== parsed.signature.length) return null;
     let diff = 0;
-    for (let i = 0; i < expectedHex.length; i++) diff |= expectedHex.charCodeAt(i) ^ sig.charCodeAt(i);
-    return diff === 0;
+    for (let i = 0; i < expectedHex.length; i++) {
+      diff |= expectedHex.charCodeAt(i) ^ parsed.signature.charCodeAt(i);
+    }
+    if (diff !== 0) return null;
+    if (!parsed.emailToken) return null;
+    return emailFromToken(parsed.emailToken);
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -53,6 +58,9 @@ export async function middleware(request: NextRequest) {
         ADMIN_SECRET: process.env.ADMIN_SECRET,
         CRON_SECRET: process.env.CRON_SECRET,
         WXM_SERVICE_SECRET: process.env.WXM_SERVICE_SECRET,
+        HR_ADMIN_SESSION_SECRET: process.env.HR_ADMIN_SESSION_SECRET,
+        ADMIN_SCRIPTS_SECRET: process.env.ADMIN_SCRIPTS_SECRET,
+        PORTAL_TOKEN_SECRET: process.env.PORTAL_TOKEN_SECRET,
       })) {
     return NextResponse.json(
       { error: 'Servicio temporalmente no disponible.' },
@@ -72,9 +80,11 @@ export async function middleware(request: NextRequest) {
     if (pathname === '/hr-admin/login' || pathname.startsWith('/api/hr-admin/login')) {
       return NextResponse.next();
     }
-    const token = request.cookies.get(SESSION_COOKIE)?.value;
-    const secret = (process.env.ADMIN_SECRET ?? '').trim();
-    const ok = await isValidSession(token, secret);
+    const token = request.cookies.get(HR_ADMIN_SESSION_COOKIE)?.value;
+    const secret = (process.env.HR_ADMIN_SESSION_SECRET ?? '').trim();
+    const usable = secret.length >= MIN_AUTH_SECRET_LENGTH && !sessionSecretFailure();
+    const email = usable ? await sessionEmail(token, secret) : null;
+    const ok = Boolean(email && adminSessionEmailAllowed(email));
     if (!ok) {
       const url = request.nextUrl.clone();
       url.pathname = '/hr-admin/login';

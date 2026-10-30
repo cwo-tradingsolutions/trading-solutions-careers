@@ -6,7 +6,7 @@
  * (Samuel · Informes HM) cuando no hay webhook o para ponerse al día después
  * de una caída: el historial es la verdad, el webhook es solo el aviso.
  *
- * Auth: ADMIN_SECRET (Bearer o sesión HR) o WXM_SERVICE_SECRET.
+ * Auth: sesión HR (cookie con email) o WXM_SERVICE_SECRET.
  * Orden ascendente por changed_at; paginar pasando el occurred_at del último
  * como `since` (exclusivo).
  */

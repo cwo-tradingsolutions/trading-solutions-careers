@@ -5,12 +5,18 @@ import { NextRequest } from 'next/server';
 import { middleware } from '../middleware';
 import { isMaskedCredential } from './credential-config';
 
-const KEYS = ['ADMIN_SECRET', 'CRON_SECRET', 'WXM_SERVICE_SECRET'] as const;
+const KEYS = ['ADMIN_SECRET', 'CRON_SECRET', 'WXM_SERVICE_SECRET', 'HR_ADMIN_SESSION_SECRET', 'ADMIN_SCRIPTS_SECRET', 'PORTAL_TOKEN_SECRET'] as const;
 const originals = Object.fromEntries(KEYS.map(key => [key, process.env[key]]));
 const VALID = 'clave-valida-ficticia-para-pruebas';
+const SESSION = `${VALID}-session`;
+const SCRIPTS = `${VALID}-scripts`;
 
 beforeEach(() => {
   for (const key of KEYS) process.env[key] = VALID;
+  process.env.HR_ADMIN_SESSION_SECRET = SESSION;
+  process.env.ADMIN_SCRIPTS_SECRET = SCRIPTS;
+  process.env.PORTAL_TOKEN_SECRET = `${VALID}-portal-token-32`;
+  process.env.HR_ADMIN_ALLOWED_EMAILS = 'kelly@tradingsolutions.com';
 });
 afterEach(() => {
   for (const key of KEYS) {
@@ -21,8 +27,10 @@ afterEach(() => {
 
 function sessionCookie(secret: string): string {
   const timestamp = Date.now().toString();
-  const signature = createHmac('sha256', secret).update(timestamp).digest('hex');
-  return `hr_admin_session=${timestamp}.${signature}`;
+  const email = Buffer.from('kelly@tradingsolutions.com', 'utf8').toString('base64url');
+  const payload = `${timestamp}.${email}`;
+  const signature = createHmac('sha256', secret).update(payload).digest('hex');
+  return `hr_admin_session=${payload}.${signature}`;
 }
 
 function request(path: string, init?: ConstructorParameters<typeof NextRequest>[1]): NextRequest {
@@ -82,7 +90,7 @@ test('el marcador bloquea también las pantallas y API de login antes de sus exc
 });
 
 test('cookie válida con clave real sigue pasando y cookie inválida conserva la redirección', async () => {
-  const allowed = await middleware(request('/hr-admin', { headers: { Cookie: sessionCookie(VALID) } }));
+  const allowed = await middleware(request('/hr-admin', { headers: { Cookie: sessionCookie(SESSION) } }));
   assert.equal(allowed.headers.get('x-middleware-next'), '1');
   const denied = await middleware(request('/hr-admin/prep?tab=uno'));
   assert.equal(denied.status, 307);
@@ -113,7 +121,9 @@ test('no se agrega bloqueo de configuración por credenciales ausentes o cortas'
   const login = await middleware(request('/hr-admin/login'));
   assert.equal(login.headers.get('x-middleware-next'), '1');
   process.env.ADMIN_SECRET = 'x';
-  const short = await middleware(request('/hr-admin', { headers: { Cookie: sessionCookie('x') } }));
+  process.env.HR_ADMIN_SESSION_SECRET = SESSION;
+  process.env.HR_ADMIN_ALLOWED_EMAILS = 'kelly@tradingsolutions.com';
+  const short = await middleware(request('/hr-admin', { headers: { Cookie: sessionCookie(SESSION) } }));
   assert.equal(short.headers.get('x-middleware-next'), '1');
 });
 

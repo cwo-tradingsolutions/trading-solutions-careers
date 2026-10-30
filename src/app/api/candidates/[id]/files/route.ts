@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { almacen } from "@/lib/almacen";
 import { supabaseAdmin } from '@/lib/supabase';
+import { adminSessionEmail } from '@/lib/admin-auth';
 import { isAdminRequest } from '@/lib/bateria/auth';
 import {
   MAX_BYTES_ADJUNTO,
@@ -106,7 +107,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         storage_path: path,
         mime: archivo.type,
         bytes: binario.length,
-        uploaded_by: 'hr-admin',
+        uploaded_by: adminSessionEmail(req) || 'hr-admin',
       })
       .select('id, kind, title, storage_path, mime, bytes, created_at')
       .single();

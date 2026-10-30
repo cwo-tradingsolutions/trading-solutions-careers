@@ -1,10 +1,15 @@
 # Construye la imagen del ATS para Cloud Run (PostgREST como sidecar sobre la
 # base `careers` de Cloud SQL, archivos en Cloud Storage, IA por Vertex).
 #
+# Staging image (OAuth redirect uses this origin):
+#   --substitutions _TAG=gcp-stg,_APP_URL=https://stg-careers-gcp-z4sq5ztzyq-uw.a.run.app
+# Production image:
+#   --substitutions _TAG=prd,_APP_URL=https://careers.tradingsolutions.com
+#
 #   gcloud builds submit . --config infra/gcp/careers.cloudbuild.yaml \
 #     --project wellness-experience-management --region us-west1 \
 #     --service-account projects/wellness-experience-management/serviceAccounts/sa-build@wellness-experience-management.iam.gserviceaccount.com \
-#     --substitutions _TAG=gcp-stg,_APP_URL=http://localhost:8081
+#     --substitutions _TAG=gcp-stg,_APP_URL=https://stg-careers-gcp-z4sq5ztzyq-uw.a.run.app
 #
 # La llave anon se firma aquí con el secreto JWT de PostgREST; el navegador no
 # habla con Supabase, solo el servidor.
@@ -14,7 +19,9 @@ substitutions:
   # Vacío en builds a mano. El trigger de main lo fija al servicio de staging
   # para que cada push quede desplegado sin pasar por el Mac.
   _SERVICIO: ""
-  _APP_URL: http://localhost:8081
+  # Public origin baked into the image. Staging default. Production builds
+  # must pass _APP_URL=https://careers.tradingsolutions.com.
+  _APP_URL: https://stg-careers-gcp-z4sq5ztzyq-uw.a.run.app
   _IMAGEN: us-west1-docker.pkg.dev/wellness-experience-management/trading/careers
 
 options:

@@ -6,14 +6,14 @@
  *
  * Para correr una sola vez después del deploy:
  *   curl -X POST https://trading-solutions-careers.vercel.app/api/admin/seed-linkedin-apps \
- *        -H "Authorization: Bearer $ADMIN_SECRET"
+ *        -H "Authorization: Bearer $ADMIN_SCRIPTS_SECRET"
  *
  * O simplemente desde el browser estando logueada (sin headers — usa cookie de sesión):
  *   abrí la URL en una nueva tab y hacé fetch desde la consola:
  *   fetch('/api/admin/seed-linkedin-apps', { method: 'POST' }).then(r => r.json()).then(console.log)
  */
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdminOrScripts } from "@/lib/admin-scripts-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import seedData from "@/data/linkedin_apps_2026_05_03.json";
 
@@ -29,7 +29,7 @@ type SeedRow = {
 };
 
 export async function POST(req: NextRequest) {
-  const authError = requireAdmin(req);
+  const authError = requireAdminOrScripts(req);
   if (authError) return authError;
 
   try {
@@ -195,7 +195,7 @@ export async function POST(req: NextRequest) {
 
 // GET para preview sin insertar (dry run)
 export async function GET(req: NextRequest) {
-  const authError = requireAdmin(req);
+  const authError = requireAdminOrScripts(req);
   if (authError) return authError;
 
   const cands = seedData as SeedRow[];

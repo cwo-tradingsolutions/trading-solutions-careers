@@ -15,7 +15,7 @@
  * desde esta ruta.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-auth";
+import { adminSessionEmail, requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getStoredTokens, sendViaGmail } from "@/lib/gmail";
 import { googleOAuthEnvironment } from "@/lib/google-oauth-env";
@@ -366,7 +366,7 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
         calendar_event_id: created.event_id,
         meet_url: created.meet_url || null,
         status: "scheduled",
-        created_by: google.email || "hr-admin",
+        created_by: adminSessionEmail(req) || google.email || "hr-admin",
       })
       .select("id")
       .single();
@@ -383,7 +383,7 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
         toStage: form.value.round === "wellness" ? "entrevista_wellness" : "entrevista_hm",
         vacancyId: candidate.vacancy_id ?? null,
         source: "ui",
-        changedBy: google.email || "hr-admin",
+        changedBy: adminSessionEmail(req) || google.email || "hr-admin",
         note: [
           `Invitación ${form.value.round}`,
           `${form.value.date} ${form.value.time} ${form.value.tz}`,

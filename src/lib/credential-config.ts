@@ -10,8 +10,14 @@ export function hasMaskedCredentialConfig(config: {
   ADMIN_SECRET?: string;
   CRON_SECRET?: string;
   WXM_SERVICE_SECRET?: string;
+  HR_ADMIN_SESSION_SECRET?: string;
+  ADMIN_SCRIPTS_SECRET?: string;
+  PORTAL_TOKEN_SECRET?: string;
 }): boolean {
   return isMaskedCredential(config.ADMIN_SECRET) ||
     isMaskedCredential(config.CRON_SECRET) ||
-    isMaskedCredential(config.WXM_SERVICE_SECRET);
+    isMaskedCredential(config.WXM_SERVICE_SECRET) ||
+    isMaskedCredential(config.HR_ADMIN_SESSION_SECRET) ||
+    isMaskedCredential(config.ADMIN_SCRIPTS_SECRET) ||
+    isMaskedCredential(config.PORTAL_TOKEN_SECRET);
 }

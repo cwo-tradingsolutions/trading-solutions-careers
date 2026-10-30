@@ -58,6 +58,25 @@ spec:
             - { name: GEMINI_RAZONAMIENTO, value: high }
             - name: ADMIN_SECRET
               valueFrom: { secretKeyRef: { name: prd-careers-ADMIN_SECRET, key: latest } }
+            - name: HR_ADMIN_SESSION_SECRET
+              valueFrom: { secretKeyRef: { name: prd-careers-hr-admin-session-secret, key: latest } }
+            # ADMIN_SCRIPTS_SECRET is optional. Add prd-careers-admin-scripts-secret
+            # only if seed, sync, or reseed jobs run. Unset: those routes fail closed.
+            - name: PORTAL_TOKEN_SECRET
+              valueFrom: { secretKeyRef: { name: prd-careers-portal-token-secret, key: latest } }
+            - name: GOOGLE_ADMIN_OAUTH_CLIENT_ID
+              valueFrom: { secretKeyRef: { name: prd-careers-google-admin-oauth-client-id, key: latest } }
+            - name: GOOGLE_ADMIN_OAUTH_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: prd-careers-google-admin-oauth-client-secret, key: latest } }
+            - { name: HR_ADMIN_ALLOWED_EMAILS, value: "cwo@tradingsolutions.com,jointheteam@tradingsolutions.com" }
+            - { name: GOOGLE_MAILBOX_ALLOWED_EMAILS, value: "jointheteam@tradingsolutions.com" }
+            - { name: HR_ADMIN_PASSWORD_LOGIN_ENABLED, value: "0" }
+            # Cutover placeholder. Replace with YYYY-MM-DD, at most 14 days after deploy.
+            # Any other value disables legacy portal links signed with ADMIN_SECRET.
+            - { name: PORTAL_TOKEN_LEGACY_UNTIL, value: "SET_AT_CUTOVER_YYYY-MM-DD" }
+            # IAP aud of the HTTPS load balancer backend. Replace before IAP login
+            # can succeed: /projects/PROJECT_NUMBER/global/backendServices/BACKEND_SERVICE_ID
+            - { name: IAP_AUDIENCE, value: "REPLACE_WITH_IAP_AUDIENCE" }
             - name: CRON_SECRET
               valueFrom: { secretKeyRef: { name: prd-careers-CRON_SECRET, key: latest } }
             - name: WXM_SERVICE_SECRET
@@ -83,6 +102,16 @@ spec:
               valueFrom: { secretKeyRef: { name: prd-careers-GOOGLE_CLIENT_ID, key: latest } }
             - name: GOOGLE_CLIENT_SECRET
               valueFrom: { secretKeyRef: { name: prd-careers-GOOGLE_CLIENT_SECRET, key: latest } }
+          startupProbe:
+            httpGet: { path: /api/health, port: 8080 }
+            periodSeconds: 5
+            timeoutSeconds: 4
+            failureThreshold: 24
+          livenessProbe:
+            httpGet: { path: /api/health, port: 8080 }
+            periodSeconds: 15
+            timeoutSeconds: 4
+            failureThreshold: 3
 
         - name: postgrest
           image: docker.io/postgrest/postgrest:v16.5
