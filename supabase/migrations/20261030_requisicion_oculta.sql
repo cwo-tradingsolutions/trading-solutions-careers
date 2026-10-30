@@ -20,7 +20,10 @@
 -- ============================================================================
 
 -- ─── A) Columnas. Siempre se quedan. ────────────────────────────────────────
+-- lock_timeout corto: si otra sesión tiene el candado, no dejamos que las
+-- lecturas del API se encolen detrás de esta transacción.
 begin;
+set local lock_timeout = '5s';
 
 alter table ht_requisitions add column if not exists hidden_at timestamptz;
 alter table ht_requisitions add column if not exists hidden_reason text;

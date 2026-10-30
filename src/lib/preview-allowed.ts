@@ -5,9 +5,9 @@
  * así que un guard que solo mira VERCEL_ENV === "production" deja la página
  * pública. Acá se permite solo un entorno conocido de no-producción.
  *
- * Niega primero producción: VERCEL_ENV=production o K_SERVICE prd-*.
- * Eso gana sobre NODE_ENV=development, para que un build local mal
- * etiquetado no abra la página en prod.
+ * Niega primero producción, en cualquier entorno: VERCEL_ENV=production,
+ * K_SERVICE vacío (está seteado y no nombra un servicio) o K_SERVICE prd / prd-*.
+ * Eso gana sobre NODE_ENV=development y sobre VERCEL_ENV=preview.
  *
  * Después permite solo:
  *   - VERCEL_ENV preview o development, o
@@ -27,8 +27,10 @@ export function isPreviewAllowed(env: {
   const vercel = limpio(env.VERCEL_ENV);
   const servicio = limpio(env.K_SERVICE);
   const nodeEnv = limpio(env.NODE_ENV);
+  const servicioSeteado = Object.prototype.hasOwnProperty.call(env, "K_SERVICE");
   if (vercel === "production") return false;
-  if (servicio.startsWith("prd-")) return false;
+  if (servicioSeteado && servicio === "") return false;
+  if (servicio === "prd" || servicio.startsWith("prd-")) return false;
   if (vercel === "preview" || vercel === "development") return true;
   if (servicio.startsWith("stg-")) return true;
   if (nodeEnv === "development") return true;

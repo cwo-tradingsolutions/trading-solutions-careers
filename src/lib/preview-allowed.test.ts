@@ -25,6 +25,12 @@ describe("isPreviewAllowed", () => {
     assert.equal(isPreviewAllowed({ VERCEL_ENV: "Production", NODE_ENV: "production" }), false);
     assert.equal(isPreviewAllowed({ K_SERVICE: "staging-careers", NODE_ENV: "production" }), false);
     assert.equal(isPreviewAllowed({ K_SERVICE: "", NODE_ENV: "production" }), false);
+    assert.equal(isPreviewAllowed({ K_SERVICE: "", NODE_ENV: "development" }), false);
+    assert.equal(isPreviewAllowed({ K_SERVICE: "   ", NODE_ENV: "development" }), false);
+    assert.equal(isPreviewAllowed({ K_SERVICE: "", VERCEL_ENV: "preview", NODE_ENV: "development" }), false);
+    assert.equal(isPreviewAllowed({ K_SERVICE: "prd", NODE_ENV: "development" }), false);
+    assert.equal(isPreviewAllowed({ K_SERVICE: "prd", VERCEL_ENV: "preview" }), false);
+    assert.equal(isPreviewAllowed({ K_SERVICE: " PRD ", NODE_ENV: "development" }), false);
     assert.equal(isPreviewAllowed({ K_SERVICE: "   ", NODE_ENV: "production" }), false);
     assert.equal(isPreviewAllowed({ K_SERVICE: " PRD-careers ", NODE_ENV: "development" }), false);
     assert.equal(isPreviewAllowed({ VERCEL_ENV: "  PRODUCTION  ", NODE_ENV: "development" }), false);

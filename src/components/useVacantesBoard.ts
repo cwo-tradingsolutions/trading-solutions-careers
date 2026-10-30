@@ -89,7 +89,7 @@ export function useVacantesBoard() {
     setChipOcupado(true);
     setAvisoChip(null);
     const previas = vacantes;
-    const ticket = ++seq.current;
+    seq.current += 1;
     setVacantes((curr) => curr.map((v) => {
       if (v.vacancy_id !== vacancyId) return v;
       const sources = publicada ? v.sources.filter((s) => s !== key) : [...v.sources, key];
@@ -103,11 +103,14 @@ export function useVacantesBoard() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ source: key }),
           });
-      if (ticket !== seq.current) return;
       if (!r.ok) {
-        setVacantes(previas);
-        const j = await r.json().catch(() => ({}));
-        setAvisoChip(j.error || "No se pudo actualizar la fuente");
+        const fuentesPrevias = previas.find((v) => v.vacancy_id === vacancyId)?.sources;
+        setVacantes((curr) => curr.map((v) => (
+          v.vacancy_id === vacancyId && fuentesPrevias
+            ? { ...v, sources: fuentesPrevias }
+            : v
+        )));
+        setAvisoChip("No se pudo actualizar la fuente");
         return;
       }
       try {
@@ -116,10 +119,13 @@ export function useVacantesBoard() {
         // El POST ya quedó. No se muestra error por un reload que falló.
       }
     } catch {
-      if (ticket === seq.current) {
-        setVacantes(previas);
-        setAvisoChip("No se pudo actualizar la fuente");
-      }
+      const fuentesPrevias = previas.find((v) => v.vacancy_id === vacancyId)?.sources;
+      setVacantes((curr) => curr.map((v) => (
+        v.vacancy_id === vacancyId && fuentesPrevias
+          ? { ...v, sources: fuentesPrevias }
+          : v
+      )));
+      setAvisoChip("No se pudo actualizar la fuente");
     } finally {
       enVuelo.current = false;
       setChipOcupado(false);

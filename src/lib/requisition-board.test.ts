@@ -235,6 +235,7 @@ describe("migraciones", () => {
     const ddl = oculta.slice(0, oculta.indexOf("-- ─── B)"));
     const datos = oculta.slice(oculta.indexOf("-- ─── B)"));
     assert.match(ddl, /add column if not exists hidden_at/);
+    assert.match(ddl, /set local lock_timeout = '5s'/);
     assert.match(ddl, /^commit;/m);
     assert.equal(/22c60d38/.test(ddl), false);
     assert.match(datos, /_req_hide_before/);

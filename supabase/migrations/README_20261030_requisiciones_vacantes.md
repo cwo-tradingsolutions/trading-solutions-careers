@@ -53,55 +53,34 @@ Una segunda corrida no pisa el backup (`on conflict do nothing`).
 
 ## Verificación
 
-La migración guarda el antes en `ht_migration_verify_20261030` y el después al final. Esta consulta se puede correr sola, después, y no escribe:
+No compara totales. En staging puede haber más filas que el 30-oct y seguir estando bien. Esta consulta se corre sola y no escribe. Las cinco columnas tienen que salir `true`: las columnas, el CHECK y el índice existen, y cada uuid está oculto con su motivo **si la fila existe**. Si no existe, esa columna también sale `true`.
 
 ```sql
 select
-  v.phase,
-  v.metric,
-  v.n,
-  case v.metric
-    when 'ht_requisitions' then 11
-    when 'publicada' then 9
-    when 'pedida' then 1
-    when 'rechazada' then 1
-    when 'hidden' then case v.phase when 'before' then 0 when 'after' then 2 end
-    when 'events' then case v.phase when 'before' then 28 when 'after' then 30 end
-  end as esperado,
-  v.n = case v.metric
-    when 'ht_requisitions' then 11
-    when 'publicada' then 9
-    when 'pedida' then 1
-    when 'rechazada' then 1
-    when 'hidden' then case v.phase when 'before' then 0 when 'after' then 2 end
-    when 'events' then case v.phase when 'before' then 28 when 'after' then 30 end
-  end as coincide
-from ht_migration_verify_20261030 v
-order by v.phase, v.metric;
+  (
+    select count(*) = 3
+    from information_schema.columns
+    where table_name = 'ht_requisitions'
+      and column_name in ('hidden_at', 'hidden_reason', 'hidden_by')
+  ) as columnas,
+  exists (
+    select 1 from pg_constraint
+    where conname = 'ht_requisitions_hidden_reason_check'
+  ) as check_motivo,
+  exists (
+    select 1 from pg_indexes
+    where indexname = 'idx_req_visible'
+  ) as indice,
+  not exists (
+    select 1 from ht_requisitions
+    where id = '22c60d38-590b-4789-a1df-fe3d8f77d2ec'
+      and (hidden_at is null or hidden_reason is distinct from 'duplicada')
+  ) as duplicada_si_existe,
+  not exists (
+    select 1 from ht_requisitions
+    where id = '8e597f02-a1dd-47ba-94f6-db4521224077'
+      and (hidden_at is null or hidden_reason is distinct from 'fuera_del_ats')
+  ) as flota_si_existe;
 ```
 
-Línea base del 30-oct-2026, antes: `ht_requisitions` 11 (publicada 9, pedida 1, rechazada 1), eventos 28, ocultas 0.
-
-Después, sobre esa misma línea base: los mismos conteos por status, `hidden` 2, eventos 30.
-
-Foto en vivo (no usa la tabla de verificación):
-
-```sql
-select
-  (select count(*) from ht_requisitions) as requisitions,
-  (select count(*) from ht_requisitions where status = 'publicada') as publicada,
-  (select count(*) from ht_requisitions where status = 'pedida') as pedida,
-  (select count(*) from ht_requisitions where status = 'rechazada') as rechazada,
-  (select count(*) from ht_requisitions where hidden_at is not null) as hidden,
-  (select count(*) from ht_requisition_events) as events,
-  (select status from ht_requisitions where id = '22c60d38-590b-4789-a1df-fe3d8f77d2ec') as status_duplicada,
-  (select hidden_reason from ht_requisitions where id = '22c60d38-590b-4789-a1df-fe3d8f77d2ec') as razon_duplicada,
-  (select status from ht_requisitions where id = '8e597f02-a1dd-47ba-94f6-db4521224077') as status_flota,
-  (select hidden_reason from ht_requisitions where id = '8e597f02-a1dd-47ba-94f6-db4521224077') as razon_flota,
-  (select status from ht_requisitions where id = '63f67118-1827-484d-8623-3f90e3758d35') as status_canonica,
-  (select hidden_at is null from ht_requisitions where id = '63f67118-1827-484d-8623-3f90e3758d35') as canonica_visible;
-```
-
-Esperado después: 11, 9, 1, 1, 2, 30, `rechazada`, `duplicada`, `pedida`, `fuera_del_ats`, `publicada`, `true`.
-
-Esos números son la foto del 30-oct, no una condición para abortar. Si entró otra requisición, el archivo igual deja las columnas y oculta solo esos dos uuid. No hay `delete` ni cambio de `status`. Si la segunda transacción aborta por un id, las columnas de la primera ya quedaron.
+La foto del 30-oct (11 requisiciones, publicada 9, pedida 1, rechazada 1, eventos 28, y después hidden 2 y eventos 30) era la base de ese día. No es el criterio. No hay `delete` ni cambio de `status`. Si la segunda transacción aborta por un id, las columnas de la primera ya quedaron.
