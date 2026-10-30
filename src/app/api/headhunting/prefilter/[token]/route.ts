@@ -13,9 +13,9 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { createDraftViaGmail, isGmailConnected, sendViaGmail } from "@/lib/gmail";
+import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
+import { sendCandidateMail } from "@/lib/ats-mail-store";
 import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
-import { ATS_FROM_NAME } from "@/lib/ats-from";
 import {
   panamaOpsNoticeLines,
   panamaPrefilterExpired,
@@ -827,8 +827,11 @@ export async function POST(
       if (panama) {
         const lines = panamaOpsNoticeLines(panama);
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://trading-solutions-careers.vercel.app";
-        await sendViaGmail({
+        const panamaMail = await sendCandidateMail({
           to: "jointheteam@tradingsolutions.com",
+          candidate: "jointheteam@tradingsolutions.com",
+          type: "prefilter_notice",
+          dedupKey: `prefilter_notice:${candidate.id}:panama`,
           subject: `[Prefiltro ${panama.decisionLabel}] ${candidate.name} · ${vacancyTitle}`,
           html: `<!DOCTYPE html><html><body style="font-family: Inter, sans-serif; padding: 16px; color: #1a1a1a;">
             <p><strong>${candidate.name}</strong> completed the Panama Operations prefilter.</p>
@@ -837,8 +840,10 @@ export async function POST(
             <p>${panamaCandidateMailLine(panama.decision, bateriaAuto)}</p>
             <p><a href="${baseUrl}/hr-admin?tab=prefiltros">Open HR Admin</a></p>
           </body></html>`,
-          fromName: ATS_FROM_NAME,
         });
+        if (panamaMail.status !== "sent") {
+          console.error(`[prefiltro] aviso interno no salió (${panamaMail.status})`);
+        }
         return NextResponse.json({ success: true });
       }
       const aviso = etiquetaAvisoPrefiltro(decision, bloqueos);
@@ -848,8 +853,11 @@ export async function POST(
         .map((b) => `<li>${b.sub_detail.replace(/_/g, " ")} — dato ${b.severidad}${b.valor ? ` (marcó: ${b.valor})` : ""}${b.contradiccion ? ` · <strong>${b.contradiccion}</strong>` : ""}</li>`)
         .join("");
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://trading-solutions-careers.vercel.app";
-      await sendViaGmail({
+      const notice = await sendCandidateMail({
         to: "jointheteam@tradingsolutions.com",
+        candidate: "jointheteam@tradingsolutions.com",
+        type: "prefilter_notice",
+        dedupKey: `prefilter_notice:${candidate.id}:${decision}`,
         subject: `[Prefiltro ${decisionLabel}] ${candidate.name} · ${vacancyTitle}`,
         html: `<!DOCTYPE html><html><body style="font-family: Inter, sans-serif; padding: 16px; color: #1a1a1a;">
           <p>Kelly, <strong>${candidate.name}</strong> acaba de completar el prefiltro.</p>
@@ -865,8 +873,10 @@ export async function POST(
           ${enRojo ? `<div style="background: #FEF2F2; padding: 10px 14px; border-radius: 6px; color: #991B1B; font-size: 13px;"><strong>No se rechazó a nadie.</strong> Quedó en rojo esperando tu decisión:<ul style="margin: 8px 0 0; padding-left: 18px;">${listaBloqueos}</ul></div>` : bloqueos.length ? `<div style="background: #FFFBEB; padding: 10px 14px; border-radius: 6px; color: #92400E; font-size: 13px;"><strong>Revisión.</strong> El salario quedó sobre el tope. No se rechazó a nadie:<ul style="margin: 8px 0 0; padding-left: 18px;">${listaBloqueos}</ul></div>` : ""}
           <p><a href="${baseUrl}/hr-admin?tab=prefiltros" style="color: #2C64ED;">Ver en HR Admin →</a></p>
         </body></html>`,
-        fromName: "Trading Solutions ATS",
       });
+      if (notice.status !== "sent") {
+        console.error(`[prefiltro] aviso interno no salió (${notice.status})`);
+      }
     }
   } catch (e) {
     console.error("Failed to send notification:", e);

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { googleOAuthEnvironment } from "./google-oauth-env.ts";
 import {
   blockedSendLogLine,
   decideOutboundRecipients,
@@ -52,6 +53,14 @@ test("staging without an allowlist blocks every recipient", () => {
     }
   }
   assert.equal(mailEnvironment({ K_SERVICE: "stg-careers" }), "nonprod");
+  // Cloud Run has no VERCEL_ENV. The OAuth helper treats that as production;
+  // the send guard must not.
+  assert.equal(googleOAuthEnvironment(undefined), "production");
+  assert.equal(mailEnvironment({ K_SERVICE: "stg-careers-gcp" }), "nonprod");
+  assert.equal(mailEnvironment({ STAGING_READ_ONLY: "1" }), "nonprod");
+  assert.equal(mailEnvironment({ K_SERVICE: "prd-careers" }), "prod");
+  const guardSrc = readFileSync(join(root, "src/lib/mail-recipient-guard.ts"), "utf8");
+  assert.equal(guardSrc.includes("google-oauth-env"), false);
 });
 
 test("production without an allowlist sends, and with one it still filters", () => {

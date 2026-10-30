@@ -7,11 +7,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
-import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
+import { isGmailConnected } from "@/lib/gmail";
+import { sendCandidateMail } from "@/lib/ats-mail-store";
 import { candidateSignatureHtml } from "@/lib/ats-from";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import crypto from "crypto";
-import { ATS_FROM_NAME } from "@/lib/ats-from";
 import { shouldDropVacancyId, surveySendBody } from "@/lib/candidate-public-error";
 
 export async function POST(
@@ -176,22 +176,21 @@ export async function POST(
 
           const html = lang === 'en' ? htmlEn : htmlEs;
 
-          const r = await sendViaGmail({
+          const r = await sendCandidateMail({
             to: cand.email,
+            candidate: cand.email,
+            type: "experience_survey",
             subject,
             html,
-            fromName: ATS_FROM_NAME,
             replyTo: "jointheteam@tradingsolutions.com",
+            dedupKey: `experience_survey:${surveyId}`,
+            sideEffect: { kind: "survey_sent", surveyId },
           });
 
-          if (r.ok) {
+          if (r.status === "sent") {
             emailResult = { sent: true, id: r.gmail_id };
-            await supabaseAdmin
-              .from("ts_candidate_experience")
-              .update({ sent_at: new Date().toISOString() })
-              .eq("id", surveyId);
           } else {
-            emailResult = { sent: false, error: r.error };
+            emailResult = { sent: false, status: r.status };
           }
         }
       } catch (e: any) {

@@ -10,6 +10,7 @@ type PendingItem = {
   subject: string | null;
   created_at: string;
   error: string | null;
+  status?: string;
 };
 
 type MailboxState = {
@@ -44,12 +45,16 @@ export function MailboxBanner() {
     try {
       const r = await fetch("/api/admin/outbound-mail/resend", { method: "POST" });
       const j = await r.json().catch(() => ({}));
-      if (j.status === "mailbox_disconnected") {
+      if (!r.ok) {
+        setNote("No se pudieron reenviar los pendientes. Intenta de nuevo.");
+      } else if (j.status === "mailbox_disconnected") {
         setNote("El buzón sigue desconectado. Los pendientes no se enviaron.");
       } else {
         setNote(`Enviados: ${j.sent ?? 0}. Siguen pendientes: ${j.still_pending ?? 0}.`);
       }
       await load();
+    } catch {
+      setNote("No se pudieron reenviar los pendientes. Intenta de nuevo.");
     } finally {
       setBusy(false);
     }
@@ -66,7 +71,7 @@ export function MailboxBanner() {
       )}
       {showDisconnect && (
         <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          Buzón jointheteam@ desconectado — {mail.pending_count} correos pendientes.{" "}
+          Buzón jointheteam@ desconectado — {mail.pending_count === 1 ? "1 correo pendiente" : `${mail.pending_count} correos pendientes`}.{" "}
           <a href="/api/google/auth" className="font-semibold underline">Reconectar</a>
           {showWarn && (
             <span className="block mt-1 font-semibold">Más de 1500 envíos hoy ({mail.sends_today}).</span>
@@ -95,7 +100,7 @@ export function MailboxBanner() {
             {pending.map((row) => (
               <li key={row.id}>
                 <span className="font-medium">{row.candidate || "sin destinatario"}</span>
-                {" · "}{row.type || "correo"}
+                {" · "}{row.status === "sending" ? "enviando" : row.status === "agotado" ? "agotado" : row.type || "correo"}
                 {" · "}{row.subject || "sin asunto"}
               </li>
             ))}

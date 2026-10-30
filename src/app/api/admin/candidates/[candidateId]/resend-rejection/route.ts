@@ -205,6 +205,8 @@ export async function POST(
       subject,
       html,
       replyTo: REJECTION_REPLY_TO,
+      dedupKey: `rejection_resend:${params.candidateId}`,
+      sideEffect: { kind: "rejection_sent", candidateId: params.candidateId },
     });
     if (delivered.status === "bloqueado_staging") {
       return NextResponse.json({
@@ -213,6 +215,14 @@ export async function POST(
         status: "bloqueado_staging",
         message: "El correo no salió: el destinatario no está permitido en este ambiente.",
       });
+    }
+    if (delivered.status === "agotado") {
+      return NextResponse.json({
+        success: false,
+        mode: "send",
+        status: "agotado",
+        message: "Se agotaron los reintentos de este correo.",
+      }, { status: 409 });
     }
     if (delivered.status === "pending") {
       return NextResponse.json({

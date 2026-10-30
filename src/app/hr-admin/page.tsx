@@ -3820,8 +3820,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
               className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
             />
             <div className="text-xs text-gray-500 mt-1">
-              Cada email saliente te llega también acá como copia oculta — el candidato no ve este correo.
-              Los acuses al candidato no usan esta copia.
+              Los correos al candidato salen sin copia oculta. Este campo no se aplica a esos envíos.
             </div>
           </div>
 
@@ -7293,7 +7292,7 @@ function ScheduleInterviewModal({ onClose }: { onClose: () => void }) {
             <div className="text-5xl mb-3">✅</div>
             <h3 className="text-xl font-extrabold mb-2">Entrevista agendada</h3>
             <p className="text-sm text-gray-600 mb-4">
-              {result.email_sent ? 'Invitación enviada al candidato con el .ics adjunto.' : 'Entrevista guardada. El correo no salió: revisá el buzón jointheteam@.'}
+              {result.email_sent ? 'Invitación enviada al candidato con el .ics adjunto.' : 'Entrevista guardada. El correo no salió: revisa el buzón jointheteam@.'}
             </p>
             <a
               href={result.google_calendar_url}

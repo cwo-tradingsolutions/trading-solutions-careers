@@ -16,6 +16,7 @@
 import { neon } from "@/lib/sql";
 import { ATS_FROM_EMAIL, atsFromHeader } from "@/lib/ats-from";
 import { blockedSendLogLine, decideOutboundRecipients } from "@/lib/mail-recipient-guard";
+import { buildAlternativeBody, encodeSubject, stripHeaderBreaks } from "@/lib/gmail-mime";
 import { googleOAuthEnvironment, PREVIEW_GOOGLE_CONNECT_LABEL } from "@/lib/google-oauth-env";
 import {
   deleteStoredTokens,
@@ -65,8 +66,12 @@ export async function saveTokens(tokens: {
 }
 
 export async function clearTokens() {
+  connectionProbe = null;
   await deleteStoredTokens(sqlClient(), currentEnvironment());
 }
+
+let connectionProbe: { at: number; environment: string; result: GmailConnection } | null = null;
+const CONNECTION_PROBE_MS = 60_000;
 
 async function refreshAccessToken(refreshToken: string): Promise<{ access_token: string; expires_in: number; scope?: string }> {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -129,9 +134,31 @@ export async function isGmailConnected(): Promise<GmailConnection> {
   };
   try {
     const stored = await getStoredTokens();
-    if (!stored) return disconnected;
-    return { connected: true, email: stored.email, environment };
+    if (!stored) {
+      connectionProbe = null;
+      return disconnected;
+    }
+    const now = Date.now();
+    if (
+      connectionProbe &&
+      connectionProbe.environment === environment &&
+      now - connectionProbe.at < CONNECTION_PROBE_MS
+    ) {
+      return connectionProbe.result;
+    }
+    // A stored row is not enough: a revoked refresh token still has a row.
+    // getValidAccessToken refreshes when the access token is due, and throws
+    // on invalid_grant. The result is cached so the banner does not refresh
+    // on every poll.
+    const valid = await getValidAccessToken();
+    const result: GmailConnection = valid
+      ? { connected: true, email: valid.email, environment }
+      : disconnected;
+    connectionProbe = { at: now, environment, result };
+    return result;
   } catch {
+    console.warn("[ats-mail] gmail token probe failed");
+    connectionProbe = { at: Date.now(), environment, result: disconnected };
     return disconnected;
   }
 }
@@ -146,18 +173,23 @@ function buildRfc822(opts: {
   cc?: string;
   bcc?: string;
 }): string {
+  const from = stripHeaderBreaks(opts.from);
+  const to = stripHeaderBreaks(opts.to);
+  const cc = opts.cc ? stripHeaderBreaks(opts.cc) : "";
+  const replyTo = opts.replyTo ? stripHeaderBreaks(opts.replyTo) : "";
+  const bcc = opts.bcc ? stripHeaderBreaks(opts.bcc) : "";
+  const { boundary, body } = buildAlternativeBody(opts.html);
   const lines: string[] = [];
-  lines.push(`From: ${opts.from}`);
-  lines.push(`To: ${opts.to}`);
-  if (opts.cc) lines.push(`Cc: ${opts.cc}`);
-  if (opts.replyTo) lines.push(`Reply-To: ${opts.replyTo}`);
-  if (opts.bcc) lines.push(`Bcc: ${opts.bcc}`);
-  lines.push(`Subject: =?UTF-8?B?${Buffer.from(opts.subject).toString("base64")}?=`);
+  lines.push(`From: ${from}`);
+  lines.push(`To: ${to}`);
+  if (cc) lines.push(`Cc: ${cc}`);
+  if (replyTo) lines.push(`Reply-To: ${replyTo}`);
+  if (bcc) lines.push(`Bcc: ${bcc}`);
+  lines.push(`Subject: ${encodeSubject(opts.subject)}`);
   lines.push("MIME-Version: 1.0");
-  lines.push('Content-Type: text/html; charset="UTF-8"');
-  lines.push("Content-Transfer-Encoding: base64");
+  lines.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
   lines.push("");
-  lines.push(Buffer.from(opts.html).toString("base64"));
+  lines.push(body);
   return lines.join("\r\n");
 }
 
@@ -220,8 +252,16 @@ export async function sendViaGmail(opts: {
   persistBlocked?: boolean;
   mailType?: string;
 }): Promise<GmailSendResult> {
+  const safe = {
+    ...opts,
+    to: stripHeaderBreaks(opts.to),
+    cc: opts.cc ? stripHeaderBreaks(opts.cc) : undefined,
+    bcc: opts.bcc ? stripHeaderBreaks(opts.bcc) : undefined,
+    replyTo: opts.replyTo ? stripHeaderBreaks(opts.replyTo) : undefined,
+    subject: stripHeaderBreaks(opts.subject),
+  };
   const decision = decideOutboundRecipients(
-    { to: opts.to, cc: opts.cc, bcc: opts.bcc },
+    { to: safe.to, cc: safe.cc, bcc: safe.bcc },
     {
       MAIL_RECIPIENT_ALLOWLIST: process.env.MAIL_RECIPIENT_ALLOWLIST,
       NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
@@ -237,12 +277,12 @@ export async function sendViaGmail(opts: {
       try {
         const { recordBlockedSend } = await import("@/lib/ats-mail-store");
         const saved = await recordBlockedSend({
-          candidate: opts.to,
+          candidate: safe.to,
           type: opts.mailType ?? "gmail_send",
-          subject: opts.subject,
+          subject: safe.subject,
           html: opts.html,
-          reply_to: opts.replyTo ?? null,
-          bcc: opts.bcc ?? null,
+          reply_to: safe.replyTo ?? null,
+          bcc: safe.bcc ?? null,
           reason: decision.reason,
         });
         blockedId = saved.id;
@@ -259,13 +299,13 @@ export async function sendViaGmail(opts: {
   }
 
   const rfc822 = buildRfc822({
-    from: formatFrom(opts.fromName, valid.email),
-    to: opts.to,
-    subject: opts.subject,
-    html: opts.html,
-    replyTo: opts.replyTo,
-    cc: opts.cc,
-    bcc: opts.bcc,
+    from: formatFrom(safe.fromName, valid.email),
+    to: safe.to,
+    subject: safe.subject,
+    html: safe.html,
+    replyTo: safe.replyTo,
+    cc: safe.cc,
+    bcc: safe.bcc,
   });
   const raw = Buffer.from(rfc822).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 

@@ -62,11 +62,7 @@ spec:
               valueFrom: { secretKeyRef: { name: prd-careers-CRON_SECRET, key: latest } }
             - name: WXM_SERVICE_SECRET
               valueFrom: { secretKeyRef: { name: prd-careers-WXM_SERVICE_SECRET, key: latest } }
-            # Valores que hoy viven en Vercel. Sin RESEND_API_KEY (no está en
-            # Vercel producción): el ATS envía por Gmail conectado. Los correos de
-            # aviso internos usan los valores por defecto del código.
-            # Remitente decidido por Kelly; requiere tradingsolutions.com verificado en Resend.
-            - { name: EMAIL_FROM, value: "Talent Acquisition Team <jointheteam@tradingsolutions.com>" }
+            # El ATS envía por Gmail desde jointheteam@. No hay remitente por variable.
             - name: EMAIL_BCC
               valueFrom: { secretKeyRef: { name: prd-careers-EMAIL_BCC, key: latest } }
             - name: ELEVENLABS_API_KEY

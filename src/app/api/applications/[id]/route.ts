@@ -24,7 +24,7 @@ async function ensureDB() {
 async function sendStatusTransitionEmail(
   appRow: { id: number; full_name: string; email: string; job_title: string; job_id: number | null },
   newStatus: string
-): Promise<"sent" | "pending" | "skipped" | "unavailable" | "bloqueado_staging"> {
+): Promise<"sent" | "pending" | "skipped" | "unavailable" | "bloqueado_staging" | "agotado"> {
   if (!appRow.email) return "skipped";
   // Determinar qué template usar según status
   let subject = "";
@@ -110,6 +110,7 @@ async function sendStatusTransitionEmail(
       html,
       replyTo: replyTo ?? undefined,
       bcc: bcc ?? undefined,
+      dedupKey: `application_status:${appRow.id}:${newStatus}`,
     });
     return delivered.status;
   } catch (e) {

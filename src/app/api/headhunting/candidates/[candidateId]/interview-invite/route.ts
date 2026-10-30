@@ -2,7 +2,7 @@
  * GET/POST /api/headhunting/candidates/[candidateId]/interview-invite
  *
  * Invitación a entrevista desde la ficha del candidato. El correo sale por
- * sendViaGmail (no draft), From "Talent Acquisition Team", y el evento se
+ * sendCandidateMail (no draft), From "Talent Acquisition Team", y el evento se
  * crea en el calendario de jointheteam@ con Google Meet.
  *
  * Preview (VERCEL_ENV !== production): solo cwo@ y jointheteam@ pueden
@@ -17,7 +17,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getStoredTokens, sendViaGmail } from "@/lib/gmail";
+import { getStoredTokens } from "@/lib/gmail";
+import { sendCandidateMail } from "@/lib/ats-mail-store";
 import { googleOAuthEnvironment } from "@/lib/google-oauth-env";
 import { hasCalendarWriteScope } from "@/lib/google-scopes";
 import { insertInterviewEvent } from "@/lib/google-calendar";
@@ -338,13 +339,16 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
 
   const finalArtifacts = previewOf(created.meet_url || null);
   // El payload ya se insertó con el requestId anterior. El correo usa el Meet real.
-  const mailed = await sendViaGmail({
+  const mailed = await sendCandidateMail({
     to: delivery.emailTo.join(", "),
+    candidate: delivery.emailTo[0] || null,
+    type: "interview_invite",
     subject: finalArtifacts.subject,
     html: finalArtifacts.html,
-    fromName: finalArtifacts.fromName,
     replyTo: "jointheteam@tradingsolutions.com",
+    dedupKey: `interview_invite:${params.candidateId}:${form.value.scheduledAt.toISOString()}`,
   });
+  const mailSent = mailed.status === "sent";
 
   let persisted = false;
   let recordError: string | undefined;
@@ -399,12 +403,13 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
   }
 
   return NextResponse.json({
-    success: mailed.ok,
-    sent: mailed.ok,
+    success: mailSent || mailed.status === "pending",
+    sent: mailSent,
+    email_status: mailed.status,
     persisted,
     interview_id: interviewId,
     action: "send",
-    error: mailed.ok ? null : mailed.error,
+    error: mailSent || mailed.status === "pending" ? null : mailed.status,
     record_error: recordError || null,
     suppressed: delivery.suppressed,
     from: interviewFromHeader(google.email || "jointheteam@tradingsolutions.com"),
@@ -415,7 +420,7 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
     },
     meet_url: created.meet_url || null,
     calendar_event_id: created.event_id,
-    gmail_id: mailed.ok ? mailed.gmail_id : null,
+    gmail_id: mailSent ? mailed.gmail_id : null,
     reconnect: null,
-  }, { status: mailed.ok ? 200 : 502 });
+  }, { status: mailSent || mailed.status === "pending" ? 200 : 502 });
 }

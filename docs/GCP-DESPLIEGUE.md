@@ -53,12 +53,12 @@ printf '%s' 'VALOR' | gcloud secrets create SUPABASE_SERVICE_ROLE_KEY --data-fil
 
 Inventario por app, sacado del código:
 
-**ATS / Careers** — `ADMIN_SECRET`, `ANTHROPIC_API_KEY`, `CRON_SECRET`, `DATABASE_URL`, `DIGEST_RECIPIENT`, `ELEVENLABS_AGENT_ID`, `ELEVENLABS_API_KEY`, `EMAIL_BCC`, `EMAIL_FROM`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_MAILBOX_ALLOWED_EMAILS`, `HANDOFF_EMAIL`, `INTERNAL_NEWSLETTER_EMAIL`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, `LINKEDIN_COMPANY_ID`, `MAIL_RECIPIENT_ALLOWLIST`, `MARY_PSICO_EMAIL`, `NEXT_PUBLIC_APP_URL`, `RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `VACANCY_ID_FULLSTACK_JUNIOR`, `WXM_SERVICE_SECRET`
+**ATS / Careers** — `ADMIN_SECRET`, `ANTHROPIC_API_KEY`, `CRON_SECRET`, `DATABASE_URL`, `DIGEST_RECIPIENT`, `ELEVENLABS_AGENT_ID`, `ELEVENLABS_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_MAILBOX_ALLOWED_EMAILS`, `HANDOFF_EMAIL`, `INTERNAL_NEWSLETTER_EMAIL`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, `LINKEDIN_COMPANY_ID`, `MAIL_RECIPIENT_ALLOWLIST`, `MARY_PSICO_EMAIL`, `NEXT_PUBLIC_APP_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `VACANCY_ID_FULLSTACK_JUNIOR`, `WXM_SERVICE_SECRET`
 
 `GOOGLE_MAILBOX_ALLOWED_EMAILS` is the comma-separated allowlist for the ATS Google mailbox. The OAuth callback stores tokens only when the verified Google account is on this list. Unset or empty fails closed and does not overwrite the production token (row id = 1). Expected value: `jointheteam@tradingsolutions.com`. Comparison is case-insensitive. This hotfix does not set the variable in Vercel or GCP; ops adds it before anyone reconnects Gmail.
 Build-args: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-**WXM** — `ATS_BASE_URL`, `ENCUESTA_BCC`, `ENCUESTA_FROM`, `RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TALLY_WEBHOOK_SECRET`, `WXM_SERVICE_SECRET`
+**WXM** — `ATS_BASE_URL`, `ENCUESTA_BCC`, `ENCUESTA_FROM`, `SUPABASE_SERVICE_ROLE_KEY`, `TALLY_WEBHOOK_SECRET`, `WXM_SERVICE_SECRET`
 Build-args: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
 **Career Lines OS** — `ANTHROPIC_API_KEY`, `GMAIL_REFRESH_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `REDIS_URL`, `WOS_360_SECRET`, `WOS_SESSION_SECRET`
@@ -73,7 +73,7 @@ gcloud builds submit --tag us-west1-docker.pkg.dev/TU_PROYECTO_GCP/trading/caree
 ```
 
 ```bash
-gcloud run deploy careers --image us-west1-docker.pkg.dev/TU_PROYECTO_GCP/trading/careers:v1 --region us-west1 --port 8080 --cpu 1 --memory 1Gi --min-instances 0 --max-instances 10 --timeout 300 --set-secrets ADMIN_SECRET=ADMIN_SECRET:latest,CRON_SECRET=CRON_SECRET:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,RESEND_API_KEY=RESEND_API_KEY:latest,DATABASE_URL=DATABASE_URL:latest
+gcloud run deploy careers --image us-west1-docker.pkg.dev/TU_PROYECTO_GCP/trading/careers:v1 --region us-west1 --port 8080 --cpu 1 --memory 1Gi --min-instances 0 --max-instances 10 --timeout 300 --set-secrets ADMIN_SECRET=ADMIN_SECRET:latest,CRON_SECRET=CRON_SECRET:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,DATABASE_URL=DATABASE_URL:latest
 ```
 
 Sobre los flags: `--timeout 300` cubre con margen los `maxDuration` del código (60 s y 120 s). `--min-instances 0` deja que escale a cero y no cobre cuando nadie entra; si molesta el arranque en frío en el portal público de vacantes, subirlo a 1.

@@ -16,7 +16,7 @@ _28-oct-2026. Paso 5 de `GCP-DESPLIEGUE.md`, ya con la infraestructura real de `
 | Balanceador | IP fija `prd-ip` = **136.81.187.112**. `prd-urlmap` manda `careers.tradingsolutions.com` a `prd-careers-backend` (NEG serverless). El puerto 80 redirige a HTTPS (`prd-redirect`). |
 | Certificado | `prd-cert` (clásico, administrado) para careers **y** wxm. Está en `PROVISIONING`, con los dos dominios en `FAILED_NOT_VISIBLE`. |
 | Cloud Scheduler | Las 4 tareas `ats-*` existen y están **PAUSED**. |
-| Secretos `prd-careers-*` | Todos los que pide el manifiesto. **Falta `RESEND_API_KEY`.** |
+| Secretos `prd-careers-*` | Todos los que pide el manifiesto. El correo sale por Gmail (`jointheteam@`), no por otro proveedor. |
 | Datos | `copiar-careers.cloudbuild.yaml` (repo `wxm-app`) copia Supabase `elevare-careers` y Neon a la base `careers` de Cloud SQL. Hay que correrlo otra vez en la ventana del corte. |
 | Vercel | Sigue sirviendo producción. Los 4 crons de `vercel.json` siguen activos. |
 
@@ -32,7 +32,7 @@ Si se cambia el DNS sin más, careers queda **sin HTTPS entre 15 y 60 minutos** 
 
 ## 2. Decisiones que necesito de Kelly
 
-1. **Correo.** Sin `RESEND_API_KEY`, `src/lib/resend.ts` lanza excepción. Algunas invitaciones de entrevista usan Resend directo; el resto va por Gmail conectado. Hay dos caminos: cargar la llave (con `tradingsolutions.com` verificado en Resend) o aceptar que esas rutas fallen hasta que haya llave.
+1. **Correo.** Todo el ATS sale por Gmail desde `jointheteam@`. No hay una segunda llave de correo. En staging, `MAIL_RECIPIENT_ALLOWLIST` limita los destinatarios porque esa base tiene correos reales.
 2. **Qué código sale a producción.** Recomiendo construir desde `5d69996` (HEAD de esta rama), que ya incluye el sitio público nuevo. Hay dos cambios **sin commit** (`src/middleware.ts` + `src/lib/credential-config.ts`): el middleware responde 503 si algún secreto es un marcador de Vercel. ¿Entran o no?
 3. **Ventana.** Entre la copia final de datos y el cambio de DNS, lo que se escriba en Vercel se pierde. Propongo una ventana corta (~30 min) fuera de horario de Bogotá, avisando a reclutamiento.
 

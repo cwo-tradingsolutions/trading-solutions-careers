@@ -246,6 +246,7 @@ export async function POST(req: NextRequest) {
           html,
           replyTo: dynamicReplyTo ?? undefined,
           bcc: dynamicBcc ?? undefined,
+          dedupKey: `assessment_invite:${token}`,
         });
         emailStatus = delivered.status === "sent"
           ? { sent: true, status: "sent", id: delivered.gmail_id, via: "gmail" }

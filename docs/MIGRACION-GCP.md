@@ -112,7 +112,7 @@ Migrar así significa mover dos bases y mantener la sincronización durante el c
 3. **Mover los 4 cron** a Cloud Scheduler y verificar una semana completa.
 4. **Decidir B o C** con la factura real de los pasos 2 y 3 sobre la mesa.
 5. Si es B: montar Supabase autohospedado, migrar con `pg_dump`/`pg_restore`, copiar los 3 buckets, cortar en una ventana de fin de semana.
-6. **Rotar todas las llaves** al cerrar — Supabase, Google OAuth, `ADMIN_SECRET`, `WXM_SERVICE_SECRET`, Resend. Es el momento natural para hacerlo y ya hay una `service_role` pendiente de rotar.
+6. **Rotar todas las llaves** al cerrar — Supabase, Google OAuth, `ADMIN_SECRET`, `WXM_SERVICE_SECRET`. Es el momento natural para hacerlo y ya hay una `service_role` pendiente de rotar.
 
 ---
 

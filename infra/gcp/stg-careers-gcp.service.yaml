@@ -6,8 +6,8 @@
 #   gcloud run services replace infra/gcp/stg-careers-gcp.service.yaml \
 #     --project wellness-experience-management --region us-west1
 #
-# Sin RESEND_API_KEY. La base de staging tiene correos reales copiados de
-# producción: MAIL_RECIPIENT_ALLOWLIST es lo único que puede salir por Gmail.
+# La base de staging tiene correos reales copiados de producción.
+# MAIL_RECIPIENT_ALLOWLIST es lo único que puede salir por Gmail.
 # Si se quita, el proceso bloquea todos los envíos (STAGING_READ_ONLY=1 y
 # K_SERVICE=stg-careers-gcp).
 apiVersion: serving.knative.dev/v1

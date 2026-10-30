@@ -162,6 +162,8 @@ export async function enviarBateriaAuto(candidatoId: string, origin: string): Pr
       subject: asunto,
       html,
       replyTo: RESPONDER_A,
+      dedupKey: `battery_auto:${ses.id}`,
+      sideEffect: { kind: 'battery', candidateId: candidatoId, sessionId: ses.id, channel: 'auto-gmail' },
     });
     if (delivered.status === 'bloqueado_staging') {
       return { enviado: false, motivo: 'correo bloqueado en este ambiente', url: ses.url, pendiente: true, status: 'pending' };
@@ -170,15 +172,11 @@ export async function enviarBateriaAuto(candidatoId: string, origin: string): Pr
       await marcarBateriaPendiente(candidatoId);
       return { enviado: false, motivo: 'buzón jointheteam@ desconectado', url: ses.url, pendiente: true, status: 'pending' };
     }
+    if (delivered.status !== 'sent') {
+      return { enviado: false, motivo: 'no se pudo enviar la batería', url: ses.url };
+    }
 
-    const canal = 'gmail' as const;
-    await supabaseAdmin
-      .from('ts_bat_sessions')
-      .update({ invited_at: new Date().toISOString(), invite_channel: `auto-${canal}`, invite_count: ses.invite_count + 1, updated_at: new Date().toISOString() })
-      .eq('id', ses.id);
-    await limpiarBateriaPendiente(candidatoId);
-    await moverABateria(candidatoId, `Batería enviada automáticamente (${canal}) al pasar el prefiltro`);
-    return { enviado: true, canal, url: ses.url };
+    return { enviado: true, canal: 'gmail', url: ses.url };
   } catch (e: any) {
     console.error('bateria · envío automático falló', candidatoId, e?.message || e);
     return { enviado: false, motivo: 'no se pudo enviar la batería' };

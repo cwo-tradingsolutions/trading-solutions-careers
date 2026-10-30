@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { createDraftViaGmail, isGmailConnected } from '@/lib/gmail';
-import { queueCandidateMail, sendCandidateMail } from '@/lib/ats-mail-store';
+import { sendCandidateMail } from '@/lib/ats-mail-store';
 import crypto from 'crypto';
 import { ATS_FROM_NAME, candidateSignatureHtml } from "@/lib/ats-from";
 
@@ -121,6 +121,7 @@ export async function POST(req: NextRequest) {
         type: 'headhunting_invite',
         subject: emailSubject,
         html: emailHtml,
+        dedupKey: `headhunting_invite:${candidate_id}`,
       });
       return NextResponse.json({
         ...okBase,
@@ -151,24 +152,20 @@ export async function POST(req: NextRequest) {
         }
         console.error('headhunting invite draft failed');
         if (mode === 'draft') {
-          await queueCandidateMail({
-            to: candidate.email,
-            candidate: candidate.email,
-            type: 'headhunting_invite',
-            subject: emailSubject,
-            html: emailHtml,
-          }, 'Gmail no dejó el borrador');
-          return NextResponse.json({ ...okBase, channel: 'pending', email_status: 'pending' });
+          return NextResponse.json({
+            ...okBase,
+            channel: 'gmail-draft-failed',
+            email_status: 'draft_required',
+            note: 'No se pudo dejar el borrador. Conecta jointheteam@ y vuelve a intentarlo. No se envió el correo.',
+          }, { status: 409 });
         }
       } else if (mode === 'draft') {
-        await queueCandidateMail({
-          to: candidate.email,
-          candidate: candidate.email,
-          type: 'headhunting_invite',
-          subject: emailSubject,
-          html: emailHtml,
-        }, 'Gmail no conectado');
-        return NextResponse.json({ ...okBase, channel: 'pending', email_status: 'pending' });
+        return NextResponse.json({
+          ...okBase,
+          channel: 'gmail-not-connected',
+          email_status: 'draft_required',
+          note: 'Gmail no está conectado. El borrador queda para revisión de HR: no se encoló un envío automático.',
+        }, { status: 409 });
       }
     }
 

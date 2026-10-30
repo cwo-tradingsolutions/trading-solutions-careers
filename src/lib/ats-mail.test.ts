@@ -202,6 +202,10 @@ test("From is the team mailbox and the daily warning starts after 1500", () => {
     mailboxDisconnectedBanner(3),
     "Buzón jointheteam@ desconectado — 3 correos pendientes. Reconectar",
   );
+  assert.equal(
+    mailboxDisconnectedBanner(1),
+    "Buzón jointheteam@ desconectado — 1 correo pendiente. Reconectar",
+  );
 });
 
 test("a staging block is not put back on the pending queue", async () => {
@@ -268,6 +272,8 @@ test("battery direct send uses Gmail and the HR banner names the pending mailbox
   assert.match(banner, /Más de 1500 envíos hoy/);
   const migration = readFileSync(join(root, "supabase/migrations/20261030_ats_outbound_mail.sql"), "utf8");
   assert.match(migration, /ats_outbound_mail/);
-  assert.match(migration, /ats_mail_forbid_delete/);
+  assert.match(migration, /ats_mail_audit_forbid_delete/);
+  assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(migration, /ats_outbound_mail_purge_bodies/);
   assert.doesNotMatch(migration, /DELETE FROM/i);
 });

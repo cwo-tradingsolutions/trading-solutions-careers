@@ -8,17 +8,28 @@
 
 export const DAILY_SEND_WARN_AFTER = 1500;
 
-export const MAILBOX_DISCONNECTED_BANNER =
-  "Buzón jointheteam@ desconectado — ";
+export const MAX_SEND_ATTEMPTS = 5;
+export const SENDING_STALE_MINUTES = 15;
+
+export function nextAttemptDelayMs(attemptCount: number): number {
+  const step = Math.max(1, attemptCount);
+  return Math.min(2 ** (step - 1), 360) * 60_000;
+}
 
 export function mailboxDisconnectedBanner(pendingCount: number): string {
   const n = Number.isFinite(pendingCount) && pendingCount > 0 ? Math.floor(pendingCount) : 0;
-  return `Buzón jointheteam@ desconectado — ${n} correos pendientes. Reconectar`;
+  const label = n === 1 ? "1 correo pendiente" : `${n} correos pendientes`;
+  return `Buzón jointheteam@ desconectado — ${label}. Reconectar`;
 }
 
 export function dailySendWarning(sendsToday: number): boolean {
   return sendsToday > DAILY_SEND_WARN_AFTER;
 }
+
+export type MailSideEffect =
+  | { kind: "battery"; candidateId: string; sessionId: string; channel: string }
+  | { kind: "rejection_sent"; candidateId: string }
+  | { kind: "survey_sent"; surveyId: string };
 
 export type CandidateMailInput = {
   to: string;
@@ -28,12 +39,15 @@ export type CandidateMailInput = {
   html: string;
   replyTo?: string | null;
   bcc?: string | null;
+  dedupKey?: string | null;
+  sideEffect?: MailSideEffect | null;
 };
 
 export type CandidateMailResult =
   | { status: "sent"; gmail_id: string }
   | { status: "pending"; id: string }
-  | { status: "bloqueado_staging"; id: string };
+  | { status: "bloqueado_staging"; id: string }
+  | { status: "agotado"; id: string };
 
 /** What a candidate-facing response may say. No provider error, no address. */
 export function candidateMailStatus(result: CandidateMailResult): { status: CandidateMailResult["status"] } {
@@ -49,9 +63,18 @@ export type PendingMailRow = {
   bcc: string | null;
   error: string;
   status?: string;
+  dedupKey?: string | null;
+  sideEffect?: MailSideEffect | null;
 };
 
-export type ClaimedMail = PendingMailRow & { id: string };
+export type OpenDedupRow = {
+  id: string;
+  status: string;
+  gmail_id: string | null;
+  side_effect_applied_at: string | null;
+};
+
+export type ClaimedMail = PendingMailRow & { id: string; sideEffect?: MailSideEffect | null };
 
 type SendOutcome =
   | { ok: true; gmail_id: string }
@@ -61,6 +84,9 @@ export type MailDeps = {
   send: (input: CandidateMailInput) => Promise<SendOutcome>;
   savePending: (row: PendingMailRow) => Promise<{ id: string }>;
   recordSend: (type: string) => Promise<number>;
+  findOpen?: (dedupKey: string) => Promise<OpenDedupRow | null>;
+  applySideEffect?: (effect: MailSideEffect) => Promise<void>;
+  markSideEffectApplied?: (id: string) => Promise<void>;
   log?: (line: string) => void;
 };
 
@@ -68,10 +94,46 @@ function asError(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+async function finishSent(
+  input: CandidateMailInput,
+  deps: MailDeps,
+  gmailId: string,
+  rowId?: string,
+): Promise<CandidateMailResult> {
+  if (input.sideEffect && deps.applySideEffect) {
+    await deps.applySideEffect(input.sideEffect);
+    if (rowId && deps.markSideEffectApplied) await deps.markSideEffectApplied(rowId);
+  }
+  let today = 0;
+  try {
+    today = await deps.recordSend(input.type);
+  } catch (e) {
+    deps.log?.(`[ats-mail] counter failed type=${input.type} ${asError(e)}`);
+  }
+  deps.log?.(`[ats-mail] sent type=${input.type} sends_today=${today}`);
+  return { status: "sent", gmail_id: gmailId };
+}
+
 export async function deliverCandidateMail(
   input: CandidateMailInput,
   deps: MailDeps,
 ): Promise<CandidateMailResult> {
+  if (input.dedupKey && deps.findOpen) {
+    const open = await deps.findOpen(input.dedupKey);
+    if (open) {
+      if (open.status === "sent") {
+        if (!open.side_effect_applied_at && input.sideEffect && deps.applySideEffect) {
+          await deps.applySideEffect(input.sideEffect);
+          if (deps.markSideEffectApplied) await deps.markSideEffectApplied(open.id);
+        }
+        return { status: "sent", gmail_id: open.gmail_id || "deduped" };
+      }
+      if (open.status === "bloqueado_staging") return { status: "bloqueado_staging", id: open.id };
+      if (open.status === "agotado") return { status: "agotado", id: open.id };
+      return { status: "pending", id: open.id };
+    }
+  }
+
   let sent: SendOutcome;
   try {
     sent = await deps.send(input);
@@ -80,14 +142,7 @@ export async function deliverCandidateMail(
   }
 
   if (sent.ok) {
-    let today = 0;
-    try {
-      today = await deps.recordSend(input.type);
-    } catch (e) {
-      deps.log?.(`[ats-mail] counter failed type=${input.type} ${asError(e)}`);
-    }
-    deps.log?.(`[ats-mail] sent type=${input.type} sends_today=${today}`);
-    return { status: "sent", gmail_id: sent.gmail_id };
+    return finishSent(input, deps, sent.gmail_id);
   }
 
   if (sent.blocked === "bloqueado_staging") {
@@ -101,6 +156,8 @@ export async function deliverCandidateMail(
       bcc: input.bcc ?? null,
       error: "bloqueado_staging",
       status: "bloqueado_staging",
+      dedupKey: input.dedupKey,
+      sideEffect: input.sideEffect,
     });
     return { status: "bloqueado_staging", id: saved.id };
   }
@@ -113,6 +170,8 @@ export async function deliverCandidateMail(
     reply_to: input.replyTo ?? null,
     bcc: input.bcc ?? null,
     error: sent.error,
+    dedupKey: input.dedupKey,
+    sideEffect: input.sideEffect,
   });
   deps.log?.(`[ats-mail] pending type=${input.type}`);
   return { status: "pending", id: saved.id };
@@ -124,6 +183,8 @@ export type PendingReplayDeps = {
   markSent: (id: string, gmailId: string) => Promise<void>;
   markPending: (id: string, error: string) => Promise<void>;
   markBlocked: (id: string, reason: string) => Promise<void>;
+  applySideEffect?: (effect: MailSideEffect) => Promise<void>;
+  markSideEffectApplied?: (id: string) => Promise<void>;
   recordSend: (type: string) => Promise<number>;
   log?: (line: string) => void;
 };
@@ -155,6 +216,10 @@ export async function resendPendingOnce(deps: PendingReplayDeps): Promise<{ sent
       }
       if (result.ok) {
         await deps.markSent(row.id, result.gmail_id);
+        if (row.sideEffect && deps.applySideEffect) {
+          await deps.applySideEffect(row.sideEffect);
+          if (deps.markSideEffectApplied) await deps.markSideEffectApplied(row.id);
+        }
         try {
           const today = await deps.recordSend(row.type || "pending");
           deps.log?.(`[ats-mail] sent type=${row.type || "pending"} sends_today=${today}`);

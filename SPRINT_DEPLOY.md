@@ -41,9 +41,7 @@ Ya configuradas en deploys previos, sólo confirmar que existen:
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Cliente público (encuesta NPS) |
 | `DATABASE_URL` | Neon (legacy applications + gmail tokens) |
 | `ANTHROPIC_API_KEY` | Market Research IA · scoring |
-| `RESEND_API_KEY` | Emails (NPS · invites entrevistas) |
-| `EMAIL_FROM` | `Elevare Careers <orders@elevarecareer.com>` |
-| `EMAIL_BCC` | `hello@elevarecareer.com` |
+| `MAIL_RECIPIENT_ALLOWLIST` | Destinatarios permitidos fuera de producción. Staging: `cwo@tradingsolutions.com,jointheteam@tradingsolutions.com` |
 | `NEXT_PUBLIC_APP_URL` | Para Elevare assessment links |
 
 No se agregaron nuevas envs en este sprint.
@@ -105,7 +103,7 @@ No se agregaron nuevas envs en este sprint.
 ### 8. Interview scheduling con Google Calendar
 - Tabla `ts_interviews` para tracking
 - Library `src/lib/ics.ts` — genera .ics universal + Google Calendar URL
-- Endpoint `POST /api/headhunting/candidates/[id]/schedule-interview` envía email Resend con .ics adjunto
+- Endpoint `POST /api/headhunting/candidates/[id]/schedule-interview` está cerrado y no envía correo
 - Botón global "📅 Agendar" en topbar abre modal de 3 pasos
 - "Agenda de hoy" en Today's Focus
 
@@ -133,7 +131,7 @@ Después de que Vercel confirme deploy exitoso:
 
 ### Tests funcionales rápidos
 
-1. **Schedule interview test**: click 📅 Agendar → buscar candidato existente → completar → confirmar. Verificar en Resend que el email salió con .ics.
+1. **Schedule interview test**: el agendado desde el encabezado está cerrado. La invitación viva sale por Gmail desde la ficha, y solo a direcciones permitidas fuera de producción.
 2. **Market research test**: abrir cualquier vacante → ✨ → click "Generar". Esperar ~30s. Verificar JSON renderizado.
 3. **Onboarding auto-create test**: en Funnel, mover un candidato dummy a `contratado`. Volver a Onboarding tab → debería aparecer su card.
 4. **Bulk import test**: descargar template del modal de import, agregar 1-2 filas, importar (dry run primero).

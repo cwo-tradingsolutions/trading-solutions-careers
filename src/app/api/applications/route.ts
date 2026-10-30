@@ -16,6 +16,9 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { canalPostulacionPublica } from "@/lib/candidate-source";
 import { publicStepBody } from "@/lib/candidate-public-error";
 import { publicApplicationCreated } from "@/lib/public-application";
+import { isSafeMailbox } from "@/lib/gmail-mime";
+import { countRecentQueued } from "@/lib/ats-mail-store";
+import { isGmailConnected } from "@/lib/gmail";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -58,6 +61,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Missing required fields: job_id, full_name, email" },
         { status: 400 }
+      );
+    }
+    if (!isSafeMailbox(String(email))) {
+      return NextResponse.json(
+        { error: "Escribe un correo válido.", error_en: "Enter a valid email address." },
+        { status: 400 },
       );
     }
 
@@ -283,6 +292,11 @@ export async function POST(request: NextRequest) {
 
         const html = lang === "en" ? htmlEn : htmlEs;
 
+        const mailbox = await isGmailConnected();
+        const recent = mailbox.connected ? 0 : await countRecentQueued("application_received", 15);
+        if (!mailbox.connected && recent >= 20) {
+          console.warn("[ats-mail] application enqueue rate limited");
+        } else {
         const delivered = await sendCandidateMail({
           to: email,
           candidate: email,
@@ -291,9 +305,11 @@ export async function POST(request: NextRequest) {
           html,
           replyTo: replyTo ?? undefined,
           bcc: bcc ?? undefined,
+          dedupKey: `application_received:${newId}`,
         });
         if (delivered.status === "pending") {
           console.info(`[ats-mail] application acknowledgement pending id=${delivered.id}`);
+        }
         }
       } catch (e) {
         console.error("No se pudo enviar ni encolar el acuse:", e);

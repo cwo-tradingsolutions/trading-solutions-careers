@@ -146,6 +146,10 @@ export async function POST(req: NextRequest) {
           subject: asunto,
           html,
           replyTo: RESPONDER_A,
+          dedupKey: `battery_invite:${ses.id}`,
+          sideEffect: c.id
+            ? { kind: 'battery', candidateId: c.id, sessionId: ses.id, channel: 'gmail' }
+            : null,
         });
         if (delivered.status === 'sent') {
           canal = 'gmail';
@@ -159,7 +163,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      if (!fallo && emailStatus !== 'pending' && emailStatus !== 'bloqueado_staging') {
+      if (modo === 'borrador' && !fallo) {
         await supabaseAdmin
           .from('ts_bat_sessions')
           .update({ invited_at: new Date().toISOString(), invite_channel: canal, invite_count: ses.invite_count + 1, updated_at: new Date().toISOString() })
@@ -183,7 +187,7 @@ export async function POST(req: NextRequest) {
         resultado,
         nota:
           modo === 'borrador'
-            ? `Quedaron ${ok} borradores en la bandeja de ${gmail.email ?? 'Gmail'}. Revíselos y déles Enviar. Ya quedaron en la etapa Batería.`
+            ? `Quedaron ${ok} borradores en la bandeja de ${gmail.email ?? 'Gmail'}. Revísalos y dales Enviar. Ya quedaron en la etapa Batería.`
             : `Salieron ${ok} correos por Gmail${pendientes ? ` y ${pendientes} quedaron pendientes` : ''}. Las respuestas llegan a ${RESPONDER_A}.`,
       },
       { headers: { 'Cache-Control': 'no-store' } }

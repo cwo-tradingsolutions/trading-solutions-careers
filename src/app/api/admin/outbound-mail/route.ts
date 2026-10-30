@@ -17,10 +17,11 @@ export async function GET(req: NextRequest) {
       listPending(),
       countSendsToday(),
     ]);
+    const queued = pending.filter((row) => row.status === "pending" || row.status === "sending");
     return NextResponse.json({
       connected: gmail.connected,
       email: gmail.email ?? null,
-      pending_count: pending.length,
+      pending_count: queued.length,
       sends_today: sendsToday,
       warn_daily: dailySendWarning(sendsToday),
       pending,
