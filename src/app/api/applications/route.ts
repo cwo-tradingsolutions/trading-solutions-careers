@@ -10,6 +10,7 @@ import { recordStageEvent } from "@/lib/stage-events";
 // /api/admin/sync-applications-to-funnel · no duplicarla acá.
 import { resolverVacante } from "@/lib/vacancy-map";
 import { isEnglishTemplate, resolveCandidateLang } from "@/lib/candidate-lang";
+import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -24,9 +25,26 @@ async function ensureDB() {
 
 export async function POST(request: NextRequest) {
   try {
-    await ensureDB();
-
     const body = await request.json();
+
+    if (body?.talent_pool === true) {
+      const poolName = String(body.full_name || "").trim();
+      const poolEmail = String(body.email || "").trim();
+      if (!poolName || !poolEmail) {
+        return NextResponse.json(
+          { error: "Missing required fields: full_name, email" },
+          { status: 400 }
+        );
+      }
+      if (!isPreviewTestMode()) {
+        return NextResponse.json(
+          { error: "Talent pool applications are not connected" },
+          { status: 400 }
+        );
+      }
+      return previewTestJson("POST /api/applications talent_pool");
+    }
+
     const { job_id, job_title, full_name, email, phone, linkedin, cv_filename, cv_data, why_ts, ref } = body;
 
     if (!job_id || !full_name || !email) {
@@ -35,6 +53,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    if (isPreviewTestMode()) {
+      return previewTestJson("POST /api/applications");
+    }
+
+    await ensureDB();
 
     // ─── Detectar candidato INTERNO ────────────────────────────────────
     // Criterios (cualquiera dispara internal):

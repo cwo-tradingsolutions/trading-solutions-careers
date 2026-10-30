@@ -237,7 +237,7 @@ export async function sendViaGmail(opts: {
   html: string;
   replyTo?: string;
   bcc?: string;
-  fromName?: string; // Display name (defaults to ATS_FROM_NAME)
+  fromName?: string; // Display name (defaults to ATS_FROM_NAME when empty)
 }): Promise<{ ok: true; gmail_id: string } | { ok: false; error: string }> {
   const valid = await getValidAccessToken();
   if (!valid) {

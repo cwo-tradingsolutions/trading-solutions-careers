@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { CONSENT_TEXT_VERSION } from '@/lib/bateria/items';
 import { consentVersionFor, batteryVersionFor, type BatLang } from '@/lib/bateria/i18n';
+import { isPreviewTestMode, previewTestJson } from '@/lib/preview-mode';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,14 @@ export async function POST(req: NextRequest) {
       .from('ts_bat_sessions').select('id, status').eq('token', token).single();
     if (eSes) return NextResponse.json({ error: `[buscar] ${eSes.message}` }, { status: 500 });
     if (!session) return NextResponse.json({ error: 'Enlace no válido' }, { status: 404 });
+
+    if (isPreviewTestMode()) {
+      return previewTestJson('POST /api/bateria/consent', {
+        version: CONSENT_TEXT_VERSION,
+        camara: !!camera,
+        status: 'consented',
+      });
+    }
 
     const now = new Date().toISOString();
     const ip =

@@ -12,3 +12,4 @@
  */
 export const ATS_FROM_NAME = "Talent Acquisition Team";
 export const ATS_FROM_NAME_EN = "Talent Acquisition Team";
+export const ATS_FROM_EMAIL = "jointheteam@tradingsolutions.com";

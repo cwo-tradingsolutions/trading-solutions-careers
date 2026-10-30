@@ -61,9 +61,18 @@ function titleSaysChina(jobTitle?: string | null): boolean {
   return /\bchina\b/i.test(String(jobTitle || ""));
 }
 
+function isPanamaOpsRole(input: LangInput): boolean {
+  if (String(input.formTemplateKey || "").toLowerCase() === "panama_ops") return true;
+  const title = String(input.jobTitle || "");
+  const place = String(input.country || "");
+  const ops = /operations specialist|especialista de operaciones/i.test(title);
+  return ops && /\bpanam[aá]\b/i.test(`${title} ${place}`);
+}
+
 export function resolveCandidateLang(input: LangInput): CandidateLang {
   if (String(input.preferredLanguage || "").toLowerCase() === "en") return "en";
   if (isEnglishTemplate(input.formTemplateKey)) return "en";
+  if (isPanamaOpsRole(input)) return "en";
   if (input.jobId !== undefined && isEnglishJobId(input.jobId)) return "en";
   // Respaldo por país o título · una vacante nueva de China no debería quedar
   // en español solo porque nadie se acordó de agregar su id a la lista.
@@ -73,8 +82,7 @@ export function resolveCandidateLang(input: LangInput): CandidateLang {
 
 /** ¿El proceso corre en huso horario de China? Para fechas y horas. */
 export function isChinaProcess(input: LangInput): boolean {
-  // Solo china (no panama_ops u otros EN): Panamá usa America/Panama /
-  // America/Bogota, no Asia/Shanghai.
+  // Solo china (no panama_ops): Panamá usa America/Panama, no Asia/Shanghai.
   const key = String(input.formTemplateKey || "").toLowerCase();
   return (
     key === "china" ||

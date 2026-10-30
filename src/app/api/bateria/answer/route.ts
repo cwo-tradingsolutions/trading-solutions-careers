@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { findItem, ITEMS } from '@/lib/bateria/items';
 import { cerrarSesion } from '@/lib/bateria/cerrar';
+import { isPreviewTestMode, previewTestJson } from '@/lib/preview-mode';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,10 @@ export async function POST(req: NextRequest) {
         { error: 'enlace_ya_presentado', detalle: 'Este enlace ya fue presentado por otra persona. Sus respuestas no se están guardando.' },
         { status: 409 }
       );
+    }
+
+    if (isPreviewTestMode()) {
+      return previewTestJson('POST /api/bateria/answer', { saved: true });
     }
 
     // Marcar el inicio no puede fallar en silencio: si esta escritura no llega,

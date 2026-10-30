@@ -14,6 +14,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected, sendViaGmail } from "@/lib/gmail";
+import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
+import {
+  panamaOpsNoticeLines,
+  panamaPrefilterExpired,
+  scorePanamaOps,
+  type PanamaScore,
+} from "@/lib/panama-ops-prefilter";
 import { recordStageEvent } from "@/lib/stage-events";
 import { resolveCandidateLang, EN_SIGNATURE_NAME } from "@/lib/candidate-lang";
 import { TEMPLATE_ENGLISH_MIN_RANK, TEMPLATE_SALARY_CAP, type TemplateKey } from "@/lib/prefilter-templates";
@@ -223,24 +231,6 @@ function checkEnglishLevel(englishLevel: string | undefined, vacancyId: string, 
 const CHINA_SALARY_CAP_USD = 1500;
 
 /**
- * Tope mensual USD (bruto) para Panama Operations Specialist.
- * Igual que China: sobre el tope = flag/review, NUNCA auto-reject.
- */
-const PANAMA_OPS_SALARY_CAP_USD = 1500;
-
-/** Inglés corto EN (A1–C2). Mínimo soft B1 para panama_ops. */
-const PANAMA_OPS_ENGLISH_RANK: Record<string, number> = {
-  A1: 1,
-  A2: 2,
-  B1: 3,
-  B2: 4,
-  C1: 5,
-  C2: 6,
-};
-const PANAMA_OPS_ENGLISH_MIN_RANK = 3; // B1
-const PANAMA_OPS_YEARS_MIN = 4;
-
-/**
  * Lee un monto o un rango en USD.
  * "USD 2,500" y "2.300" → 2500 / 2300 (el punto de miles no es decimal).
  * "1800-2000" → min 1800, max 2000. "1.500,00" → 1500. Sin número → null.
@@ -320,14 +310,22 @@ export async function GET(
     return NextResponse.json({ error: "already_completed" }, { status: 409 });
   }
 
+  // @ts-expect-error supabase relation
+  const getTemplateKey = String(candidate.ht_vacancies?.form_template_key || "");
+  // Ops PA: the link lasts 7 days from send. An expired click does not
+  // extend it and does not delete the candidate.
+  if (getTemplateKey === "panama_ops" && panamaPrefilterExpired(candidate.prefilter_token_expires_at as string | null)) {
+    return NextResponse.json({ error: "expired" }, { status: 410 });
+  }
+
   // Token evergreen · si el candidato hace click, extendemos 7 días más.
   // Razón: drafts de Gmail pueden sentarse días antes de enviar · si el link
   // expira en el camino, candidato recibe link muerto sin culpa. Cada click
   // del candidato vivo re-activa el reloj.
-  if (candidate.prefilter_token_expires_at) {
+  if (getTemplateKey !== "panama_ops" && candidate.prefilter_token_expires_at) {
     const expires = new Date(candidate.prefilter_token_expires_at as string);
     const now = new Date();
-    if (expires < now || (expires.getTime() - now.getTime()) < 3 * 24 * 60 * 60 * 1000) {
+    if (!isPreviewTestMode() && (expires < now || (expires.getTime() - now.getTime()) < 3 * 24 * 60 * 60 * 1000)) {
       const fresh = new Date();
       fresh.setDate(fresh.getDate() + 7);
       await supabaseAdmin
@@ -373,9 +371,14 @@ export async function POST(
   // @ts-expect-error supabase relation
   const templateKey = String(candidate.ht_vacancies?.form_template_key || "comex");
 
+  if (templateKey === "panama_ops" && panamaPrefilterExpired(candidate.prefilter_token_expires_at as string | null)) {
+    return NextResponse.json({ error: "expired" }, { status: 410 });
+  }
+
   let decision: Decision;
   let rejectionReason: { category: string; sub_detail: string } | null = null;
   let meta: Record<string, unknown>;
+  let panama: PanamaScore | null = null;
   const bloqueos: Bloqueo[] = [];
 
   if (templateKey === "china") {
@@ -456,95 +459,29 @@ export async function POST(
       pipl_consent: true,
     };
   } else if (templateKey === "panama_ops") {
-    // ─── Rama PANAMA OPS · freight knock-outs (EN) ──────────────────
-    //   - Consentimiento privacy EN obligatorio (no PIPL, no habeas CO).
-    //   - Salario (salary_usd) nunca descarta. Sobre el tope (mínimo del
-    //     rango) entra como bloqueo blando y la decisión pasa a revisión.
-    //   - Knock-outs → review flags: work_authorized_panama, onsite_panama_city.
-    //   - Soft mark: years_freight_panama < 4, english below B1.
     if (!isYes(body.privacy_consent)) {
       return NextResponse.json({ error: "privacy_consent_required" }, { status: 400 });
     }
-
-    const englishKey = String(body.english_level || "").trim().toUpperCase();
-    const englishRank = PANAMA_OPS_ENGLISH_RANK[englishKey] ?? 0;
-    const englishFails = englishRank > 0 && englishRank < PANAMA_OPS_ENGLISH_MIN_RANK;
-    const workAuthorized = isYes(body.work_authorized_panama);
-    const onsitePanama = isYes(body.onsite_panama_city);
-    const yearsFreight = Number(body.years_freight_panama ?? 0);
-    const yearsShort = Number.isFinite(yearsFreight) && yearsFreight < PANAMA_OPS_YEARS_MIN;
-
-    if (!workAuthorized) {
+    panama = scorePanamaOps(body);
+    decision = panama.decision;
+    for (const reason of panama.reasons) {
       bloqueos.push({
-        regla: "autorizacion_trabajo",
-        severidad: "duro",
-        categoria: "requisito_excluyente",
-        sub_detail: "sin_autorizacion_trabajo_panama",
-        valor: String(body.work_authorized_panama ?? ""),
+        regla: reason.text,
+        severidad: reason.effect === "knockout" ? "duro" : "blando",
+        categoria: reason.category ?? "",
+        sub_detail: reason.sub_detail ?? reason.text,
+        valor: reason.text,
       });
     }
-    if (!onsitePanama) {
-      bloqueos.push({
-        regla: "disponibilidad_presencial",
-        severidad: "duro",
-        categoria: "requisito_excluyente",
-        sub_detail: "sin_disponibilidad_presencial",
-        valor: String(body.onsite_panama_city ?? ""),
-      });
-    }
-    if (englishFails) {
-      bloqueos.push({
-        regla: "ingles_minimo",
-        severidad: "blando",
-        categoria: "idioma_insuficiente",
-        sub_detail: englishRank <= 2 ? "ingles_a1_a2" : "ingles_b1",
-        valor: String(body.english_level ?? ""),
-      });
-    }
-    if (yearsShort) {
-      bloqueos.push({
-        regla: "anos_freight_panama",
-        severidad: "blando",
-        categoria: "experiencia_insuficiente",
-        sub_detail: "anos_freight_panama",
-        valor: String(body.years_freight_panama ?? ""),
-      });
-    }
-
-    decision = bloqueos.length ? "review" : "pass";
-
-    const salaryRange = parseSalaryRangeUsd(body.salary_usd);
-    const salaryOverBudget = salaryRange !== null && salaryRange.min > PANAMA_OPS_SALARY_CAP_USD;
-    if (salaryOverBudget) {
-      bloqueos.push({
-        regla: "salario_sobre_tope",
-        severidad: "blando",
-        categoria: "pretension_salarial",
-        sub_detail: "salario_sobre_tope",
-        valor: String(body.salary_usd),
-      });
-      if (decision === "pass") decision = "review";
-    }
-
     meta = {
       panama_ops: true,
-      salary_usd_expectation: body.salary_usd ?? null,
-      salary_usd_parsed: salaryRange?.min ?? null,
-      salary_usd_max: salaryRange?.max ?? null,
-      salary_cap_usd: PANAMA_OPS_SALARY_CAP_USD,
-      salary_over_budget: salaryOverBudget,
-      english_min_required_rank: PANAMA_OPS_ENGLISH_MIN_RANK,
-      english_candidate_rank: englishRank,
-      english_fails: englishFails,
-      work_authorized_panama: workAuthorized,
-      onsite_panama_city: onsitePanama,
-      years_freight_panama: yearsFreight,
-      years_freight_short: yearsShort,
-      ocean_fcl_lcl: isYes(body.ocean_fcl_lcl),
-      air_freight: isYes(body.air_freight),
-      bl_awb_docs: isYes(body.bl_awb_docs),
-      warehouse_ftz: isYes(body.warehouse_ftz),
-      privacy_consent: true,
+      decision: panama.decision,
+      decision_label: panama.decisionLabel,
+      stage: panama.stage,
+      reasons: panama.reasons,
+      notice: panamaOpsNoticeLines(panama),
+      salary_usd: null,
+      email_candidate: false,
     };
   } else if (templateKey === "sig_sst") {
     // ─── Rama SIG-SST · credenciales de ley + salario + inglés ──────
@@ -811,7 +748,9 @@ export async function POST(
       sub_detail: rejectionReason.sub_detail,
     });
   }
-  if (decision === "reject") decision = "review";
+  // Ops PA hard knock-outs stay rejected. Every other template still
+  // converts an automatic reject into review (Kelly, 29-sep-2026).
+  if (decision === "reject" && templateKey !== "panama_ops") decision = "review";
 
   // La prioridad ordena la mesa de decision. Arriba lo que puede estar mal y
   // cuesta caro: dato blando con una senal que lo contradice. Abajo el hecho
@@ -828,9 +767,12 @@ export async function POST(
     prioridad_revision: prioridadRevision,
   };
 
+  const storedBody = { ...body } as Record<string, unknown>;
+  if (templateKey === "panama_ops") storedBody.salary_usd = null;
+
   const updates: Record<string, unknown> = {
     prefilter_data: {
-      ...body,
+      ...storedBody,
       _meta: meta,
     },
     prefilter_decision: decision,
@@ -843,8 +785,26 @@ export async function POST(
   // nadie ha revisado es lo que dejo a doce personas esperando en silencio.
 
   // Actualizar stage según decisión
-  if (decision === "pass") updates.stage = "prefiltro_pasado";
+  if (panama) {
+    updates.stage = panama.stage;
+    if (panama.decision === "reject") {
+      updates.rejected_at = new Date().toISOString();
+      updates.rejection_note_private = panama.reasons
+        .filter((reason) => reason.effect === "knockout")
+        .map((reason) => reason.text)
+        .join("; ");
+      const catalogued = panama.reasons.find((reason) => reason.effect === "knockout" && reason.category);
+      if (catalogued) {
+        updates.rejection_category = catalogued.category;
+        updates.rejection_sub_detail = catalogued.sub_detail;
+      }
+    }
+  } else if (decision === "pass") updates.stage = "prefiltro_pasado";
   else if (decision === "review") updates.stage = "prefiltro_revision";
+
+  if (isPreviewTestMode()) {
+    return previewTestJson("POST /api/headhunting/prefilter/[token]", { decision });
+  }
 
   const { error: updateErr } = await supabaseAdmin
     .from("ht_candidates")
@@ -865,7 +825,7 @@ export async function POST(
       toStage: updates.stage as string,
       vacancyId: (candidate.vacancy_id as string) ?? null,
       source: "system",
-      note: `prefiltro: ${decision}`,
+      note: panama ? panamaOpsNoticeLines(panama).join(" · ") : `prefiltro: ${decision}`,
     });
   }
 
@@ -875,6 +835,23 @@ export async function POST(
     if (gmail.connected) {
       // @ts-expect-error supabase relation
       const vacancyTitle = candidate.ht_vacancies?.title || "vacante";
+      if (panama) {
+        const lines = panamaOpsNoticeLines(panama);
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://trading-solutions-careers.vercel.app";
+        await sendViaGmail({
+          to: "jointheteam@tradingsolutions.com",
+          subject: `[Prefiltro ${panama.decisionLabel}] ${candidate.name} · ${vacancyTitle}`,
+          html: `<!DOCTYPE html><html><body style="font-family: Inter, sans-serif; padding: 16px; color: #1a1a1a;">
+            <p><strong>${candidate.name}</strong> completed the Panama Operations prefilter.</p>
+            <p>Recorded decision: <strong>${lines[0]}</strong></p>
+            ${lines.slice(1).length ? `<ul>${lines.slice(1).map((line) => `<li>${line}</li>`).join("")}</ul>` : "<p>No flags.</p>"}
+            <p>No email was sent to the candidate${panama.decision === "reject" ? " (knock-out)." : "."}</p>
+            <p><a href="${baseUrl}/hr-admin?tab=prefiltros">Open HR Admin</a></p>
+          </body></html>`,
+          fromName: ATS_FROM_NAME,
+        });
+        return NextResponse.json({ success: true });
+      }
       const salarioRaw = body.salary || body.salary_usd;
       const salarioTxt = salarioRaw ? String(salarioRaw) : "Salario no informado";
       // Salario desconocido no pinta la ficha de rojo. Revisión amarilla si
