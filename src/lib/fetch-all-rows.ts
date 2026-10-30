@@ -7,9 +7,14 @@
  * El builder de supabase-js se ejecuta una sola vez; reusarlo devolvería la
  * misma página. El orden es estable (`created_at`, luego `id`, salvo que se
  * pase otro) para que una fila no se pierda ni se duplique entre páginas.
- * `pageSize` no puede superar el max-rows del servidor: si la página vuelve
- * más corta por el tope del servidor, el loop cree que ya terminó.
+ *
+ * El offset avanza por las filas recibidas, no por `pageSize`. Así un
+ * max-rows menor que `pageSize` no se confunde con el final de la tabla: se
+ * corta en una página vacía, o en una página corta solo después de haber
+ * visto una página del tamaño pedido (el servidor respetó el range). Si el
+ * servidor ignora el range, el tope de páginas lanza en vez de ciclar.
  */
+export const MAX_PAGES = 200;
 export type RowOrder = { column: string; ascending?: boolean };
 
 interface Pageable<T> {
@@ -35,7 +40,12 @@ export async function fetchAllRows<T>(
   }
 
   const all: T[] = [];
-  for (let from = 0; ; from += pageSize) {
+  let from = 0;
+  // Una página del tamaño pedido prueba que el servidor aplicó el range.
+  // Antes de eso, una página corta puede ser el tope de max-rows.
+  let serverHonorsRange = false;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
     let query = queryBuilderFactory() as Pageable<T>;
     for (const spec of order) {
       query = query.order(spec.column, { ascending: spec.ascending !== false });
@@ -44,7 +54,12 @@ export async function fetchAllRows<T>(
     const { data, error } = await query.range(from, to);
     if (error) throw new Error(error.message);
     const rows = data ?? [];
+    if (rows.length === 0) return all;
     all.push(...rows);
-    if (rows.length < pageSize) return all;
+    if (rows.length < pageSize && serverHonorsRange) return all;
+    if (rows.length === pageSize) serverHonorsRange = true;
+    from += rows.length;
   }
+
+  throw new Error(`fetchAllRows: excedió ${MAX_PAGES} páginas de ${pageSize}`);
 }

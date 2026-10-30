@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { fetchAllRows } from "./fetch-all-rows.ts";
+import { fetchAllRows, MAX_PAGES } from "./fetch-all-rows.ts";
 
 type Row = { id: string; created_at: string };
 
@@ -112,5 +112,101 @@ describe("fetchAllRows", () => {
     const { queryBuilderFactory, calls } = table(rows2500(), 2);
     await assert.rejects(() => fetchAllRows(queryBuilderFactory), /boom/);
     assert.equal(calls.length, 2);
+  });
+
+  it("una tabla vacía devuelve [] en una sola página", async () => {
+    const { queryBuilderFactory, calls } = table([]);
+    const got = await fetchAllRows(queryBuilderFactory);
+    assert.deepEqual(got, []);
+    assert.deepEqual(calls.map((call) => [call.from, call.to]), [[0, 999]]);
+  });
+
+  it("un empate de created_at que cruza 999/1000 no pierde ni duplica", async () => {
+    const tie = "2026-06-15T00:00:00.000Z";
+    const source: Row[] = Array.from({ length: 1001 }, (_, i) => ({
+      id: `c${String(i).padStart(4, "0")}`,
+      created_at: i >= 999 ? tie : new Date(Date.UTC(2026, 0, 1) + i * 60_000).toISOString(),
+    }));
+    const calls: { from: number; order: string[] }[] = [];
+    const queryBuilderFactory = () => {
+      const order: { column: string; ascending: boolean }[] = [];
+      const builder = {
+        order(column: string, options?: { ascending?: boolean }) {
+          order.push({ column, ascending: options?.ascending !== false });
+          return builder;
+        },
+        range(from: number, to: number) {
+          const snapshot = order.map((spec) => ({ ...spec }));
+          calls.push({ from, order: snapshot.map((spec) => spec.column) });
+          const decorated = source.map((row, index) => ({ row, index }));
+          const hasId = snapshot.some((spec) => spec.column === "id");
+          decorated.sort((a, b) => {
+            for (const spec of snapshot) {
+              const av = a.row[spec.column as keyof Row];
+              const bv = b.row[spec.column as keyof Row];
+              if (av < bv) return spec.ascending ? -1 : 1;
+              if (av > bv) return spec.ascending ? 1 : -1;
+            }
+            // Sin id, cada página desempata al revés: el par del borde se duplica y se pierde.
+            if (hasId) return 0;
+            return (a.index - b.index) * (from === 0 ? 1 : -1);
+          });
+          return Promise.resolve({
+            data: decorated.map((item) => item.row).slice(from, to + 1),
+            error: null,
+          });
+        },
+      };
+      return builder;
+    };
+
+    const got = await fetchAllRows<Row>(queryBuilderFactory);
+    assert.deepEqual(calls[0]?.order, ["created_at", "id"]);
+    assert.equal(got.length, source.length);
+    assert.equal(new Set(got.map((row) => row.id)).size, source.length);
+    assert.equal(got[999]?.id, "c0999");
+    assert.equal(got[1000]?.id, "c1000");
+    assert.deepEqual(got, source);
+  });
+
+  it("sigue leyendo cuando max-rows es menor que pageSize", async () => {
+    const source: Row[] = Array.from({ length: 1200 }, (_, i) => ({
+      id: `c${String(i).padStart(4, "0")}`,
+      created_at: new Date(Date.UTC(2026, 0, 1) + i * 1000).toISOString(),
+    }));
+    const maxRows = 500;
+    const calls: number[] = [];
+    const queryBuilderFactory = () => {
+      const builder = {
+        order() {
+          return builder;
+        },
+        range(from: number, to: number) {
+          calls.push(from);
+          const window = source.slice(from, to + 1).slice(0, maxRows);
+          return Promise.resolve({ data: window, error: null });
+        },
+      };
+      return builder;
+    };
+
+    const got = await fetchAllRows<Row>(queryBuilderFactory, 1000);
+    assert.deepEqual(got, source);
+    assert.deepEqual(calls, [0, 500, 1000, 1200]);
+  });
+
+  it("lanza al llegar al tope de páginas si el servidor ignora el range", async () => {
+    let calls = 0;
+    const queryBuilderFactory = () => ({
+      order() {
+        return this;
+      },
+      range() {
+        calls += 1;
+        return Promise.resolve({ data: [{ id: "x", created_at: "t" }], error: null });
+      },
+    });
+    await assert.rejects(() => fetchAllRows(queryBuilderFactory, 1), new RegExp(String(MAX_PAGES)));
+    assert.equal(calls, MAX_PAGES);
   });
 });

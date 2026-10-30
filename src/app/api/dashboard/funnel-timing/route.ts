@@ -112,19 +112,26 @@ export async function GET(req: NextRequest) {
       // Índice por id: buscar con .find() dentro del loop era O(candidatos ×
       // eventos), y la siembra deja varios eventos por candidato.
       const byId = new Map<string, any>(live.map((c: any) => [c.id, c]));
-      // changed_at desc: el primero de cada candidato es el más reciente.
-      // Esta tabla no tiene created_at; id desempata timestamps iguales.
-      const events = await fetchAllRows(() =>
-        supabaseAdmin
-          .from("ht_candidate_stage_events")
-          .select("candidate_id, to_stage, changed_at, source")
-          .in("candidate_id", Array.from(byId.keys())),
-        1000,
-        [
-          { column: "changed_at", ascending: false },
-          { column: "id", ascending: true },
-        ],
-      );
+      // Tandas de 150: un .in() con todos los ids vivos no cabe en la URL y,
+      // repetido en cada página, un 414 tumbaría toda la sección.
+      // changed_at desc dentro de cada tanda: el primero de cada candidato es
+      // el más reciente. Esta tabla no tiene created_at; id desempata.
+      const events: any[] = [];
+      const liveIds = Array.from(byId.keys());
+      for (let i = 0; i < liveIds.length; i += 150) {
+        const slice = liveIds.slice(i, i + 150);
+        events.push(...await fetchAllRows(() =>
+          supabaseAdmin
+            .from("ht_candidate_stage_events")
+            .select("candidate_id, to_stage, changed_at, source")
+            .in("candidate_id", slice),
+          1000,
+          [
+            { column: "changed_at", ascending: false },
+            { column: "id", ascending: true },
+          ],
+        ));
+      }
 
       for (const ev of (events || []) as any[]) {
         const cand = byId.get(ev.candidate_id);
@@ -140,13 +147,18 @@ export async function GET(req: NextRequest) {
     // ── Sub-pruebas pendientes ───────────────────────────────────
     const testsByCandidate = new Map<string, any[]>();
     if (live.length > 0) {
-      const tests = await fetchAllRows(() =>
-        supabaseAdmin
-          .from("ht_candidate_tests")
-          .select("candidate_id, test_id, status, sent_at, completed_at")
-          .in("candidate_id", live.map((c: any) => c.id))
-          .in("status", ["pendiente", "enviada"]),
-      );
+      const tests: any[] = [];
+      const testIds = live.map((c: any) => c.id as string);
+      for (let i = 0; i < testIds.length; i += 150) {
+        const slice = testIds.slice(i, i + 150);
+        tests.push(...await fetchAllRows(() =>
+          supabaseAdmin
+            .from("ht_candidate_tests")
+            .select("candidate_id, test_id, status, sent_at, completed_at")
+            .in("candidate_id", slice)
+            .in("status", ["pendiente", "enviada"]),
+        ));
+      }
       for (const t of tests || []) {
         const arr = testsByCandidate.get((t as any).candidate_id) || [];
         arr.push(t);
