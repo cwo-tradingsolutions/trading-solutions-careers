@@ -364,6 +364,163 @@ describe("TTF, TTH, aging y drill", () => {
   });
 });
 
+describe("costo salarial base", () => {
+  it("salario / 30 × días, sin created_at, y no publica el salario", () => {
+    const d = buildDashboard(exampleInput());
+    const cop = d.kpis.salaryCost.byCurrency.find((c) => c.currency === "COP")!;
+    const usd = d.kpis.salaryCost.byCurrency.find((c) => c.currency === "USD")!;
+    assert.equal(d.kpis.salaryCost.formula, "salario mensual / 30 × días abierta");
+    assert.equal(d.kpis.salaryCost.openTotal, 6);
+    assert.equal(d.kpis.salaryCost.openWithSalary, 2);
+    assert.equal(d.kpis.salaryCost.partialCoverage, true);
+    assert.equal(d.kpis.cost.placeholder, true);
+    assert.ok(Math.abs((cop.openAvgDaily ?? 0) - 4_000_000 / 30) < 1e-6);
+    assert.ok(Math.abs((cop.openAccumulated ?? 0) - (4_000_000 / 30) * 10) < 1e-4);
+    assert.equal(cop.closedN, 5);
+    assert.equal(cop.closedInsufficient, false);
+    assert.ok(Math.abs((cop.closedAccumulated ?? 0) - (3_000_000 / 30) * 136) < 1e-2);
+    assert.ok(Math.abs((usd.openAccumulated ?? 0) - 1_900) < 1e-6);
+    assert.notEqual(cop.openAccumulated, (cop.openAccumulated ?? 0) + (usd.openAccumulated ?? 0));
+
+    const abierta = d.vacancies.find((v) => v.id === "v7")!;
+    assert.equal(abierta.open, true);
+    assert.equal(abierta.cost.salarySource, "tope_interno");
+    assert.equal(abierta.cost.currency, "COP");
+    assert.equal(JSON.stringify(abierta).includes("monthly"), false);
+    assert.equal(JSON.stringify(abierta).includes("4000000"), false);
+    const rango = d.vacancies.find((v) => v.id === "v8")!;
+    assert.equal(rango.cost.salarySource, "punto_medio_rango");
+    assert.equal(rango.cost.currency, "USD");
+    const sin = d.vacancies.find((v) => v.id === "v9")!;
+    assert.equal(sin.cost.salarySource, "sin_dato");
+    assert.equal(sin.cost.sinDato, "sin_salario");
+    assert.equal(sin.cost.dailyCost, null);
+
+    const drill = buildDrill(exampleInput(), "v7");
+    const packed = JSON.stringify(drill);
+    assert.equal(packed.includes("monthly"), false);
+    assert.equal(packed.includes("salary_cap"), false);
+    assert.equal(packed.includes("4000000"), false);
+    assert.equal(d.vacancies.filter((v) => v.open).length, 6);
+    assert.equal(d.vacancies.filter((v) => !v.open && v.cost.costToDate != null).length, 5);
+  });
+
+  it("sin hr_request_date es sin dato y una cerrada corta en closed_at", () => {
+    const input = baseInput();
+    input.now = at(40);
+    input.vacancies = [
+      {
+        id: "abierta",
+        title: "Sin hito",
+        area: "A",
+        country: "Colombia",
+        status: "open",
+        owner_recruiter_id: null,
+        salary_cap_amount: 3_000_000,
+        salary_cap_currency: "COP",
+      },
+      {
+        id: "corte",
+        title: "Cerrada",
+        area: "A",
+        country: "Colombia",
+        status: "closed",
+        owner_recruiter_id: null,
+        closed_at: at(10),
+        salary_texts: ["2.000.000 – 4.000.000 COP"],
+      },
+      {
+        id: "sin-corte",
+        title: "Sin cierre",
+        area: "A",
+        country: "Colombia",
+        status: "closed",
+        owner_recruiter_id: null,
+        salary_cap_amount: 3_000_000,
+        salary_cap_currency: "COP",
+      },
+      {
+        id: "un-extremo",
+        title: "Un extremo",
+        area: "A",
+        country: "Colombia",
+        status: "open",
+        owner_recruiter_id: null,
+        salary_texts: ["4.000.000 COP"],
+      },
+    ];
+    input.milestones = [
+      { vacancy_id: "corte", hr_request_date: at(0), hire_date: null },
+      { vacancy_id: "sin-corte", hr_request_date: at(0), hire_date: null },
+      { vacancy_id: "un-extremo", hr_request_date: at(0), hire_date: null },
+    ];
+    const d = buildDashboard(input);
+    const sinHito = d.vacancies.find((v) => v.id === "abierta")!;
+    assert.equal(sinHito.cost.sinDato, "sin_hito");
+    assert.equal(sinHito.cost.costToDate, null);
+    assert.equal(sinHito.cost.daysOpen, null);
+    assert.equal(sinHito.cost.salarySource, "tope_interno");
+    const corte = d.vacancies.find((v) => v.id === "corte")!;
+    assert.equal(corte.cost.salarySource, "punto_medio_rango");
+    assert.ok(Math.abs((corte.cost.costToDate ?? 0) - (3_000_000 / 30) * 10) < 1e-4);
+    assert.equal(corte.open, false);
+    const sinCorte = d.vacancies.find((v) => v.id === "sin-corte")!;
+    assert.equal(sinCorte.cost.sinDato, "sin_cierre");
+    assert.equal(sinCorte.cost.costToDate, null);
+    const unExtremo = d.vacancies.find((v) => v.id === "un-extremo")!;
+    assert.equal(unExtremo.cost.salarySource, "sin_dato");
+    assert.equal(unExtremo.cost.dailyCost, null);
+    const cop = d.kpis.salaryCost.byCurrency.find((c) => c.currency === "COP")!;
+    assert.equal(cop.closedN, 1);
+    assert.equal(cop.closedAccumulated, null);
+    assert.equal(d.kpis.salaryCost.openWithSalary, 1);
+    assert.equal(d.kpis.salaryCost.openTotal, 2);
+  });
+
+  it("el canal deja fuera una vacante sin candidatos de ese canal", () => {
+    const input = baseInput();
+    input.now = at(30);
+    input.filters = { ...emptyFilters(), source: "LinkedIn" };
+    input.vacancies = [
+      {
+        id: "li",
+        title: "Con LinkedIn",
+        area: "A",
+        country: "Colombia",
+        status: "open",
+        owner_recruiter_id: null,
+        salary_cap_amount: 3_000_000,
+        salary_cap_currency: "COP",
+      },
+      {
+        id: "ref",
+        title: "Solo referido",
+        area: "A",
+        country: "Colombia",
+        status: "open",
+        owner_recruiter_id: null,
+        salary_cap_amount: 6_000_000,
+        salary_cap_currency: "COP",
+      },
+    ];
+    input.milestones = [
+      { vacancy_id: "li", hr_request_date: at(0), hire_date: null },
+      { vacancy_id: "ref", hr_request_date: at(0), hire_date: null },
+    ];
+    input.candidates = [
+      { id: "a", name: "A", vacancy_id: "li", stage: "aplico", source: "LinkedIn", created_at: at(1), rejected: false },
+      { id: "b", name: "B", vacancy_id: "ref", stage: "aplico", source: "Referido", created_at: at(1), rejected: false },
+    ];
+    const d = buildDashboard(input);
+    assert.equal(d.kpis.salaryCost.openTotal, 1);
+    assert.equal(d.vacancies.find((v) => v.id === "ref")?.inCostScope, false);
+    assert.equal(d.vacancies.find((v) => v.id === "li")?.inCostScope, true);
+    const cop = d.kpis.salaryCost.byCurrency[0];
+    assert.ok(Math.abs((cop.openAccumulated ?? 0) - (3_000_000 / 30) * 30) < 1e-2);
+    assert.ok((cop.openAccumulated ?? 0) < (6_000_000 / 30) * 30);
+  });
+});
+
 function baseInput(): DashboardInput {
   return {
     candidates: [],

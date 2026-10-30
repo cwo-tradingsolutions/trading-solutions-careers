@@ -22,6 +22,16 @@ import {
   stageSla,
   type KellyGate,
 } from "../stage-labels";
+import {
+  FORMULA_COSTO,
+  benefitsMultiplier,
+  dailyFromMonthly,
+  resolveSalary,
+  type SalaryCurrency,
+  type SalarySource,
+} from "./salary";
+
+export type { SalaryCurrency, SalarySource } from "./salary";
 
 export const MIN_N = 5;
 export const SIN_CANAL = "Sin canal";
@@ -70,6 +80,13 @@ export type DashVacancy = {
   country: string | null;
   status: string | null;
   owner_recruiter_id: string | null;
+  /** Fecha en que se cerró sin contratación. No se inventa con created_at ni updated_at. */
+  closed_at?: string | null;
+  /** Tope mensual numérico ya en una moneda. null si no hay. */
+  salary_cap_amount?: number | null;
+  salary_cap_currency?: SalaryCurrency | null;
+  /** Rangos en texto, en orden. El primero que tenga dos extremos gana. */
+  salary_texts?: (string | null)[];
 };
 
 export type DashMilestone = {
@@ -155,6 +172,26 @@ export type MonthPoint = {
   tthN: number;
 };
 
+export type VacancyCost = {
+  salarySource: SalarySource;
+  currency: SalaryCurrency | null;
+  daysOpen: number | null;
+  dailyCost: number | null;
+  costToDate: number | null;
+  /** null cuando hay costo a la fecha. */
+  sinDato: "sin_salario" | "sin_hito" | "sin_cierre" | null;
+};
+
+export type CurrencyCost = {
+  currency: SalaryCurrency;
+  openAccumulated: number | null;
+  openAvgDaily: number | null;
+  openWithDaily: number;
+  closedAccumulated: number | null;
+  closedN: number;
+  closedInsufficient: boolean;
+};
+
 export type VacancyRow = {
   id: string;
   title: string;
@@ -169,6 +206,9 @@ export type VacancyRow = {
   bottleneck: string | null;
   candidates: number;
   overSla: number;
+  /** Entra al costo cuando pasa vacante, área, país, recruiter y canal. */
+  inCostScope: boolean;
+  cost: VacancyCost;
 };
 
 export type DrillRow = {
@@ -201,7 +241,15 @@ export type DashboardPayload = {
     };
     conversion: Metric & { num: number; den: number };
     quality90: { placeholder: true; note: string };
+    /** Costo de reclutamiento. Sigue sin monto. No es el costo salarial. */
     cost: { placeholder: true; note: string };
+    salaryCost: {
+      formula: string;
+      openWithSalary: number;
+      openTotal: number;
+      partialCoverage: boolean;
+      byCurrency: CurrencyCost[];
+    };
   };
   funnel: FunnelRow[];
   slaBars: SlaBar[];
@@ -522,6 +570,67 @@ function vacancyOk(v: DashVacancy, f: DashFilters): boolean {
 
 type Core = Omit<DashboardPayload, "example" | "options" | "gaps"> & { _ttfPrev?: never };
 
+function emptyCost(sinDato: VacancyCost["sinDato"]): VacancyCost {
+  return {
+    salarySource: "sin_dato",
+    currency: null,
+    daysOpen: null,
+    dailyCost: null,
+    costToDate: null,
+    sinDato,
+  };
+}
+
+/**
+ * Días abiertas: solo desde hr_request_date. Sin ese hito, sin dato
+ * (no se usa created_at). El corte es hire_date, o la fecha de cierre
+ * si se cerró sin contratación, o hoy si sigue abierta.
+ */
+function costOfVacancy(v: DashVacancy, milestone: DashMilestone | undefined, asOf: string): VacancyCost {
+  const resolved = resolveSalary({
+    capAmount: v.salary_cap_amount ?? null,
+    capCurrency: v.salary_cap_currency ?? null,
+    texts: v.salary_texts ?? [],
+  });
+  const start = milestone?.hr_request_date ?? null;
+  const hire = milestone?.hire_date ?? null;
+  const open = v.status === "open";
+  const end = hire || (open ? asOf : v.closed_at || null);
+  const days = start && end ? daySpan(start, end) : null;
+  if (resolved.source === "sin_dato" || resolved.monthly == null || !resolved.currency) {
+    return { ...emptyCost("sin_salario"), daysOpen: days };
+  }
+  const daily = dailyFromMonthly(resolved.monthly, benefitsMultiplier(v.country));
+  if (!start) {
+    return {
+      salarySource: resolved.source,
+      currency: resolved.currency,
+      daysOpen: null,
+      dailyCost: daily,
+      costToDate: null,
+      sinDato: "sin_hito",
+    };
+  }
+  if (!end) {
+    return {
+      salarySource: resolved.source,
+      currency: resolved.currency,
+      daysOpen: null,
+      dailyCost: daily,
+      costToDate: null,
+      sinDato: "sin_cierre",
+    };
+  }
+  return {
+    salarySource: resolved.source,
+    currency: resolved.currency,
+    daysOpen: days,
+    dailyCost: daily,
+    costToDate: daily * (days ?? 0),
+    sinDato: null,
+  };
+}
+
 function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): Core {
   const asOf = input.now;
   const vacs = input.vacancies.filter((v) => vacancyOk(v, filters));
@@ -757,6 +866,68 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
   const agingMed = median(agingDays);
   const agingPacked = pack(agingMed, agingDays.length);
 
+  // ── Costo salarial base. Respeta vacante, área, país, recruiter y canal.
+  //    El canal deja afuera una vacante sin candidatos de ese canal.
+  //    La fecha del filtro no mueve esta foto.
+  const costScope = new Set<string>();
+  if (filters.source) {
+    for (const row of scoped) costScope.add(row.c.vacancy_id);
+  } else {
+    for (const v of vacs) costScope.add(v.id);
+  }
+  const costByVac = new Map<string, VacancyCost>();
+  for (const v of vacs) costByVac.set(v.id, costOfVacancy(v, prep.milestoneByVac.get(v.id), asOf));
+
+  const openScoped = vacs.filter((v) => v.status === "open" && costScope.has(v.id));
+  const openWithSalary = openScoped.filter((v) => costByVac.get(v.id)?.salarySource !== "sin_dato");
+  type CostBucket = {
+    accumulated: number;
+    accN: number;
+    dailySum: number;
+    dailyN: number;
+    closedSum: number;
+    closedN: number;
+  };
+  const buckets = new Map<SalaryCurrency, CostBucket>();
+  const bucket = (currency: SalaryCurrency): CostBucket => {
+    let cur = buckets.get(currency);
+    if (!cur) {
+      cur = { accumulated: 0, accN: 0, dailySum: 0, dailyN: 0, closedSum: 0, closedN: 0 };
+      buckets.set(currency, cur);
+    }
+    return cur;
+  };
+  for (const v of openScoped) {
+    const c = costByVac.get(v.id);
+    if (!c?.currency || c.dailyCost == null || c.salarySource === "sin_dato") continue;
+    const b = bucket(c.currency);
+    b.dailySum += c.dailyCost;
+    b.dailyN += 1;
+    if (c.costToDate != null && c.sinDato == null) {
+      b.accumulated += c.costToDate;
+      b.accN += 1;
+    }
+  }
+  for (const v of vacs) {
+    if (!costScope.has(v.id) || v.status === "open") continue;
+    const c = costByVac.get(v.id);
+    if (!c?.currency || c.costToDate == null || c.sinDato != null) continue;
+    const b = bucket(c.currency);
+    b.closedSum += c.costToDate;
+    b.closedN += 1;
+  }
+  const byCurrency: CurrencyCost[] = [...buckets.entries()]
+    .map(([currency, b]) => ({
+      currency,
+      openAccumulated: b.accN > 0 ? b.accumulated : null,
+      openAvgDaily: b.dailyN > 0 ? b.dailySum / b.dailyN : null,
+      openWithDaily: b.dailyN,
+      closedAccumulated: b.closedN >= MIN_N ? b.closedSum : null,
+      closedN: b.closedN,
+      closedInsufficient: b.closedN < MIN_N,
+    }))
+    .sort((a, b) => a.currency.localeCompare(b.currency));
+
   // ── Tabla. El filtro de etapa recorta candidatos, no la vacante. ──
   const vacancies: VacancyRow[] = vacs.map((v) => {
     const people = enriched.filter(
@@ -813,6 +984,8 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
       bottleneck: bottleneck && bottleneck.n > 0 ? bottleneck.label : null,
       candidates: people.length,
       overSla,
+      inCostScope: costScope.has(v.id),
+      cost: costByVac.get(v.id) ?? emptyCost("sin_salario"),
     };
   });
   vacancies.sort((a, b) => {
@@ -883,6 +1056,13 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
         placeholder: true,
         note: "Próximamente. No hay campo de monto por vacante (3.1 / 3.2).",
       },
+      salaryCost: {
+        formula: FORMULA_COSTO,
+        openWithSalary: openWithSalary.length,
+        openTotal: openScoped.length,
+        partialCoverage: openScoped.length > 0 && openWithSalary.length / openScoped.length < 0.5,
+        byCurrency,
+      },
     },
     funnel,
     slaBars,
@@ -903,7 +1083,8 @@ function compute(input: DashboardInput, prep: Prepared, filters: DashFilters): C
 
 const GAPS = [
   "Calidad @90d vive en Buk: no hay puente ATS↔Buk.",
-  "Costo por vacante: el ATS no tiene campo de monto.",
+  "Costo de reclutamiento: no hay fee por vacante. El costo salarial base es otra cuenta y solo usa un salario que ya esté guardado.",
+  "Costo salarial base: sin hr_request_date es sin dato. Una cerrada sin hire_date corta en closed_at; si esa fecha no existe, también es sin dato.",
   "Gates 6 Psicométricas y 8 Entrevista HM no tienen código de escritura. Se muestran con «sin código aún» y no entran a la conversión.",
   "No existe tabla de ofertas: la aceptación sale de los eventos de etapa (gate ≥10 y gate 12).",
   "Eventos source=backfill no entran al SLA: la fecha es reconstruida.",
@@ -997,15 +1178,19 @@ export function exampleInput(): DashboardInput {
   const now = "2026-10-29T12:00:00.000Z";
   const day = (offset: number) => new Date(new Date(now).getTime() + offset * DIA).toISOString();
   const recruiters: DashRecruiter[] = [{ id: "rec-1", nombre: "Kelly Castañeda" }];
+  const cap = (amount: number): Pick<DashVacancy, "salary_cap_amount" | "salary_cap_currency"> => ({
+    salary_cap_amount: amount,
+    salary_cap_currency: "COP",
+  });
   const vacancies: DashVacancy[] = [
-    { id: "v1", title: "Analista de datos", area: "Datos", country: "Colombia", status: "closed", owner_recruiter_id: "rec-1" },
-    { id: "v2", title: "Ejecutivo comercial", area: "Comercial", country: "Colombia", status: "closed", owner_recruiter_id: "rec-1" },
-    { id: "v3", title: "Full stack", area: "Tecnología", country: "México", status: "closed", owner_recruiter_id: "rec-1" },
-    { id: "v4", title: "People partner", area: "Talento", country: null, status: "closed", owner_recruiter_id: "rec-1" },
-    { id: "v5", title: "Controller", area: "Finanzas", country: "Colombia", status: "closed", owner_recruiter_id: null },
+    { id: "v1", title: "Analista de datos", area: "Datos", country: "Colombia", status: "closed", owner_recruiter_id: "rec-1", ...cap(3_000_000) },
+    { id: "v2", title: "Ejecutivo comercial", area: "Comercial", country: "Colombia", status: "closed", owner_recruiter_id: "rec-1", ...cap(3_000_000) },
+    { id: "v3", title: "Full stack", area: "Tecnología", country: "México", status: "closed", owner_recruiter_id: "rec-1", ...cap(3_000_000) },
+    { id: "v4", title: "People partner", area: "Talento", country: null, status: "closed", owner_recruiter_id: "rec-1", ...cap(3_000_000) },
+    { id: "v5", title: "Controller", area: "Finanzas", country: "Colombia", status: "closed", owner_recruiter_id: null, ...cap(3_000_000) },
     { id: "v6", title: "CSM Andino", area: "Cliente", country: "Perú", status: "closed", owner_recruiter_id: "rec-1" },
-    { id: "v7", title: "SDR Norte", area: "Comercial", country: "México", status: "open", owner_recruiter_id: "rec-1" },
-    { id: "v8", title: "Analista SIG", area: "Operaciones", country: null, status: "open", owner_recruiter_id: "rec-1" },
+    { id: "v7", title: "SDR Norte", area: "Comercial", country: "México", status: "open", owner_recruiter_id: "rec-1", ...cap(4_000_000) },
+    { id: "v8", title: "Analista SIG", area: "Operaciones", country: null, status: "open", owner_recruiter_id: "rec-1", salary_texts: ["1.800 – 2.000 USD"] },
     { id: "v9", title: "Backend", area: "Tecnología", country: "Colombia", status: "open", owner_recruiter_id: null },
     { id: "v10", title: "Finance analyst", area: "Finanzas", country: "Colombia", status: "open", owner_recruiter_id: "rec-1" },
     { id: "v11", title: "Diseñador", area: "Producto", country: "Colombia", status: "open", owner_recruiter_id: "rec-1" },

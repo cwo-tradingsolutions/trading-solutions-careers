@@ -28,15 +28,7 @@ import { batteryAutoSendEnabled, NOTA_BATERIA_PENDIENTE } from "@/lib/battery-au
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { TEMPLATE_ENGLISH_MIN_RANK, TEMPLATE_SALARY_CAP, type TemplateKey } from "@/lib/prefilter-templates";
 import { etiquetaAvisoPrefiltro, textoSalarioAviso } from "@/lib/prefilter-salary";
-
-// Techos por vacancy_id (en COP mensuales)
-const SALARY_CAPS: Record<string, number> = {
-  "368006e7-98da-46a2-b871-6b741290821b": 4_000_000, // Pricing Senior
-  "c25ce70b-9244-4393-aea6-75372a99a6ef": 4_000_000, // Inside Sales
-  "6e4838dd-8aea-4426-bd26-ea588f0f493a": 3_000_000, // Customer Documentation
-  "d354c55a-eb1c-4aee-bd02-b0a20162e1f1": 3_500_000, // Pricing Junior
-  "8c246bb3-8244-4755-bf92-58c0c627821c": 6_000_000, // Lead Accounting Finance
-};
+import { PREFILTER_SALARY_CAPS_COP as SALARY_CAPS } from "@/lib/prefilter-salary-caps";
 
 const SALARY_LOWER: Record<string, number> = {
   "< 3 M": 0,

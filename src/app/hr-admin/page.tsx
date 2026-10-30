@@ -1,5 +1,6 @@
 "use client";
 
+import FunnelDashboard from "@/components/FunnelDashboard";
 import FunnelTiming from "@/components/FunnelTiming";
 import RubricasPanel from "@/components/RubricasPanel";
 import NueveBoxPanel from "@/components/NueveBoxPanel";
@@ -1269,6 +1270,29 @@ type ImportResult = {
 };
 
 function Dashboard({ setTab }: { setTab: (t: Tab) => void }) {
+  const [ops, setOps] = useState(false);
+  return (
+    <div>
+      <FunnelDashboard />
+      <div className="mt-10 pt-6 border-t border-[color:var(--ts-line)]">
+        <button
+          type="button"
+          aria-expanded={ops}
+          onClick={() => setOps((v) => !v)}
+          className="rounded-full border border-[color:var(--ts-line)] bg-white px-4 py-1.5 text-[13px] font-medium text-[var(--ts-ink)]"
+        >
+          Operación del día
+        </button>
+        <p className="mt-2 text-[12px] text-[var(--ts-muted)] max-w-[640px]">
+          Tiempos de hoy, batería y el estudio de las vacantes abiertas.
+        </p>
+        {ops && <OperacionDelDia setTab={setTab} />}
+      </div>
+    </div>
+  );
+}
+
+function OperacionDelDia({ setTab }: { setTab: (t: Tab) => void }) {
   // ── Dashboard v4 · 18-ago-2026 ────────────────────────────────
   // Kelly lo redujo a dos cosas: dónde se está quedando la gente, y qué
   // necesita cada vacante abierta. Todo lo demás (Today's Focus, Source

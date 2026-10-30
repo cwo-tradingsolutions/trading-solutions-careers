@@ -1,4 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase";
+import { PREFILTER_SALARY_CAPS_COP } from "@/lib/prefilter-salary-caps";
+import { VACANCY_MAP } from "@/lib/vacancy-map";
 import {
   buildDashboard,
   buildDrill,
@@ -7,6 +9,7 @@ import {
   type DashFilters,
   type DashboardInput,
   type DashboardPayload,
+  type SalaryCurrency,
 } from "./metrics";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
@@ -49,13 +52,7 @@ export async function loadDashboardInput(clientId: string, filters: DashFilters)
     candRows = candRows.map((r) => ({ ...r, source: null }));
   }
 
-  const vacancies = await pages((from, to) =>
-    supabaseAdmin
-      .from("ht_vacancies")
-      .select("id, title, area, country, status, owner_recruiter_id")
-      .eq("client_id", clientId)
-      .range(from, to),
-  );
+  const vacancies = await loadVacancyRows(clientId);
 
   const vacIds = vacancies.map((v) => String(v.id));
   const candIds = candRows.map((c) => String(c.id));
@@ -113,20 +110,28 @@ export async function loadDashboardInput(clientId: string, filters: DashFilters)
   }
 
   const str = (v: unknown) => (v == null ? null : String(v));
+  const salaries = await loadSalaries(clientId, vacancies);
 
   return {
     filters,
     now: new Date().toISOString(),
     agingTargetDays,
     recruiters,
-    vacancies: vacancies.map((v) => ({
-      id: String(v.id),
-      title: String(v.title ?? "Sin título"),
-      area: str(v.area),
-      country: str(v.country),
-      status: str(v.status),
-      owner_recruiter_id: str(v.owner_recruiter_id),
-    })),
+    vacancies: vacancies.map((v) => {
+      const pay = salaries.get(String(v.id));
+      return {
+        id: String(v.id),
+        title: String(v.title ?? "Sin título"),
+        area: str(v.area),
+        country: str(v.country),
+        status: str(v.status),
+        owner_recruiter_id: str(v.owner_recruiter_id),
+        closed_at: str(v.closed_at),
+        salary_cap_amount: pay?.amount ?? null,
+        salary_cap_currency: pay?.currency ?? null,
+        salary_texts: pay?.texts ?? [],
+      };
+    }),
     milestones: milestones.map((m) => ({
       vacancy_id: String(m.vacancy_id),
       hr_request_date: str(m.hr_request_date),
@@ -148,6 +153,108 @@ export async function loadDashboardInput(clientId: string, filters: DashFilters)
       source: str(e.source),
     })),
   };
+}
+
+async function loadVacancyRows(clientId: string): Promise<Record<string, unknown>[]> {
+  const attempts = [
+    "id, title, area, country, status, owner_recruiter_id, requisition_id, closed_at",
+    "id, title, area, country, status, owner_recruiter_id, requisition_id",
+    "id, title, area, country, status, owner_recruiter_id",
+  ];
+  let last: unknown;
+  for (const cols of attempts) {
+    try {
+      return await pages((from, to) =>
+        supabaseAdmin.from("ht_vacancies").select(cols).eq("client_id", clientId).range(from, to),
+      );
+    } catch (err) {
+      last = err;
+    }
+  }
+  throw last instanceof Error ? last : new Error("No se pudieron leer las vacantes");
+}
+
+function positiveAmount(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+  if (typeof value === "string" && /^\d+(\.\d+)?$/.test(value.trim())) {
+    const n = Number(value);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
+
+/**
+ * Salario de la vacante, en este orden, sin columnas nuevas:
+ * 1. ht_requisitions.salary_cap_cop (tope interno, COP), por requisition_id o vacancy_id
+ * 2. el tope que el prefiltro ya tiene por vacancy_id (PREFILTER_SALARY_CAPS_COP)
+ * 3. textos: salary_public y, si hay DATABASE_URL, vacancies.salary_range de Neon
+ *    vía VACANCY_MAP. El punto medio solo entra si el texto tiene dos extremos
+ *    y moneda COP o USD. Si nada de eso se puede leer, el cálculo dice sin dato.
+ */
+async function loadSalaries(
+  clientId: string,
+  vacancies: Record<string, unknown>[],
+): Promise<Map<string, { amount: number | null; currency: SalaryCurrency | null; texts: string[] }>> {
+  const out = new Map<string, { amount: number | null; currency: SalaryCurrency | null; texts: string[] }>();
+  let reqs: Record<string, unknown>[] = [];
+  try {
+    reqs = await pages((from, to) =>
+      supabaseAdmin
+        .from("ht_requisitions")
+        .select("id, vacancy_id, salary_cap_cop, salary_public")
+        .eq("client_id", clientId)
+        .range(from, to),
+    );
+  } catch {
+    reqs = [];
+  }
+  const byReq = new Map<string, { amount: number | null; text: string | null }>();
+  const byVac = new Map<string, { amount: number | null; text: string | null }>();
+  for (const row of reqs) {
+    const pack = {
+      amount: positiveAmount(row.salary_cap_cop),
+      text: row.salary_public ? String(row.salary_public) : null,
+    };
+    byReq.set(String(row.id), pack);
+    if (row.vacancy_id) byVac.set(String(row.vacancy_id), pack);
+  }
+
+  const jobText = await loadJobSalaryRanges(vacancies.map((v) => String(v.id)));
+  for (const v of vacancies) {
+    const id = String(v.id);
+    const linked =
+      (v.requisition_id ? byReq.get(String(v.requisition_id)) : undefined) || byVac.get(id) || null;
+    const cap = linked?.amount ?? PREFILTER_SALARY_CAPS_COP[id] ?? null;
+    const texts = [linked?.text, jobText.get(id)].filter((t): t is string => Boolean(t));
+    out.set(id, { amount: cap, currency: cap ? "COP" : null, texts });
+  }
+  return out;
+}
+
+async function loadJobSalaryRanges(vacancyIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const pairs = Object.entries(VACANCY_MAP)
+    .map(([jobId, vacancyId]) => ({ jobId: Number(jobId), vacancyId }))
+    .filter((p) => vacancyIds.includes(p.vacancyId) && Number.isFinite(p.jobId));
+  if (pairs.length === 0 || !process.env.DATABASE_URL) return out;
+  try {
+    const { neon } = await import("@/lib/sql");
+    const sql = neon(process.env.DATABASE_URL);
+    const ids = pairs.map((p) => p.jobId);
+    const marks = ids.map((_, i) => `$${i + 1}`).join(", ");
+    const rows = await sql(`SELECT id, salary_range FROM vacancies WHERE id IN (${marks})`, ids);
+    const byJob = new Map<number, string>();
+    for (const row of rows as { id: unknown; salary_range: unknown }[]) {
+      if (row.salary_range) byJob.set(Number(row.id), String(row.salary_range));
+    }
+    for (const pair of pairs) {
+      const text = byJob.get(pair.jobId);
+      if (text) out.set(pair.vacancyId, text);
+    }
+  } catch {
+    return out;
+  }
+  return out;
 }
 
 export async function dashboardResponse(url: URL): Promise<DashboardPayload> {
