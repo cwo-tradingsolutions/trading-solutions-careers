@@ -43,6 +43,9 @@ const TEAM_VOICE: [string, string][] = [
   ["Kelly Castañeda · Trading Solutions", "Talent Acquisition Team · Trading Solutions"],
   ["Soy Kelly de Trading Solutions", "Te escribe el Talent Acquisition Team de Trading Solutions"],
   ["soy Kelly de Trading Solutions", "te escribe el Talent Acquisition Team de Trading Solutions"],
+  // Reminder 1 WhatsApp: the greeting is third person, the rest stays "nosotros".
+  ["Te escribo para recordarte", "Te escribimos para recordarte"],
+  ["Cualquier duda me cuentas", "Cualquier duda nos cuentas"],
   ["This is Kelly from Trading Solutions", "The Talent Acquisition Team at Trading Solutions is writing to you"],
   ["this is Kelly from Trading Solutions", "the Talent Acquisition Team at Trading Solutions is writing to you"],
   ["soy Kelly.", "te escribe el Talent Acquisition Team de Trading Solutions."],
