@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { isPreviewAllowed } from "@/lib/preview-allowed";
 import { InvitarEntrevistaModal } from "@/components/InvitarEntrevistaModal";
 import {
   buildInviteArtifacts,
@@ -10,15 +11,15 @@ export const dynamic = "force-dynamic";
 
 /**
  * Fixture de la invitación. No llama a Gmail, Calendar ni a la base.
- * En producción responde 404. Sirve para revisar el modal y el correo EN/ES
- * en el deployment de preview.
+ * Fuera de un entorno de preview responde 404. Sirve para revisar el modal
+ * y el correo EN/ES en el deployment de preview.
  */
 export default function InvitarEntrevistaPreviewPage({
   searchParams,
 }: {
   searchParams?: { parte?: string };
 }) {
-  if (process.env.VERCEL_ENV === "production") notFound();
+  if (!isPreviewAllowed()) notFound();
   const parte = searchParams?.parte || "todo";
 
   const when = new Date("2026-11-04T15:00:00.000Z");

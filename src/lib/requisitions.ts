@@ -179,13 +179,20 @@ export function faltaParaElPerfil(req: Record<string, unknown>): string[] {
   return faltantes;
 }
 
-/** Las fuentes donde se publica una vacante hoy. */
+/**
+ * Fallback de fuentes. La lista viva es `ht_recruitment_sources`
+ * (`cargarFuentes` en recruitment-sources-db.ts). Si la tabla no responde,
+ * las pantallas y el POST de postings usan esta constante: las mismas seis
+ * claves con las que se siembra la tabla, así un posting ya guardado sigue
+ * siendo válido.
+ */
 export const FUENTES = [
-  { key: "careers", label: "Página de empleo", automatico: true },
-  { key: "linkedin", label: "LinkedIn", automatico: false },
-  { key: "turpial", label: "Turpial", automatico: false },
-  { key: "magneto", label: "Magneto", automatico: false },
-  { key: "referidos", label: "Referidos", automatico: false },
+  { key: "careers", label: "Careers", automatico: true, active: true, sort_order: 10 },
+  { key: "linkedin", label: "LinkedIn", automatico: false, active: true, sort_order: 20 },
+  { key: "turpial", label: "Turpial", automatico: false, active: true, sort_order: 30 },
+  { key: "magneto", label: "Magneto", automatico: false, active: true, sort_order: 40 },
+  { key: "referidos", label: "Referidos", automatico: false, active: true, sort_order: 50 },
+  { key: "otro", label: "Otro", automatico: false, active: true, sort_order: 60 },
 ] as const;
 
 export type FuenteKey = (typeof FUENTES)[number]["key"];

@@ -17,12 +17,15 @@ export default function ApplyForm({
   job,
   areas,
   refCode,
+  srcCode,
   previewTestMode = false,
 }: {
   mode: Mode;
   job?: Job;
   areas: string[];
   refCode?: string | null;
+  /** ?src=<clave> del portal donde vieron el aviso. No es ht_candidates.source. */
+  srcCode?: string | null;
   /** Server-passed. True only when VERCEL_ENV === "preview". */
   previewTestMode?: boolean;
 }) {
@@ -128,6 +131,7 @@ export default function ApplyForm({
                   cv_filename,
                   cv_data,
                   ref: refCode || null,
+                  src: srcCode || null,
                 }),
               });
         if (!res.ok) throw new Error("submit");

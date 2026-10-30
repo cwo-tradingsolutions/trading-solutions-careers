@@ -15,13 +15,23 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   RequisitionStatus,
-  STATUS_LABEL,
-  STATUS_HINT,
   TYPE_LABEL,
   accionesDisponibles,
   TRANSICIONES,
   type AccionRequisicion,
 } from "@/lib/requisitions";
+import RequisitionCountCards from "@/components/RequisitionCountCards";
+import FuentesAdmin from "@/components/FuentesAdmin";
+import { ArrivalCross, SourceChips } from "@/components/VacancySourceChips";
+import {
+  clasificarConteo,
+  contarTarjetas,
+  estaOculta,
+  etiquetaTarjeta,
+  TARJETAS_CONTEO,
+  type ConteoClave,
+} from "@/lib/requisition-board";
+import type { FuenteLista, LlegadaFila } from "@/lib/recruitment-sources";
 import { PREFILTER_TEMPLATES } from "@/lib/prefilter-templates";
 import PublishPanel from "@/components/PublishPanel";
 import { FechasVacanteFields, errorFechas } from "@/components/CamposObligatorios";
@@ -72,9 +82,20 @@ type Requisicion = {
   decision_note: string | null;
   approved_at: string | null;
   vacancy_id: string | null;
+  vacancy_status?: string | null;
+  hidden_at?: string | null;
+  hidden_reason?: string | null;
+  hidden_by?: string | null;
   created_at: string;
   updated_at: string;
   dias_en_estado: number | null;
+};
+
+type VacanteTablero = {
+  vacancy_id: string;
+  sources: string[];
+  llegada: LlegadaFila[];
+  web_vacancy_id: number | null;
 };
 
 /** Grupos de la bandeja, en orden de urgencia. */
@@ -83,8 +104,47 @@ const GRUPOS: { estados: RequisitionStatus[]; titulo: string; nota: string }[] =
   { estados: ["con_perfil"], titulo: "Esperando al CWO", nota: "Ya tienen perfil. Falta la decisión." },
   { estados: ["devuelta"], titulo: "Devueltas al líder", nota: "La pelota está del otro lado." },
   { estados: ["aprobada"], titulo: "Aprobadas, sin publicar", nota: "La vacante existe. Falta montarla en las fuentes." },
-  { estados: ["publicada", "rechazada"], titulo: "Cerradas", nota: "" },
+  { estados: ["rechazada"], titulo: "Cerradas", nota: "Rechazada y no oculta." },
 ];
+
+function secciones(
+  visibles: Requisicion[],
+  filtro: ConteoClave | null,
+): { titulo: string; nota: string; filas: Requisicion[] }[] {
+  if (filtro) {
+    const tarjeta = TARJETAS_CONTEO.find((t) => t.key === filtro);
+    return [{ titulo: tarjeta?.label || filtro, nota: tarjeta?.definicion || "", filas: visibles }];
+  }
+  const operativas = GRUPOS.filter((g) => g.titulo !== "Cerradas").map((g) => ({
+    titulo: g.titulo,
+    nota: g.nota,
+    filas: visibles.filter((r) => g.estados.includes(r.status)),
+  }));
+  const cerradas = GRUPOS.filter((g) => g.titulo === "Cerradas").map((g) => ({
+    titulo: g.titulo,
+    nota: g.nota,
+    filas: visibles.filter((r) => g.estados.includes(r.status)),
+  }));
+  return [
+    ...operativas,
+    {
+      titulo: "Publicadas",
+      nota: "Requisición publicada con la vacante abierta.",
+      filas: visibles.filter((r) => clasificarConteo(r) === "publicadas"),
+    },
+    {
+      titulo: "Archivadas",
+      nota: "Requisición publicada cuya vacante ya está cerrada.",
+      filas: visibles.filter((r) => clasificarConteo(r) === "archivadas"),
+    },
+    {
+      titulo: "Publicadas, vacante en pausa o sin estado",
+      nota: "",
+      filas: visibles.filter((r) => r.status === "publicada" && clasificarConteo(r) == null),
+    },
+    ...cerradas,
+  ];
+}
 
 const COLOR: Record<RequisitionStatus, string> = {
   pedida: "bg-gray-100 text-gray-700",
@@ -107,12 +167,27 @@ function Alerta({ dias, estado }: { dias: number | null; estado: RequisitionStat
   );
 }
 
-export default function RequisitionsInbox() {
-  const [items, setItems] = useState<Requisicion[]>([]);
-  const [cargando, setCargando] = useState(true);
+export default function RequisitionsInbox({
+  ejemplo,
+}: {
+  /** Datos de ejemplo. No llama a la API. */
+  ejemplo?: {
+    requisiciones: Requisicion[];
+    fuentes: FuenteLista[];
+    vacantes: VacanteTablero[];
+  };
+} = {}) {
+  const [items, setItems] = useState<Requisicion[]>(ejemplo?.requisiciones ?? []);
+  const [cargando, setCargando] = useState(!ejemplo);
   const [error, setError] = useState<string | null>(null);
   const [abierta, setAbierta] = useState<string | null>(null);
   const [nueva, setNueva] = useState(false);
+  const [filtro, setFiltro] = useState<ConteoClave | null>(null);
+  const [fuenteFiltro, setFuenteFiltro] = useState("");
+  const [fuentes, setFuentes] = useState<FuenteLista[]>(ejemplo?.fuentes ?? []);
+  const [vacantes, setVacantes] = useState<VacanteTablero[]>(ejemplo?.vacantes ?? []);
+  const [adminFuentes, setAdminFuentes] = useState(false);
+  const [avisoFuente, setAvisoFuente] = useState<string | null>(null);
 
   /**
    * Recarga la bandeja.
@@ -129,20 +204,38 @@ export default function RequisitionsInbox() {
    * La primera carga sí ocupa la pantalla, porque no hay nada que mostrar.
    * Las siguientes reemplazan los datos sin tumbar lo que está en uso.
    */
+  const cargarTablero = useCallback(async () => {
+    if (ejemplo) return;
+    const b = await fetch("/api/hr-admin/vacancy-sources", { cache: "no-store" });
+    if (!b.ok) return;
+    const board = await b.json();
+    setFuentes(board.fuentes || []);
+    setVacantes(board.vacantes || []);
+  }, [ejemplo]);
+
   const cargar = useCallback(async (primera = false) => {
+    if (ejemplo) return;
     if (primera) setCargando(true);
     setError(null);
     try {
-      const r = await fetch("/api/requisitions", { cache: "no-store" });
+      const [r, b] = await Promise.all([
+        fetch("/api/requisitions?include_hidden=1", { cache: "no-store" }),
+        fetch("/api/hr-admin/vacancy-sources", { cache: "no-store" }),
+      ]);
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "No se pudo cargar la bandeja");
       setItems(j.requisiciones || []);
+      if (b.ok) {
+        const board = await b.json();
+        setFuentes(board.fuentes || []);
+        setVacantes(board.vacantes || []);
+      }
     } catch (e: any) {
       setError(e?.message || "Error de red");
     } finally {
       if (primera) setCargando(false);
     }
-  }, []);
+  }, [ejemplo]);
 
   useEffect(() => {
     cargar(true);
@@ -161,11 +254,84 @@ export default function RequisitionsInbox() {
     );
   }
 
-  const pendientes = items.filter((r) => r.status === "pedida" || r.status === "con_perfil").length;
+  const pendientes = items.filter((r) => !estaOculta(r) && (r.status === "pedida" || r.status === "con_perfil")).length;
+  const conteos = contarTarjetas(cargando ? null : items);
+
+  function vacanteDe(req: Requisicion): VacanteTablero | undefined {
+    if (!req.vacancy_id) return undefined;
+    return vacantes.find((v) => v.vacancy_id === req.vacancy_id);
+  }
+
+  function pasaFuente(req: Requisicion): boolean {
+    if (!fuenteFiltro) return true;
+    return (vacanteDe(req)?.sources || []).includes(fuenteFiltro);
+  }
+
+  const visibles = items.filter((r) => {
+    if (!pasaFuente(r)) return false;
+    if (filtro === "ocultas") return estaOculta(r);
+    if (estaOculta(r)) return false;
+    if (filtro) return clasificarConteo(r) === filtro;
+    return true;
+  });
+
+  async function alternarFuente(vacancyId: string, key: string, publicada: boolean) {
+    if (ejemplo) {
+      setVacantes((prev) => prev.map((v) => {
+        if (v.vacancy_id !== vacancyId) return v;
+        const sources = publicada ? v.sources.filter((s) => s !== key) : [...v.sources, key];
+        return { ...v, sources };
+      }));
+      return;
+    }
+    const r = publicada
+      ? await fetch(`/api/vacancies/${vacancyId}/postings?source=${encodeURIComponent(key)}`, { method: "DELETE" })
+      : await fetch(`/api/vacancies/${vacancyId}/postings`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source: key }),
+        });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      setAvisoFuente(j.error || "No se pudo actualizar la fuente");
+      return;
+    }
+    await cargarTablero();
+  }
+
+  async function guardarFuente(accion: "alta" | "cambio", cuerpo: Record<string, unknown>): Promise<string | null> {
+    if (ejemplo) {
+      if (accion === "alta") {
+        const key = String(cuerpo.key || "").trim().toLowerCase();
+        const label = String(cuerpo.label || "").trim();
+        if (!key || !label) return "Falta la clave o el nombre.";
+        setFuentes((prev) => [...prev, { key, label, active: true, sort_order: 100, automatico: false }]);
+      } else {
+        setFuentes((prev) => prev.map((f) => {
+          if (f.key !== cuerpo.key) return f;
+          return {
+            ...f,
+            label: cuerpo.label != null ? String(cuerpo.label) : f.label,
+            active: typeof cuerpo.active === "boolean" ? cuerpo.active : f.active,
+          };
+        }));
+      }
+      return null;
+    }
+    const r = await fetch("/api/recruitment-sources", {
+      method: accion === "alta" ? "POST" : "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cuerpo),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return j.error || "No se pudo guardar la fuente";
+    await cargarTablero();
+    return null;
+  }
 
   return (
     <div>
-      <div className="flex items-end gap-4 mb-1">
+      <div className="flex flex-wrap items-end gap-4 mb-4">
         <div>
           <h2 className="text-xl font-bold">Requisiciones</h2>
           <p className="text-sm text-gray-500 mt-0.5">
@@ -175,7 +341,14 @@ export default function RequisitionsInbox() {
             )}
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setAdminFuentes((v) => !v)}
+            className="min-h-11 text-sm px-4 rounded-full border border-[color:var(--ts-line)] text-[var(--ts-ink)]"
+          >
+            Fuentes
+          </button>
           <button
             onClick={() => setNueva(true)}
             className="text-sm px-4 py-2 rounded-full bg-black text-white hover:bg-gray-800 font-medium"
@@ -190,6 +363,42 @@ export default function RequisitionsInbox() {
           </button>
         </div>
       </div>
+
+      <div className="mt-4">
+        <RequisitionCountCards counts={conteos} activo={filtro} onElegir={setFiltro} />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <label className="flex items-center gap-1.5 text-[12px] text-[var(--ts-muted)]">
+          Fuente
+          <select
+            value={fuenteFiltro}
+            onChange={(e) => setFuenteFiltro(e.target.value)}
+            className="min-h-11 rounded-full border border-[color:var(--ts-line)] bg-white px-3 text-[13px] text-[var(--ts-ink)]"
+          >
+            <option value="">Todas</option>
+            {fuentes.filter((f) => f.active).map((f) => (
+              <option key={f.key} value={f.key}>{f.label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {avisoFuente && (
+        <p className="mb-3 text-[13px] border border-[color:var(--ts-line)] rounded-xl px-3 py-2">{avisoFuente}</p>
+      )}
+
+      {adminFuentes && (
+        <FuentesAdmin
+          fuentes={fuentes}
+          onCerrar={() => setAdminFuentes(false)}
+          onGuardar={guardarFuente}
+        />
+      )}
+
+      {ejemplo && (
+        <p className="mb-4 text-[13px] text-[var(--ts-muted)]">Datos de ejemplo. No son cifras del ATS.</p>
+      )}
 
       {nueva && (
         <NuevaRequisicion
@@ -208,28 +417,40 @@ export default function RequisitionsInbox() {
         </div>
       )}
 
-      {GRUPOS.map((g) => {
-        const delGrupo = items.filter((r) => g.estados.includes(r.status));
-        if (delGrupo.length === 0) return null;
+      {items.length > 0 && secciones(visibles, filtro).every((g) => g.filas.length === 0) && (
+        <p className="mt-8 text-[13px] text-[var(--ts-muted)] text-center bg-white rounded-2xl border border-[color:var(--ts-line)] py-8 px-4">
+          No hay requisiciones con ese filtro.
+        </p>
+      )}
+
+      {secciones(visibles, filtro).map((g) => {
+        if (g.filas.length === 0) return null;
         return (
           <section key={g.titulo} className="mt-8">
             <div className="flex items-baseline gap-3 mb-3">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--ts-muted)]">
                 {g.titulo}
               </h3>
-              <span className="text-sm text-gray-400">{delGrupo.length}</span>
-              {g.nota && <span className="text-xs text-gray-400 ml-auto">{g.nota}</span>}
+              <span className="text-sm text-[var(--ts-muted)]">{g.filas.length}</span>
+              {g.nota && <span className="text-xs text-[var(--ts-muted)] ml-auto">{g.nota}</span>}
             </div>
             <div className="space-y-3">
-              {delGrupo.map((r) => (
-                <Tarjeta
-                  key={r.id}
-                  req={r}
-                  abierta={abierta === r.id}
-                  onToggle={() => setAbierta(abierta === r.id ? null : r.id)}
-                  onCambio={cargar}
-                />
-              ))}
+              {g.filas.map((r) => {
+                const vac = vacanteDe(r);
+                return (
+                  <Tarjeta
+                    key={r.id}
+                    req={r}
+                    abierta={abierta === r.id}
+                    onToggle={() => setAbierta(abierta === r.id ? null : r.id)}
+                    onCambio={cargar}
+                    fuentes={fuentes}
+                    sources={vac?.sources || []}
+                    llegada={vac?.llegada || []}
+                    onAlternar={alternarFuente}
+                  />
+                );
+              })}
             </div>
           </section>
         );
@@ -243,11 +464,19 @@ function Tarjeta({
   abierta,
   onToggle,
   onCambio,
+  fuentes = [],
+  sources = [],
+  llegada = [],
+  onAlternar,
 }: {
   req: Requisicion;
   abierta: boolean;
   onToggle: () => void;
   onCambio: () => void;
+  fuentes?: FuenteLista[];
+  sources?: string[];
+  llegada?: LlegadaFila[];
+  onAlternar?: (vacancyId: string, key: string, publicada: boolean) => void;
 }) {
   const [perfil, setPerfil] = useState({
     job_description: req.job_description || "",
@@ -355,8 +584,6 @@ function Tarjeta({
     setPublicando(true);
   }
 
-  const acciones = accionesDisponibles(req.status);
-
   /**
    * Manda el perfil que está en pantalla a la base. Devuelve `true` si quedó
    * guardado; si no, deja el motivo en `problema` y devuelve `false`.
@@ -429,11 +656,21 @@ function Tarjeta({
   }
 
   // El perfil es lo que el CWO aprueba: después de la aprobación se congela.
-  const editable = req.status === "pedida" || req.status === "con_perfil" || req.status === "devuelta";
+  const etiqueta = etiquetaTarjeta({
+    status: req.status,
+    hidden_at: req.hidden_at,
+    hidden_reason: req.hidden_reason,
+  });
+  const archivada = clasificarConteo(req) === "archivadas";
+  const chip = archivada
+    ? { label: "Archivada", hint: null as string | null, neutro: true }
+    : { label: etiqueta.label, hint: etiqueta.hint, neutro: etiqueta.oculta };
+  const acciones = etiqueta.oculta ? [] : accionesDisponibles(req.status);
+  const editable = !etiqueta.oculta && (req.status === "pedida" || req.status === "con_perfil" || req.status === "devuelta");
   // Los datos de publicación no son parte de lo aprobado, y encima se
   // necesitan DESPUÉS de aprobar. Bloquearlos junto con el perfil dejaba la
   // vacante aprobada sin poder publicarse nunca.
-  const editablePublicacion = editable || req.status === "aprobada" || req.status === "publicada";
+  const editablePublicacion = !etiqueta.oculta && (editable || req.status === "aprobada" || req.status === "publicada");
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -453,16 +690,37 @@ function Tarjeta({
             </p>
           </div>
           <div className="ml-auto flex items-center gap-3">
-            <Alerta dias={req.dias_en_estado} estado={req.status} />
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${COLOR[req.status]}`}>
-              {STATUS_LABEL[req.status]}
+            {!etiqueta.oculta && !archivada && <Alerta dias={req.dias_en_estado} estado={req.status} />}
+            <span
+              className={
+                chip.neutro
+                  ? "text-xs font-semibold px-2.5 py-1 rounded-full bg-[var(--ts-canvas)] text-[var(--ts-ink)] border border-[color:var(--ts-line)]"
+                  : `text-xs font-semibold px-2.5 py-1 rounded-full ${COLOR[req.status]}`
+              }
+            >
+              {chip.label}
             </span>
           </div>
         </div>
-        {STATUS_HINT[req.status] && (
-          <p className="text-xs text-gray-400 mt-2">{STATUS_HINT[req.status]}</p>
+        {chip.hint && (
+          <p className="text-xs text-[var(--ts-muted)] mt-2">{chip.hint}</p>
         )}
       </button>
+
+      {req.vacancy_id && (
+        <div className="px-5 pb-4">
+          <SourceChips
+            fuentes={fuentes}
+            activas={sources}
+            onAlternar={
+              onAlternar
+                ? (key, on) => onAlternar(req.vacancy_id as string, key, on)
+                : undefined
+            }
+          />
+          <ArrivalCross sources={sources} llegada={llegada} fuentes={fuentes} />
+        </div>
+      )}
 
       {abierta && (
         <div className="border-t border-gray-200 px-5 py-5 space-y-5">
