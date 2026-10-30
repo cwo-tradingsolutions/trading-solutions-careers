@@ -88,9 +88,11 @@ export async function insertPending(row: {
   reply_to: string | null;
   bcc: string | null;
   error: string;
+  status?: string;
 }): Promise<{ id: string }> {
   await ensureOutboundMail();
   const id = randomUUID();
+  const status = row.status === "bloqueado_staging" ? "bloqueado_staging" : "pending";
   const db = sql();
   await db`
     INSERT INTO ats_outbound_mail (id, candidate, type, subject, html, reply_to, bcc, status, error)
@@ -102,11 +104,33 @@ export async function insertPending(row: {
       ${row.html},
       ${row.reply_to},
       ${row.bcc},
-      'pending',
+      ${status},
       ${row.error}
     )
   `;
   return { id };
+}
+
+/** A send the staging guard refused. Not claimed by "Reenviar pendientes". */
+export async function recordBlockedSend(row: {
+  candidate: string | null;
+  type: string | null;
+  subject: string | null;
+  html: string | null;
+  reply_to: string | null;
+  bcc: string | null;
+  reason: string;
+}): Promise<{ id: string }> {
+  return insertPending({
+    candidate: row.candidate,
+    type: row.type,
+    subject: row.subject,
+    html: row.html,
+    reply_to: row.reply_to,
+    bcc: row.bcc,
+    error: row.reason,
+    status: "bloqueado_staging",
+  });
 }
 
 export async function recordSuccessfulSend(type: string): Promise<number> {
@@ -203,6 +227,14 @@ async function markPending(id: string, error: string) {
   `;
 }
 
+async function markBlocked(id: string, reason: string) {
+  await sql()`
+    UPDATE ats_outbound_mail
+    SET status = 'bloqueado_staging', error = ${reason}, claimed_at = NULL
+    WHERE id = ${id}::uuid AND status = 'sending'
+  `;
+}
+
 export async function queueCandidateMail(input: CandidateMailInput, error: string): Promise<{ id: string }> {
   return insertPending({
     candidate: input.candidate ?? input.to,
@@ -224,6 +256,7 @@ export async function sendCandidateMail(input: CandidateMailInput): Promise<Cand
         html: mail.html,
         replyTo: mail.replyTo || undefined,
         bcc: mail.bcc || undefined,
+        mailType: mail.type,
       }),
     savePending: insertPending,
     recordSend: recordSuccessfulSend,
@@ -241,9 +274,12 @@ export async function resendPendingMails(): Promise<{ sent: number; pending: num
         html: row.html || "",
         replyTo: row.reply_to || undefined,
         bcc: row.bcc || undefined,
+        mailType: row.type || undefined,
+        persistBlocked: false,
       }),
     markSent,
     markPending,
+    markBlocked,
     recordSend: recordSuccessfulSend,
     log: (line) => console.info(line),
   });

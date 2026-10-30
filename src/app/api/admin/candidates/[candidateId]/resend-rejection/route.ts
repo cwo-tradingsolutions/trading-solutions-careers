@@ -206,6 +206,14 @@ export async function POST(
       html,
       replyTo: REJECTION_REPLY_TO,
     });
+    if (delivered.status === "bloqueado_staging") {
+      return NextResponse.json({
+        success: true,
+        mode: "send",
+        status: "bloqueado_staging",
+        message: "El correo no salió: el destinatario no está permitido en este ambiente.",
+      });
+    }
     if (delivered.status === "pending") {
       return NextResponse.json({
         success: true,

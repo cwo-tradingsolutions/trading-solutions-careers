@@ -218,7 +218,7 @@ export async function POST(req: NextRequest) {
     const mailto = `mailto:${body.candidate_email}?subject=${subject}&body=${message}`;
 
     // Envío automático del email si se solicita
-    let emailStatus: { sent: boolean; status: "sent" | "pending" | "skipped" | "unavailable"; id?: string; via?: "gmail" } = { sent: false, status: "skipped" };
+    let emailStatus: { sent: boolean; status: "sent" | "pending" | "skipped" | "unavailable" | "bloqueado_staging"; id?: string; via?: "gmail" } = { sent: false, status: "skipped" };
     if (body.send_email) {
       try {
         // Kelly: no BCC on candidate mail. Reply-To still comes from config.
@@ -249,7 +249,9 @@ export async function POST(req: NextRequest) {
         });
         emailStatus = delivered.status === "sent"
           ? { sent: true, status: "sent", id: delivered.gmail_id, via: "gmail" }
-          : { sent: false, status: "pending", id: delivered.id, via: "gmail" };
+          : delivered.status === "bloqueado_staging"
+            ? { sent: false, status: "bloqueado_staging", id: delivered.id, via: "gmail" }
+            : { sent: false, status: "pending", id: delivered.id, via: "gmail" };
       } catch (e) {
         console.error("[assessments] no se pudo enviar ni encolar", e);
         emailStatus = { sent: false, status: "unavailable", via: "gmail" };

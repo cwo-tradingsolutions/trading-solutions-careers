@@ -127,6 +127,11 @@ test("reenviar pendientes sends each pending email once", async () => {
       row.status = "pending";
       row.error = error;
     },
+    markBlocked: async (id: string) => {
+      const row = rows.find((item) => item.id === id);
+      if (!row) return;
+      row.status = "bloqueado_staging";
+    },
     recordSend: async () => sent.length,
   };
   const first = await resendPendingOnce(deps);
@@ -168,6 +173,9 @@ test("a failed replay stays pending and the next replay sends it once", async ()
       row.status = "pending";
       row.error = error;
     },
+    markBlocked: async () => {
+      row.status = "bloqueado_staging";
+    },
     recordSend: async () => 1,
   };
   const first = await resendPendingOnce(deps);
@@ -194,6 +202,55 @@ test("From is the team mailbox and the daily warning starts after 1500", () => {
     mailboxDisconnectedBanner(3),
     "Buzón jointheteam@ desconectado — 3 correos pendientes. Reconectar",
   );
+});
+
+test("a staging block is not put back on the pending queue", async () => {
+  const row = {
+    id: "b",
+    status: "pending",
+    candidate: "person@example.com",
+    type: "gmail_send",
+    subject: "Hola",
+    html: "<p>x</p>",
+    reply_to: null,
+    bcc: null,
+    error: "",
+  };
+  const result = await resendPendingOnce({
+    claimPending: async () => {
+      if (row.status !== "pending") return [];
+      row.status = "sending";
+      return [{ ...row }];
+    },
+    send: async () => ({ ok: false as const, blocked: "bloqueado_staging" as const, error: "bloqueado_staging" }),
+    markSent: async () => {
+      row.status = "sent";
+    },
+    markPending: async (_id: string, error: string) => {
+      row.status = "pending";
+      row.error = error;
+    },
+    markBlocked: async () => {
+      row.status = "bloqueado_staging";
+      row.error = "bloqueado_staging";
+    },
+    recordSend: async () => {
+      throw new Error("blocked mail must not count as sent");
+    },
+  });
+  assert.deepEqual(result, { sent: 0, pending: 0 });
+  assert.equal(row.status, "bloqueado_staging");
+  const again = await resendPendingOnce({
+    claimPending: async () => (row.status === "pending" ? [{ ...row, status: "sending" }] : []),
+    send: async () => {
+      throw new Error("must not send a blocked row again");
+    },
+    markSent: async () => {},
+    markPending: async () => {},
+    markBlocked: async () => {},
+    recordSend: async () => 0,
+  });
+  assert.deepEqual(again, { sent: 0, pending: 0 });
 });
 
 test("battery direct send uses Gmail and the HR banner names the pending mailbox", () => {

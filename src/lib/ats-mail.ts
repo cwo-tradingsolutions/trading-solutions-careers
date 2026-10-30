@@ -32,10 +32,11 @@ export type CandidateMailInput = {
 
 export type CandidateMailResult =
   | { status: "sent"; gmail_id: string }
-  | { status: "pending"; id: string };
+  | { status: "pending"; id: string }
+  | { status: "bloqueado_staging"; id: string };
 
-/** What a candidate-facing response may say. No provider error, no token. */
-export function candidateMailStatus(result: CandidateMailResult): { status: "sent" | "pending" } {
+/** What a candidate-facing response may say. No provider error, no address. */
+export function candidateMailStatus(result: CandidateMailResult): { status: CandidateMailResult["status"] } {
   return { status: result.status };
 }
 
@@ -47,11 +48,14 @@ export type PendingMailRow = {
   reply_to: string | null;
   bcc: string | null;
   error: string;
+  status?: string;
 };
 
 export type ClaimedMail = PendingMailRow & { id: string };
 
-type SendOutcome = { ok: true; gmail_id: string } | { ok: false; error: string };
+type SendOutcome =
+  | { ok: true; gmail_id: string }
+  | { ok: false; error: string; blocked?: "bloqueado_staging"; blockedId?: string };
 
 export type MailDeps = {
   send: (input: CandidateMailInput) => Promise<SendOutcome>;
@@ -86,6 +90,21 @@ export async function deliverCandidateMail(
     return { status: "sent", gmail_id: sent.gmail_id };
   }
 
+  if (sent.blocked === "bloqueado_staging") {
+    if (sent.blockedId) return { status: "bloqueado_staging", id: sent.blockedId };
+    const saved = await deps.savePending({
+      candidate: input.candidate ?? input.to,
+      type: input.type,
+      subject: input.subject,
+      html: input.html,
+      reply_to: input.replyTo ?? null,
+      bcc: input.bcc ?? null,
+      error: "bloqueado_staging",
+      status: "bloqueado_staging",
+    });
+    return { status: "bloqueado_staging", id: saved.id };
+  }
+
   const saved = await deps.savePending({
     candidate: input.candidate ?? input.to,
     type: input.type,
@@ -104,6 +123,7 @@ export type PendingReplayDeps = {
   send: (row: ClaimedMail) => Promise<SendOutcome>;
   markSent: (id: string, gmailId: string) => Promise<void>;
   markPending: (id: string, error: string) => Promise<void>;
+  markBlocked: (id: string, reason: string) => Promise<void>;
   recordSend: (type: string) => Promise<number>;
   log?: (line: string) => void;
 };
@@ -142,6 +162,8 @@ export async function resendPendingOnce(deps: PendingReplayDeps): Promise<{ sent
           deps.log?.(`[ats-mail] counter failed type=${row.type || "pending"} ${asError(e)}`);
         }
         sent++;
+      } else if (result.blocked === "bloqueado_staging") {
+        await deps.markBlocked(row.id, "bloqueado_staging");
       } else {
         await deps.markPending(row.id, result.error);
         pending++;

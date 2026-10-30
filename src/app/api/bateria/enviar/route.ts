@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
 
       let canal: string;
       let fallo: string | null = null;
-      let emailStatus: 'sent' | 'pending' | 'draft' | 'not_sent' = 'not_sent';
+      let emailStatus: 'sent' | 'pending' | 'draft' | 'not_sent' | 'bloqueado_staging' = 'not_sent';
 
       if (modo === 'borrador') {
         const r = await createDraftViaGmail({ to: c.email, subject: asunto, html, fromName: ATS_FROM_NAME });
@@ -150,13 +150,16 @@ export async function POST(req: NextRequest) {
         if (delivered.status === 'sent') {
           canal = 'gmail';
           emailStatus = 'sent';
+        } else if (delivered.status === 'bloqueado_staging') {
+          canal = 'bloqueado_staging';
+          emailStatus = 'bloqueado_staging';
         } else {
           canal = 'pending';
           emailStatus = 'pending';
         }
       }
 
-      if (!fallo && emailStatus !== 'pending') {
+      if (!fallo && emailStatus !== 'pending' && emailStatus !== 'bloqueado_staging') {
         await supabaseAdmin
           .from('ts_bat_sessions')
           .update({ invited_at: new Date().toISOString(), invite_channel: canal, invite_count: ses.invite_count + 1, updated_at: new Date().toISOString() })
@@ -168,7 +171,7 @@ export async function POST(req: NextRequest) {
       resultado.push({ id: c.id, nombre: c.nombre, email: c.email, url: ses.url, reusada: ses.reusada, canal, idioma: lang, email_status: emailStatus, error: fallo });
     }
 
-    const ok = resultado.filter((r) => r.url && !r.error && r.email_status !== 'pending').length;
+    const ok = resultado.filter((r) => r.url && !r.error && r.email_status !== 'pending' && r.email_status !== 'bloqueado_staging').length;
     const pendientes = resultado.filter((r) => r.email_status === 'pending').length;
     return NextResponse.json(
       {

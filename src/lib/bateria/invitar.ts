@@ -163,6 +163,9 @@ export async function enviarBateriaAuto(candidatoId: string, origin: string): Pr
       html,
       replyTo: RESPONDER_A,
     });
+    if (delivered.status === 'bloqueado_staging') {
+      return { enviado: false, motivo: 'correo bloqueado en este ambiente', url: ses.url, pendiente: true, status: 'pending' };
+    }
     if (delivered.status === 'pending') {
       await marcarBateriaPendiente(candidatoId);
       return { enviado: false, motivo: 'buzón jointheteam@ desconectado', url: ses.url, pendiente: true, status: 'pending' };

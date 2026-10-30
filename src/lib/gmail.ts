@@ -15,6 +15,7 @@
  */
 import { neon } from "@/lib/sql";
 import { ATS_FROM_EMAIL, atsFromHeader } from "@/lib/ats-from";
+import { blockedSendLogLine, decideOutboundRecipients } from "@/lib/mail-recipient-guard";
 import { googleOAuthEnvironment, PREVIEW_GOOGLE_CONNECT_LABEL } from "@/lib/google-oauth-env";
 import {
   deleteStoredTokens,
@@ -142,11 +143,13 @@ function buildRfc822(opts: {
   subject: string;
   html: string;
   replyTo?: string;
+  cc?: string;
   bcc?: string;
 }): string {
   const lines: string[] = [];
   lines.push(`From: ${opts.from}`);
   lines.push(`To: ${opts.to}`);
+  if (opts.cc) lines.push(`Cc: ${opts.cc}`);
   if (opts.replyTo) lines.push(`Reply-To: ${opts.replyTo}`);
   if (opts.bcc) lines.push(`Bcc: ${opts.bcc}`);
   lines.push(`Subject: =?UTF-8?B?${Buffer.from(opts.subject).toString("base64")}?=`);
@@ -201,14 +204,55 @@ export async function createDraftViaGmail(opts: {
   return { ok: true, draft_id: j.id as string, gmail_email: valid.email };
 }
 
+export type GmailSendResult =
+  | { ok: true; gmail_id: string }
+  | { ok: false; error: string; blocked?: "bloqueado_staging"; blockedId?: string };
+
 export async function sendViaGmail(opts: {
   to: string;
   subject: string;
   html: string;
   replyTo?: string;
+  cc?: string;
   bcc?: string;
   fromName?: string; // Display name (defaults to ATS_FROM_NAME when empty)
-}): Promise<{ ok: true; gmail_id: string } | { ok: false; error: string }> {
+  /** Pending replay updates the claimed row instead of inserting another. */
+  persistBlocked?: boolean;
+  mailType?: string;
+}): Promise<GmailSendResult> {
+  const decision = decideOutboundRecipients(
+    { to: opts.to, cc: opts.cc, bcc: opts.bcc },
+    {
+      MAIL_RECIPIENT_ALLOWLIST: process.env.MAIL_RECIPIENT_ALLOWLIST,
+      NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+      K_SERVICE: process.env.K_SERVICE,
+      STAGING_READ_ONLY: process.env.STAGING_READ_ONLY,
+      VERCEL_ENV: process.env.VERCEL_ENV,
+    },
+  );
+  if (!decision.send) {
+    console.warn(blockedSendLogLine(decision));
+    let blockedId: string | undefined;
+    if (opts.persistBlocked !== false) {
+      try {
+        const { recordBlockedSend } = await import("@/lib/ats-mail-store");
+        const saved = await recordBlockedSend({
+          candidate: opts.to,
+          type: opts.mailType ?? "gmail_send",
+          subject: opts.subject,
+          html: opts.html,
+          reply_to: opts.replyTo ?? null,
+          bcc: opts.bcc ?? null,
+          reason: decision.reason,
+        });
+        blockedId = saved.id;
+      } catch (e) {
+        console.warn("[ats-mail] bloqueado_staging no se pudo guardar");
+      }
+    }
+    return { ok: false, blocked: "bloqueado_staging", blockedId, error: "bloqueado_staging" };
+  }
+
   const valid = await getValidAccessToken();
   if (!valid) {
     return { ok: false, error: "Gmail no conectado. Pide a Kelly que vaya a Settings → Conectar Gmail." };
@@ -220,6 +264,7 @@ export async function sendViaGmail(opts: {
     subject: opts.subject,
     html: opts.html,
     replyTo: opts.replyTo,
+    cc: opts.cc,
     bcc: opts.bcc,
   });
   const raw = Buffer.from(rfc822).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
