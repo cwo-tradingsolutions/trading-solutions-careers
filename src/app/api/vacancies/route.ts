@@ -2,6 +2,7 @@ import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from 'next/server';
 import { validarFechasWeb, columnaCierreWebExiste } from "@/lib/vacancy-web-dates";
+import { publicStepBody } from "@/lib/candidate-public-error";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,10 +43,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(vacancies, { headers: corsHeaders });
   } catch (error) {
     console.error('GET /api/vacancies error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch vacancies' },
-      { status: 500, headers: corsHeaders }
-    );
+    return NextResponse.json(publicStepBody(), { status: 500, headers: corsHeaders });
   }
 }
 

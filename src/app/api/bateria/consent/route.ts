@@ -24,7 +24,10 @@ export async function POST(req: NextRequest) {
 
     const { data: session, error: eSes } = await supabaseAdmin
       .from('ts_bat_sessions').select('id, status').eq('token', token).single();
-    if (eSes) return NextResponse.json({ error: `[buscar] ${eSes.message}` }, { status: 500 });
+    if (eSes) {
+      console.error('bateria/consent buscar', eSes);
+      return NextResponse.json(publicStepBody(), { status: 500 });
+    }
     if (!session) return NextResponse.json({ error: 'Enlace no válido' }, { status: 404 });
 
     if (isPreviewTestMode()) {

@@ -9,6 +9,7 @@ import { applicationStatusEmailsEnabled } from "@/lib/application-status-email";
 import { buildRejectionHtml, REJECTION_REPLY_TO, rejectionEmailsEnabled, rejectionSubject } from "@/lib/rejection-email";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { candidateMailBcc } from "@/lib/candidate-bcc";
+import { publicStepBody } from "@/lib/candidate-public-error";
 
 let dbInitialized = false;
 
@@ -188,8 +189,7 @@ export async function PATCH(
     return NextResponse.json({ success: true, application: result[0], emailTriggered });
   } catch (error: unknown) {
     console.error("Error updating application:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(publicStepBody(), { status: 500 });
   }
 }
 
@@ -197,6 +197,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const authError = requireAdmin(request);
+  if (authError) return authError;
+
   try {
     await ensureDB();
     
@@ -216,7 +219,6 @@ export async function GET(
     return NextResponse.json({ application: result[0] });
   } catch (error: unknown) {
     console.error("Error fetching application:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(publicStepBody(), { status: 500 });
   }
 }

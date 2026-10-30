@@ -17,6 +17,7 @@
  *   GET    /api/assessment-preview?run_id=X  → leer un run para revisar después
  */
 import { neon } from "@/lib/sql";
+import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { TS_SCENARIOS } from "@/lib/headhunting/scenarios-ts";
 import { TS_BENCHMARK_STATS, TS_DNA_PATTERNS } from "@/lib/headhunting/calibration-data";
@@ -235,6 +236,9 @@ export async function POST(req: NextRequest) {
 
 // ─── GET: leer run completo ──────────────────────────────────────────
 export async function GET(req: NextRequest) {
+  const authError = requireAdmin(req);
+  if (authError) return authError;
+
   try {
     if (isPreviewTestMode()) {
       return NextResponse.json({ runs: [], run: null, responses: [] }, { headers: corsHeaders });

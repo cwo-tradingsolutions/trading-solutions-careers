@@ -13,6 +13,7 @@ import { isEnglishTemplate, resolveCandidateLang } from "@/lib/candidate-lang";
 import { candidateSignatureHtml } from "@/lib/ats-from";
 import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 import { candidateMailBcc } from "@/lib/candidate-bcc";
+import { requireAdmin } from "@/lib/admin-auth";
 import { canalPostulacionPublica } from "@/lib/candidate-source";
 import { publicStepBody } from "@/lib/candidate-public-error";
 
@@ -322,6 +323,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const authError = requireAdmin(request);
+  if (authError) return authError;
+
   try {
     await ensureDB();
 

@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
+import { publicStepBody } from "@/lib/candidate-public-error";
 
 // Node.js runtime para aceptar bodies grandes (CV base64 puede ser hasta ~7MB)
 export const runtime = "nodejs";
@@ -81,13 +82,13 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error('referrals insert error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(publicStepBody(), { status: 500 });
     }
 
     return NextResponse.json({ success: true, referral_id: data.id });
   } catch (err: any) {
     console.error('referrals POST error:', err);
-    return NextResponse.json({ error: err?.message || "Error" }, { status: 500 });
+    return NextResponse.json(publicStepBody(), { status: 500 });
   }
 }
 
@@ -107,7 +108,10 @@ export async function GET(req: NextRequest) {
   if (status) q = q.eq('status', status);
 
   const { data, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("referrals GET", error);
+    return NextResponse.json(publicStepBody(), { status: 500 });
+  }
 
   return NextResponse.json({ referrals: data || [], total: data?.length || 0 });
 }
