@@ -1,21 +1,19 @@
 /**
  * /api/assessments
  *   GET  → lista todas las pruebas enviadas (con filtros opcionales)
- *   POST → crea un token de prueba; opcionalmente envía email vía Resend
+ *   POST → crea un token de prueba; opcionalmente envía email vía Gmail
  *
  * Si en el body se pasa `send_email: true`, el endpoint envía la invitación
- * directamente desde el servidor usando RESEND_API_KEY. Si se omite o es
- * false, se devuelve solo el link + un `mailto:` para que el HR Admin
- * lo dispare manualmente.
+ * desde jointheteam@. Si el buzón no está conectado, el correo queda pendiente.
+ * Si se omite o es false, se devuelve solo el link + un `mailto:`.
  */
 import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
-import { getResend, EMAIL_FROM } from "@/lib/resend";
 import { candidateMailBcc } from "@/lib/candidate-bcc";
 import { publicStepBody } from "@/lib/candidate-public-error";
-import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
+import { sendCandidateMail } from "@/lib/ats-mail-store";
 import { candidateSignatureHtml, candidateSignatureText } from "@/lib/ats-from";
 
 const corsHeaders = {
@@ -96,7 +94,7 @@ type CreateBody = {
   language?: "es" | "en";
   source?: string;
   candidate_id?: number | null;
-  send_email?: boolean; // si true, envía invitación vía Resend
+  send_email?: boolean; // si true, envía la invitación por Gmail
 };
 
 function buildEmailHtml(opts: {
@@ -206,7 +204,7 @@ export async function POST(req: NextRequest) {
     const link = `${origin}/assessment/${token}`;
     const vacancyTitle = body.vacancy_title || "la vacante en Trading Solutions";
 
-    // Mailto helper (fallback si no se envía por Resend)
+    // Mailto helper cuando send_email no está pedido. No es un segundo canal.
     const subject = encodeURIComponent(
       language === "en"
         ? `Trading Solutions · Assessment for ${vacancyTitle}`
@@ -220,7 +218,7 @@ export async function POST(req: NextRequest) {
     const mailto = `mailto:${body.candidate_email}?subject=${subject}&body=${message}`;
 
     // Envío automático del email si se solicita
-    let emailStatus: { sent: boolean; id?: string; error?: string; via?: 'gmail' | 'resend' } = { sent: false };
+    let emailStatus: { sent: boolean; status: "sent" | "pending" | "skipped" | "unavailable" | "bloqueado_staging"; id?: string; via?: "gmail" } = { sent: false, status: "skipped" };
     if (body.send_email) {
       try {
         // Kelly: no BCC on candidate mail. Reply-To still comes from config.
@@ -240,41 +238,23 @@ export async function POST(req: NextRequest) {
           language,
         });
 
-        // ─── Preferir Gmail si está conectado ────────────────────────────
-        const gmailStatus = await isGmailConnected();
-        if (gmailStatus.connected) {
-          const result = await sendViaGmail({
-            to: body.candidate_email,
-            subject: emailSubject,
-            html,
-            replyTo: dynamicReplyTo ?? undefined,
-            bcc: dynamicBcc ?? undefined,
-            fromName: "Talent Acquisition Team",
-          });
-          if (result.ok) {
-            emailStatus = { sent: true, id: result.gmail_id, via: 'gmail' };
-          } else {
-            emailStatus = { sent: false, error: result.error, via: 'gmail' };
-          }
-        } else {
-          // Fallback a Resend
-          const resend = getResend();
-          const result = await resend.emails.send({
-            from: EMAIL_FROM,
-            to: body.candidate_email,
-            ...(dynamicBcc ? { bcc: dynamicBcc } : {}),
-            subject: emailSubject,
-            html,
-            ...(dynamicReplyTo ? { replyTo: dynamicReplyTo } : {}),
-          });
-          if (result.error) {
-            emailStatus = { sent: false, error: result.error.message ?? String(result.error), via: 'resend' };
-          } else {
-            emailStatus = { sent: true, id: result.data?.id, via: 'resend' };
-          }
-        }
+        const delivered = await sendCandidateMail({
+          to: body.candidate_email,
+          candidate: body.candidate_email,
+          type: "assessment_invite",
+          subject: emailSubject,
+          html,
+          replyTo: dynamicReplyTo ?? undefined,
+          bcc: dynamicBcc ?? undefined,
+        });
+        emailStatus = delivered.status === "sent"
+          ? { sent: true, status: "sent", id: delivered.gmail_id, via: "gmail" }
+          : delivered.status === "bloqueado_staging"
+            ? { sent: false, status: "bloqueado_staging", id: delivered.id, via: "gmail" }
+            : { sent: false, status: "pending", id: delivered.id, via: "gmail" };
       } catch (e) {
-        emailStatus = { sent: false, error: e instanceof Error ? e.message : String(e) };
+        console.error("[assessments] no se pudo enviar ni encolar", e);
+        emailStatus = { sent: false, status: "unavailable", via: "gmail" };
       }
     }
 

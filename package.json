@@ -9,7 +9,7 @@
     "lint": "next lint",
     "test:required-fields": "node --experimental-strip-types --test src/lib/required-fields.test.ts",
     "test:dashboard": "node --import tsx --test src/lib/funnel-dashboard/metrics.test.ts src/lib/preview-readonly.test.ts",
-    "test": "node --import tsx src/lib/preview-mode.check.ts && node --experimental-strip-types --import ./scripts/register-ts.mjs --test src/lib/ats-from.test.ts src/lib/application-status-email.test.ts src/lib/battery-auto-send.test.ts src/lib/stage-drafts.test.ts src/lib/rejection-email.test.ts src/lib/interview-invite.test.ts src/lib/google-oauth-env.test.ts src/lib/required-fields.test.ts src/lib/funnel-dashboard/metrics.test.ts src/lib/preview-readonly.test.ts src/lib/preview-public-writes.check.ts src/lib/panama-ops-prefilter.check.ts src/lib/candidate-public-error.test.ts src/lib/candidate-bcc.test.ts src/lib/assessment-validate-payload.test.ts && node --import tsx --test src/lib/admin-route-auth.test.ts"
+    "test": "node --import tsx src/lib/preview-mode.check.ts && node --experimental-strip-types --import ./scripts/register-ts.mjs --test src/lib/ats-from.test.ts src/lib/application-status-email.test.ts src/lib/battery-auto-send.test.ts src/lib/stage-drafts.test.ts src/lib/rejection-email.test.ts src/lib/interview-invite.test.ts src/lib/google-oauth-env.test.ts src/lib/required-fields.test.ts src/lib/funnel-dashboard/metrics.test.ts src/lib/preview-readonly.test.ts src/lib/preview-public-writes.check.ts src/lib/panama-ops-prefilter.check.ts src/lib/candidate-public-error.test.ts src/lib/candidate-bcc.test.ts src/lib/assessment-validate-payload.test.ts src/lib/assessment-token-public.test.ts src/lib/ai-interview-finalize.test.ts src/lib/public-vacancy.test.ts src/lib/public-application.test.ts src/lib/hr-admin-session-notice.test.ts src/lib/candidate-invalid-link.test.ts src/lib/ats-mail.test.ts src/lib/ai-interview-flag.test.ts src/lib/mail-recipient-guard.test.ts && node --import tsx --test src/lib/admin-route-auth.test.ts src/lib/google-oauth-guard.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
@@ -26,7 +26,6 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^3.10.1",
-    "resend": "^6.9.2",
     "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"

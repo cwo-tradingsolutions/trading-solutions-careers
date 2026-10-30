@@ -1,23 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase';
-import { Resend } from 'resend';
 import { createDraftViaGmail, isGmailConnected } from '@/lib/gmail';
+import { queueCandidateMail, sendCandidateMail } from '@/lib/ats-mail-store';
 import crypto from 'crypto';
 import { ATS_FROM_NAME, candidateSignatureHtml } from "@/lib/ats-from";
 
-function getResend(): Resend | null {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) return null;
-  return new Resend(key);
-}
-
 /**
  * Modes:
- *   - 'auto' (default): Si Gmail conectado → crea draft. Si no, intenta Resend.
- *                       Si nada disponible, devuelve solo el token.
- *   - 'draft': Fuerza creación de draft en Gmail (requiere conexión).
- *   - 'send':  Fuerza envío via Resend (legacy).
+ *   - 'auto' (default): Gmail conectado → borrador. Si no, el correo queda pendiente.
+ *   - 'draft': Fuerza borrador en Gmail. Sin buzón, queda pendiente.
+ *   - 'send':  Envía por Gmail. Sin buzón, queda pendiente.
  *   - 'token-only': No envía nada, solo genera el token.
  */
 type InviteMode = 'auto' | 'draft' | 'send' | 'token-only';
@@ -75,8 +68,6 @@ export async function POST(req: NextRequest) {
     // Get client info for branding
     const clientName = candidate.ht_clients?.name || 'Trading Solutions';
     const vacancyTitle = candidate.ht_vacancies?.title || 'la vacante';
-    const senderEmail = candidate.ht_clients?.sender_email || 'jointheteam@tradingsolutions.com';
-
     // ── Construir el HTML del correo (compartido por draft y send) ───────
     const emailSubject = `Trading Solutions · Evaluación para ${vacancyTitle}`;
     const emailHtml = `<!DOCTYPE html>
@@ -123,7 +114,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ...okBase, channel: 'token-only' });
     }
 
-    // 'auto' o 'draft': intentar Gmail primero
+    const queueSend = async () => {
+      const delivered = await sendCandidateMail({
+        to: candidate.email,
+        candidate: candidate.email,
+        type: 'headhunting_invite',
+        subject: emailSubject,
+        html: emailHtml,
+      });
+      return NextResponse.json({
+        ...okBase,
+        channel: delivered.status === 'sent' ? 'gmail' : delivered.status,
+        email_status: delivered.status,
+      });
+    };
+
+    // 'auto' o 'draft': borrador si el buzón responde. Si no, el correo queda pendiente.
     if (mode === 'auto' || mode === 'draft') {
       const gmailStatus = await isGmailConnected();
       if (gmailStatus.connected) {
@@ -137,43 +143,36 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({
             ...okBase,
             channel: 'gmail-draft',
+            email_status: 'draft',
             draft_id: draftRes.draft_id,
             gmail_email: draftRes.gmail_email,
             note: 'Draft creado en Gmail. Revisa tu carpeta Drafts y dale Send.',
           });
         }
+        console.error('headhunting invite draft failed');
         if (mode === 'draft') {
-          return NextResponse.json({ ...okBase, channel: 'gmail-draft-failed', error: draftRes.error }, { status: 207 });
+          await queueCandidateMail({
+            to: candidate.email,
+            candidate: candidate.email,
+            type: 'headhunting_invite',
+            subject: emailSubject,
+            html: emailHtml,
+          }, 'Gmail no dejó el borrador');
+          return NextResponse.json({ ...okBase, channel: 'pending', email_status: 'pending' });
         }
-        // mode='auto' y Gmail falló: caer a Resend
       } else if (mode === 'draft') {
-        return NextResponse.json({ ...okBase, channel: 'gmail-not-connected', error: 'Gmail no conectado. Ve a Settings → Conectar Gmail.' }, { status: 207 });
+        await queueCandidateMail({
+          to: candidate.email,
+          candidate: candidate.email,
+          type: 'headhunting_invite',
+          subject: emailSubject,
+          html: emailHtml,
+        }, 'Gmail no conectado');
+        return NextResponse.json({ ...okBase, channel: 'pending', email_status: 'pending' });
       }
     }
 
-    // 'send' o fallback de 'auto': intentar Resend
-    const resend = getResend();
-    if (!resend) {
-      return NextResponse.json({
-        ...okBase,
-        channel: 'token-only',
-        email_sent: false,
-        note: 'Sin Gmail conectado y sin RESEND_API_KEY — token generado, copialo manualmente. Conecta Gmail en Settings para auto-drafts.',
-      });
-    }
-    const { error: emailError } = await resend.emails.send({
-      from: `${ATS_FROM_NAME} <${senderEmail}>`,
-      to: candidate.email,
-      subject: emailSubject,
-      html: emailHtml,
-    });
-
-    if (emailError) {
-      console.error('Email send error:', emailError);
-      return NextResponse.json({ ...okBase, channel: 'resend-failed', error: emailError.message }, { status: 207 });
-    }
-
-    return NextResponse.json({ ...okBase, channel: 'resend-sent' });
+    return queueSend();
   } catch (err) {
     console.error('Invite error:', err);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });

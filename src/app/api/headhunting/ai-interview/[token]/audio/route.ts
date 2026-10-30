@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { publicStepBody } from "@/lib/candidate-public-error";
+import { aiInterviewEnabled } from "@/lib/ai-interview-flag";
 
 // Forzar runtime Node.js para soportar streaming de body grande
 export const runtime = "nodejs";
@@ -23,6 +24,9 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { token: string } }
 ) {
+  if (!aiInterviewEnabled()) {
+    return NextResponse.json({ status: "disabled" }, { status: 503 });
+  }
   const { token } = params;
   const url = new URL(req.url);
   let conversationId: string | null = url.searchParams.get("cid");
@@ -139,6 +143,9 @@ export async function HEAD(
   req: NextRequest,
   { params }: { params: { token: string } }
 ) {
+  if (!aiInterviewEnabled()) {
+    return NextResponse.json({ status: "disabled" }, { status: 503 });
+  }
   const { token } = params;
   const url = new URL(req.url);
   let conversationId: string | null = url.searchParams.get("cid");

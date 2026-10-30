@@ -5,7 +5,10 @@ import RubricasPanel from "@/components/RubricasPanel";
 import NueveBoxPanel from "@/components/NueveBoxPanel";
 import BateriaDashboard from "@/components/BateriaDashboard";
 import { LOGO_TS_SIMBOLO, LOGO_TS_CLASE_EN_OSCURO } from "@/lib/brand";
+import { isHrAdminSessionApi } from "@/lib/hr-admin-session-notice";
+import { VACANCY_ADMIN_HEADER } from "@/lib/public-vacancy";
 import { CanalSelect, errorCanal, FechasVacanteFields, errorFechas } from "@/components/CamposObligatorios";
+import { MailboxBanner } from "@/components/MailboxBanner";
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
@@ -140,8 +143,7 @@ export default function HRAdminPage() {
   }, []);
   const [sessionExpired, setSessionExpired] = useState(false);
 
-  // Detector global de sesión expirada — interceptamos fetch para detectar 401
-  // en cualquier endpoint /api/headhunting/* o /api/admin/* y mostrar banner.
+  // Detector global de sesión expirada — 401 en las APIs de HR muestra el aviso.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const originalFetch = window.fetch;
@@ -149,7 +151,7 @@ export default function HRAdminPage() {
       const r = await originalFetch.apply(window, args as any);
       try {
         const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request).url;
-        if (r.status === 401 && (url.includes('/api/headhunting') || url.includes('/api/admin') || url.includes('/api/dashboard'))) {
+        if (r.status === 401 && isHrAdminSessionApi(url)) {
           setSessionExpired(true);
         }
       } catch {}
@@ -389,6 +391,7 @@ export default function HRAdminPage() {
       </nav>
 
       <main className="max-w-ts mx-auto px-5 py-5 pb-12">
+        <MailboxBanner />
         {tab === "dashboard" && <Dashboard setTab={setTab} />}
         {tab === "requisiciones" && <RequisitionsInbox />}
         {tab === "vacantes" && <Vacantes />}
@@ -3036,7 +3039,7 @@ function Vacantes() {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch('/api/vacancies', { cache: 'no-store' });
+        const r = await fetch('/api/vacancies', { cache: 'no-store', headers: { [VACANCY_ADMIN_HEADER]: '1' } });
         const j = await r.json();
         if (!cancelled) {
           const list = (Array.isArray(j) ? j : j.data ?? []) as LiveVacancy[];
@@ -3680,7 +3683,7 @@ function Vacantes() {
 }
 
 function SettingsModal({ onClose }: { onClose: () => void }) {
-  const [config, setConfig] = useState<{ email_from: string; email_bcc: string; email_reply_to: string; booking_url: string; resend_domain_status: string } | null>(null);
+  const [config, setConfig] = useState<{ email_from: string; email_bcc: string; email_reply_to: string; booking_url: string } | null>(null);
   const [gmailStatus, setGmailStatus] = useState<{ connected: boolean; email?: string; environment?: string; connect_label?: string } | null>(null);
   const [bookingDraft, setBookingDraft] = useState('');
   const [bccDraft, setBccDraft] = useState('');
@@ -3702,7 +3705,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
   }, []);
 
   async function disconnectGmail() {
-    if (!confirm('¿Desconectar Gmail? Los próximos correos volverán a salir desde Resend (Elevare default).')) return;
+    if (!confirm('¿Desconectar Gmail? Los correos que no puedan salir quedarán pendientes hasta reconectar jointheteam@.')) return;
     await fetch('/api/google/disconnect', { method: 'POST' });
     setGmailStatus((prev) => ({
       connected: false,
@@ -3773,9 +3776,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
                 </>
               ) : (
                 <>
-                  Conecta tu Google Workspace una sola vez y los correos del ATS saldrán desde tu cuenta directamente.
-                  Sin verificación de dominio, sin Resend, sin Elevare. Tus candidatos ven al remitente correcto, y cada email
-                  queda en tu Enviados como si lo hubieras mandado a mano.
+                  Conecta jointheteam@ una sola vez. Los correos salen como Talent Acquisition Team y quedan en Enviados.
                   <br /><br />
                   <strong>Antes de conectar:</strong> el admin de Vercel debe tener configuradas las env vars{' '}
                   <code>GOOGLE_CLIENT_ID</code> y <code>GOOGLE_CLIENT_SECRET</code> (Google Cloud Console).
@@ -3784,25 +3785,12 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
-          {/* FROM (Resend fallback) */}
           <div>
-            <div className="text-xs uppercase font-semibold text-gray-500 tracking-wider mb-2">{gmailStatus?.connected ? 'Resend fallback (no usado mientras Gmail esté conectado)' : 'From (remitente · EMAIL_FROM env var)'}</div>
+            <div className="text-xs uppercase font-semibold text-gray-500 tracking-wider mb-2">From</div>
             <div className="bg-gray-50 rounded-lg p-3 font-mono text-xs break-all">
               {config ? config.email_from : 'cargando…'}
             </div>
-            {config && config.resend_domain_status !== 'verified_ts' && (
-              <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
-                <strong>⚠ Para que salga desde @tradingsolutions.com (no Elevare):</strong>
-                <ol className="list-decimal ml-4 mt-1 space-y-0.5">
-                  <li>En Resend (resend.com → Domains) agrega <code>tradingsolutions.com</code></li>
-                  <li>Como tradingsolutions.com está en Google Workspace, copias los 3 registros DNS (SPF, DKIM, DMARC) y los pegas en Google Domains o el proveedor donde compraste el dominio</li>
-                  <li>Espera ~10 min, click "Verify" en Resend</li>
-                  <li>En Vercel → Settings → Environment Variables, edita <code>EMAIL_FROM</code>:</li>
-                </ol>
-                <code className="block mt-1 bg-white p-2 rounded">{`Trading Solutions Recruiting <noreply@tradingsolutions.com>`}</code>
-                <div className="mt-1 text-gray-600">Recomendado: usa <code>noreply@</code> o <code>jointheteam@</code> como From, y configura abajo tu correo personal en Reply-To para que las respuestas de candidatos te lleguen directo.</div>
-              </div>
-            )}
+            <div className="text-xs text-gray-500 mt-1">El remitente es fijo: Talent Acquisition Team &lt;jointheteam@tradingsolutions.com&gt;.</div>
           </div>
 
           {/* Reply-To */}
@@ -3833,7 +3821,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
             />
             <div className="text-xs text-gray-500 mt-1">
               Cada email saliente te llega también acá como copia oculta — el candidato no ve este correo.
-              Útil para auditoría y registro sin entrar a Resend.
+              Los acuses al candidato no usan esta copia.
             </div>
           </div>
 
@@ -3989,7 +3977,7 @@ function AgentDetailModal({ agent, onClose }: { agent: 'recepcion' | 'pareo' | '
     assessment: {
       icon: '📧',
       title: 'Agente de Assessment',
-      description: 'Genera token único, envía invitación por email vía Resend, trackea status (sent → in_progress → completed) con anti-trampa (cámara + tab tracking).',
+      description: 'Genera token único, envía la invitación por Gmail desde jointheteam@, trackea status (sent → in_progress → completed) con anti-trampa (cámara + tab tracking).',
       trigger: 'POST /api/assessments con send_email:true · disponible desde Vacantes y Evaluaciones',
       logic: 'Crea fila en assessment_tokens (Neon) o ht_candidates (Supabase). Email HTML bilingüe. Link válido 30d. Auto-save cada respuesta.',
       modify_path: 'src/app/api/assessments/route.ts · src/app/api/headhunting/candidates/invite/route.ts · src/app/assessment/ht/[token]/page.tsx',
@@ -4461,7 +4449,7 @@ function Pipeline() {
   // 1. Cargar vacantes y seleccionar la primera por defecto
   useEffect(() => {
     (async () => {
-      const r = await fetch("/api/vacancies", { cache: "no-store" });
+      const r = await fetch("/api/vacancies", { cache: "no-store", headers: { [VACANCY_ADMIN_HEADER]: "1" } });
       const j = await r.json();
       const list = (Array.isArray(j) ? j : j.data ?? []) as LiveVacancy[];
       setVacs(list);
@@ -4683,7 +4671,7 @@ function Entrevistas() {
     (async () => {
       const [appR, vacR] = await Promise.all([
         fetch('/api/applications?limit=500', { cache: 'no-store' }).then((r) => r.json()),
-        fetch('/api/vacancies', { cache: 'no-store' }).then((r) => r.json()),
+        fetch('/api/vacancies', { cache: 'no-store', headers: { [VACANCY_ADMIN_HEADER]: '1' } }).then((r) => r.json()),
       ]);
       const arr = (appR.applications ?? appR.data ?? []) as typeof apps;
       setApps(arr.filter((a) => ['reviewing', 'interview'].includes(a.status)));
@@ -4991,7 +4979,7 @@ function Pruebas() {
     try {
       const [tr, vr] = await Promise.all([
         fetch("/api/assessments", { cache: "no-store" }).then((r) => r.json()),
-        fetch("/api/vacancies", { cache: "no-store" }).then((r) => r.json()),
+        fetch("/api/vacancies", { cache: "no-store", headers: { [VACANCY_ADMIN_HEADER]: "1" } }).then((r) => r.json()),
       ]);
       setTokens(tr.data ?? []);
       setVacs(Array.isArray(vr) ? vr : vr.data ?? []);
@@ -7305,7 +7293,7 @@ function ScheduleInterviewModal({ onClose }: { onClose: () => void }) {
             <div className="text-5xl mb-3">✅</div>
             <h3 className="text-xl font-extrabold mb-2">Entrevista agendada</h3>
             <p className="text-sm text-gray-600 mb-4">
-              {result.email_sent ? 'Invitación enviada al candidato con el .ics adjunto.' : 'Entrevista guardada. Email no enviado (revisá Resend).'}
+              {result.email_sent ? 'Invitación enviada al candidato con el .ics adjunto.' : 'Entrevista guardada. El correo no salió: revisá el buzón jointheteam@.'}
             </p>
             <a
               href={result.google_calendar_url}
@@ -7366,7 +7354,7 @@ function Analytics() {
       const [asR, tpR, vacR] = await Promise.all([
         fetch("/api/assessments?limit=500", { cache: "no-store" }).then((r) => r.json()),
         fetch("/api/talent-pool?limit=1000", { cache: "no-store" }).then((r) => r.json()),
-        fetch("/api/vacancies", { cache: "no-store" }).then((r) => r.json()),
+        fetch("/api/vacancies", { cache: "no-store", headers: { [VACANCY_ADMIN_HEADER]: "1" } }).then((r) => r.json()),
       ]);
       setData({
         tokens: (asR.data ?? []) as LiveToken[],
@@ -7581,7 +7569,7 @@ function LinkedInTS() {
   useEffect(() => {
     (async () => {
       const [vacR, tpR] = await Promise.all([
-        fetch("/api/vacancies", { cache: "no-store" }).then((r) => r.json()),
+        fetch("/api/vacancies", { cache: "no-store", headers: { [VACANCY_ADMIN_HEADER]: "1" } }).then((r) => r.json()),
         fetch("/api/talent-pool?limit=1000", { cache: "no-store" }).then((r) => r.json()),
       ]);
       setVacs((Array.isArray(vacR) ? vacR : vacR.data ?? []) as LiveVacancy[]);
@@ -7729,7 +7717,7 @@ function Datos() {
   useEffect(() => {
     (async () => {
       const [vacR, appR, tpR, asR] = await Promise.all([
-        fetch("/api/vacancies", { cache: "no-store" }).then((r) => r.json()),
+        fetch("/api/vacancies", { cache: "no-store", headers: { [VACANCY_ADMIN_HEADER]: "1" } }).then((r) => r.json()),
         fetch("/api/applications", { cache: "no-store" }).then((r) => r.json()),
         fetch("/api/talent-pool?limit=1000", { cache: "no-store" }).then((r) => r.json()),
         fetch("/api/assessments?limit=500", { cache: "no-store" }).then((r) => r.json()),

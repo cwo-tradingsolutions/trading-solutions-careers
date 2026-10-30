@@ -5,13 +5,12 @@
  *        Lee de la tabla recruiter_config (creada idempotente, una sola fila).
  *        Si no hay fila aún, devuelve los defaults de las env vars.
  *
- * POST → actualiza calendly_url y email_bcc desde la UI (la persona puede
- *        modificarlos sin tocar Vercel). EMAIL_FROM se queda como env var
- *        porque cambiarlo requiere DNS verificado en Resend.
+ * POST → actualiza booking_url, email_bcc y email_reply_to desde la UI.
+ *        El From es fijo: Talent Acquisition Team &lt;jointheteam@&gt;.
  */
 import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
-import { ATS_FROM_EMAIL, ATS_FROM_NAME } from "@/lib/ats-from";
+import { atsFromHeader } from "@/lib/ats-from";
 import { publicStepBody } from "@/lib/candidate-public-error";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -67,16 +66,12 @@ export async function GET(req: NextRequest) {
     const rows = await sql`SELECT * FROM recruiter_config WHERE id = 1`;
     const row = rows[0] ?? {};
 
-    const emailFrom = process.env.EMAIL_FROM ?? `${ATS_FROM_NAME} <${ATS_FROM_EMAIL}>`;
-    const isTSDomain = /tradingsolutions\.com/i.test(emailFrom);
-
     return NextResponse.json(
       {
-        email_from: emailFrom,
+        email_from: atsFromHeader(),
         email_bcc: row.email_bcc ?? "",
         email_reply_to: row.email_reply_to ?? "",
         booking_url: row.booking_url ?? "",
-        resend_domain_status: isTSDomain ? "verified_ts" : "default_elevare",
       },
       { headers: corsHeaders }
     );

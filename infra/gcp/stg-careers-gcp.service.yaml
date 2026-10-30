@@ -6,7 +6,10 @@
 #   gcloud run services replace infra/gcp/stg-careers-gcp.service.yaml \
 #     --project wellness-experience-management --region us-west1
 #
-# Sin RESEND_API_KEY a propósito: en staging no sale ningún correo.
+# Sin RESEND_API_KEY. La base de staging tiene correos reales copiados de
+# producción: MAIL_RECIPIENT_ALLOWLIST es lo único que puede salir por Gmail.
+# Si se quita, el proceso bloquea todos los envíos (STAGING_READ_ONLY=1 y
+# K_SERVICE=stg-careers-gcp).
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
@@ -38,6 +41,7 @@ spec:
           env:
             - { name: POSTGREST_DIRECTO, value: "1" }
             - { name: STAGING_READ_ONLY, value: "1" }
+            - { name: MAIL_RECIPIENT_ALLOWLIST, value: "cwo@tradingsolutions.com,jointheteam@tradingsolutions.com" }
             - name: SUPABASE_JWT_SECRET
               valueFrom: { secretKeyRef: { name: prod-careers-postgrest-jwt-secret, key: latest } }
             # Tablas que venían de Neon: esquema `neon`, rol careers_app

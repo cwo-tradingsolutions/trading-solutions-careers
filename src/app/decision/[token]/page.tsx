@@ -5,6 +5,8 @@ import { useParams, useSearchParams } from "next/navigation";
 import { CheckCircle2, XCircle, ArrowRight, HelpCircle, AlertTriangle } from "lucide-react";
 import { stageLabel } from "@/lib/stage-labels";
 import { REJECTION_CATEGORIES } from "@/lib/rejection-rules";
+import { invalidLinkBoth } from "@/lib/candidate-invalid-link";
+import { CANDIDATE_MAIL } from "@/lib/candidate-public-error";
 
 const TS_HERO = "https://cdn.prod.website-files.com/68fb7b9474bf8f90808cd50f/691645b652c1e9091b25f59c_FotosWeb_TradingSolutions-14_4_11zon.webp";
 const TS_LOGO = "https://cdn.prod.website-files.com/68fb7b9474bf8f90808cd50f/6913594489519813fe9e620e_logo%20web-03.png";
@@ -45,7 +47,7 @@ export default function DecisionPage() {
       .then(async r => {
         const j = await r.json();
         if (!r.ok) {
-          setError(j.error_en ? `${j.error} ${j.error_en}` : (j.error || "No pudimos completar este paso. Escríbenos a jointheteam@tradingsolutions.com"));
+          setError(invalidLinkBoth());
           setPhase('error');
         } else {
           setState(j);
@@ -57,7 +59,7 @@ export default function DecisionPage() {
           }
         }
       })
-      .catch(() => { setError('Error de red'); setPhase('error'); });
+      .catch(() => { setError(invalidLinkBoth()); setPhase('error'); });
   }, [token]);
 
   const submit = async () => {
@@ -75,15 +77,17 @@ export default function DecisionPage() {
           category_key: categoryKey || undefined,
         }),
       });
-      const j = await r.json();
-      if (!r.ok) {
-        setError(j.error_en ? `${j.error} ${j.error_en}` : (j.error || "No pudimos completar este paso. Escríbenos a jointheteam@tradingsolutions.com"));
+      if (r.status === 409) {
+        setError("Ya registramos tu respuesta. / We already saved your answer.");
+        setPhase('choose');
+      } else if (!r.ok) {
+        setError(`No pudimos registrar la decisión. Escríbenos a ${CANDIDATE_MAIL}. / We couldn't save this decision. Write to us at ${CANDIDATE_MAIL}.`);
         setPhase('choose');
       } else {
         setPhase('done');
       }
     } catch {
-      setError("No pudimos completar este paso. Escríbenos a jointheteam@tradingsolutions.com We couldn't complete this step. Write to us at jointheteam@tradingsolutions.com");
+      setError(`No pudimos registrar la decisión. Escríbenos a ${CANDIDATE_MAIL}. We couldn't save this decision. Write to us at ${CANDIDATE_MAIL}.`);
       setPhase('choose');
     }
   };
@@ -99,7 +103,7 @@ export default function DecisionPage() {
           <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-red-100 flex items-center justify-center">
             <AlertTriangle className="w-6 h-6 text-red-600" />
           </div>
-          <h2 className="text-xl font-bold mb-2">Algo salió mal</h2>
+          <h2 className="text-xl font-bold mb-2">No pudimos abrir este enlace</h2>
           <p className="text-sm text-gray-600">{error}</p>
         </div>
       </div>

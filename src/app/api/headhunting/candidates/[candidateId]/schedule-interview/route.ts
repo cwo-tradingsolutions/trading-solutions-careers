@@ -1,7 +1,7 @@
 /**
  * POST /api/headhunting/candidates/[candidateId]/schedule-interview
  *
- * Cerrado. No crea filas en ts_interviews ni envía correo por Resend.
+ * Cerrado. No crea filas en ts_interviews ni envía correo.
  * GET sigue listando citas que ya existían.
  */
 import { NextRequest, NextResponse } from "next/server";

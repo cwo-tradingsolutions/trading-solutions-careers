@@ -9,11 +9,9 @@
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase';
 import { BATTERY_VERSION } from '@/lib/bateria/items';
-import { asuntoBateria, htmlBateria, textoBateria, asuntoBateriaEn, htmlBateriaEn, textoBateriaEn } from '@/lib/bateria/correo';
-import { ATS_FROM_NAME } from '@/lib/ats-from';
+import { asuntoBateria, htmlBateria, asuntoBateriaEn, htmlBateriaEn } from '@/lib/bateria/correo';
 import { resolveCandidateLang } from '@/lib/candidate-lang';
-import { isGmailConnected, sendViaGmail } from '@/lib/gmail';
-import { getResend, EMAIL_FROM } from '@/lib/resend';
+import { sendCandidateMail } from '@/lib/ats-mail-store';
 import { recordStageEvent } from '@/lib/stage-events';
 import { normalizeStage, STAGE_RANK } from '@/lib/stage-labels';
 import { batteryAutoSendEnabled, NOTA_BATERIA_PENDIENTE } from '@/lib/battery-auto-send';
@@ -102,8 +100,8 @@ export async function sesionDe(c: CandBateria, perfil: string | null, origin: st
 }
 
 export type ResultadoAuto =
-  | { enviado: true; canal: 'gmail' | 'resend'; url: string }
-  | { enviado: false; motivo: string; url?: string; pendiente?: boolean };
+  | { enviado: true; canal: 'gmail'; url: string }
+  | { enviado: false; motivo: string; url?: string; pendiente?: boolean; status?: 'pending' };
 
 async function marcarBateriaPendiente(candidatoId: string) {
   const { data } = await supabaseAdmin.from('ht_candidates').select('notes').eq('id', candidatoId).maybeSingle();
@@ -124,11 +122,10 @@ export async function limpiarBateriaPendiente(candidatoId: string) {
 /**
  * Envío automático de la Batería TS (prefiltro pasado / listo para batería).
  *
- * Sale de verdad, no como borrador: Kelly lo pidió así el 27-oct. Primero por
- * Gmail —la cuenta conectada es jointheteam@, con su historial—; si Gmail no
- * está conectado, por Resend con EMAIL_FROM y respuesta a jointheteam@. Si no
- * hay ninguno de los dos (staging), no sale nada, el candidato se queda en
- * Prefiltro y se devuelve el motivo: moverlo sin invitación sería mentir.
+ * Sale de verdad, no como borrador: Kelly lo pidió así el 27-oct. Solo por
+ * Gmail, desde jointheteam@. Si el buzón no responde, el correo queda
+ * pendiente y el candidato no cambia de etapa: moverlo sin invitación sería
+ * mentir.
  */
 export async function enviarBateriaAuto(candidatoId: string, origin: string): Promise<ResultadoAuto> {
   if (!batteryAutoSendEnabled()) {
@@ -157,27 +154,24 @@ export async function enviarBateriaAuto(candidatoId: string, origin: string): Pr
     const datos = { nombre: cand.nombre ?? null, vacante: cand.vacante ?? null, url: ses.url };
     const asunto = lang === 'en' ? asuntoBateriaEn(datos.vacante) : asuntoBateria(datos.vacante);
     const html = lang === 'en' ? htmlBateriaEn(datos) : htmlBateria(datos);
-    const texto = lang === 'en' ? textoBateriaEn(datos) : textoBateria(datos);
 
-    let canal: 'gmail' | 'resend';
-    const gmail = await isGmailConnected();
-    if (gmail.connected) {
-      const r = await sendViaGmail({
-        to: c.email, subject: asunto, html, replyTo: RESPONDER_A,
-        fromName: ATS_FROM_NAME,
-      });
-      if (!r.ok) return { enviado: false, motivo: r.error, url: ses.url };
-      canal = 'gmail';
-    } else if (process.env.RESEND_API_KEY) {
-      const { error } = await getResend().emails.send({
-        from: EMAIL_FROM, to: c.email, replyTo: RESPONDER_A, subject: asunto, html, text: texto,
-      });
-      if (error) return { enviado: false, motivo: error.message, url: ses.url };
-      canal = 'resend';
-    } else {
-      return { enviado: false, motivo: 'sin Gmail ni Resend configurados', url: ses.url };
+    const delivered = await sendCandidateMail({
+      to: c.email,
+      candidate: c.email,
+      type: 'battery_auto',
+      subject: asunto,
+      html,
+      replyTo: RESPONDER_A,
+    });
+    if (delivered.status === 'bloqueado_staging') {
+      return { enviado: false, motivo: 'correo bloqueado en este ambiente', url: ses.url, pendiente: true, status: 'pending' };
+    }
+    if (delivered.status === 'pending') {
+      await marcarBateriaPendiente(candidatoId);
+      return { enviado: false, motivo: 'buzón jointheteam@ desconectado', url: ses.url, pendiente: true, status: 'pending' };
     }
 
+    const canal = 'gmail' as const;
     await supabaseAdmin
       .from('ts_bat_sessions')
       .update({ invited_at: new Date().toISOString(), invite_channel: `auto-${canal}`, invite_count: ses.invite_count + 1, updated_at: new Date().toISOString() })
@@ -187,6 +181,6 @@ export async function enviarBateriaAuto(candidatoId: string, origin: string): Pr
     return { enviado: true, canal, url: ses.url };
   } catch (e: any) {
     console.error('bateria · envío automático falló', candidatoId, e?.message || e);
-    return { enviado: false, motivo: e?.message ?? 'error' };
+    return { enviado: false, motivo: 'no se pudo enviar la batería' };
   }
 }

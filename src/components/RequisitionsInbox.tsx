@@ -334,7 +334,7 @@ function Tarjeta({
     }
 
     try {
-      const r = await fetch("/api/vacancies?status=open", { cache: "no-store" });
+      const r = await fetch("/api/vacancies?status=open&admin=1", { cache: "no-store" });
       const filas = await r.json();
       if (Array.isArray(filas)) {
         const t = req.title.trim().toLowerCase();
