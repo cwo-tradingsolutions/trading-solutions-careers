@@ -23,7 +23,8 @@ import {
   type PanamaScore,
 } from "@/lib/panama-ops-prefilter";
 import { recordStageEvent } from "@/lib/stage-events";
-import { resolveCandidateLang, EN_SIGNATURE_NAME } from "@/lib/candidate-lang";
+import { enviarBateriaAuto } from "@/lib/bateria/invitar";
+import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { TEMPLATE_ENGLISH_MIN_RANK, TEMPLATE_SALARY_CAP, type TemplateKey } from "@/lib/prefilter-templates";
 
 // Techos por vacancy_id (en COP mensuales)
@@ -829,6 +830,19 @@ export async function POST(
     });
   }
 
+  // ─── Prefiltro pasado → Batería TS, sin esperar a nadie ─────────────
+  // Kelly 27-oct: quien pasa el prefiltro recibe la batería de una vez, desde
+  // jointheteam@, y queda en el gate Batería TS. Si no hay canal de correo
+  // (staging), se queda en Prefiltro: moverlo sin invitación sería mentir.
+  let bateriaAuto: Awaited<ReturnType<typeof enviarBateriaAuto>> | null = null;
+  if (decision === "pass") {
+    const origin = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+    bateriaAuto = await enviarBateriaAuto(candidate.id as string, origin);
+    if (!bateriaAuto.enviado) {
+      console.error(`[prefiltro] batería automática no salió para ${candidate.id}: ${bateriaAuto.motivo}`);
+    }
+  }
+
   // ─── Notificación a Kelly (no bloqueante) ─────────────────────────
   try {
     const gmail = await isGmailConnected();
@@ -877,6 +891,7 @@ export async function POST(
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Salario que pidió:</td><td>${salarioTxt}</td></tr>
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Inglés:</td><td>${body.english_level || "—"}</td></tr>
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Ciudad:</td><td>${body.city || "—"}</td></tr>
+            ${bateriaAuto ? `<tr><td style="padding: 4px 12px 4px 0; color: #666;">Batería TS:</td><td>${bateriaAuto.enviado ? `enviada automáticamente (${bateriaAuto.canal})` : `<strong>no salió</strong> · ${bateriaAuto.motivo}`}</td></tr>` : ""}
           </table>
           ${bloqueos.length > 0 ? `<div style="background: ${soloSalario ? "#FFFBEB" : "#FEF2F2"}; padding: 10px 14px; border-radius: 6px; color: ${soloSalario ? "#92400E" : "#991B1B"}; font-size: 13px;"><strong>No se rechazó a nadie.</strong> ${soloSalario ? "Quedó en revisión por el salario:" : "Quedó en rojo esperando tu decisión:"}<ul style="margin: 8px 0 0; padding-left: 18px;">${listaBloqueos}</ul></div>` : ""}
           <p><a href="${baseUrl}/hr-admin?tab=prefiltros" style="color: #2C64ED;">Ver en HR Admin →</a></p>

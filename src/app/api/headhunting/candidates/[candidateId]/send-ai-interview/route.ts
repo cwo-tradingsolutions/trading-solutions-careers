@@ -11,6 +11,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
+import { recordStageEvent } from "@/lib/stage-events";
+import { normalizeStage, STAGE_RANK } from "@/lib/stage-labels";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import crypto from "crypto";
 import { ATS_FROM_NAME } from "@/lib/ats-from";
@@ -58,11 +60,27 @@ export async function POST(
       return NextResponse.json({ error: "save_failed", detail: insertErr.message }, { status: 500 });
     }
 
-    // Update candidate stage
-    await supabaseAdmin
-      .from("ht_candidates")
-      .update({ stage: "entrevista_ia", updated_at: new Date().toISOString() })
-      .eq("id", candidateId);
+    // La entrevista IA hace el trabajo del screening del reclutador: se
+    // escribe el code v4 (`entrevista_ia` ya no existe) y con evento, para que
+    // el tablero y los agentes se enteren. Solo hacia adelante: reenviar el
+    // enlace a quien va más avanzado no lo devuelve.
+    const ETAPA_IA = "recruiter_interview";
+    if ((STAGE_RANK[normalizeStage(candidate.stage)] ?? 0) < (STAGE_RANK[ETAPA_IA] ?? 0)) {
+      const { error: stageErr } = await supabaseAdmin
+        .from("ht_candidates")
+        .update({ stage: ETAPA_IA, updated_at: new Date().toISOString() })
+        .eq("id", candidateId);
+      if (!stageErr) {
+        await recordStageEvent({
+          candidateId,
+          fromStage: candidate.stage ?? null,
+          toStage: ETAPA_IA,
+          vacancyId: candidate.vacancy_id ?? null,
+          source: "system",
+          note: "Entrevista IA enviada",
+        });
+      }
+    }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://trading-solutions-careers.vercel.app";
     const interviewUrl = `${baseUrl}/entrevista-ia/${token}`;

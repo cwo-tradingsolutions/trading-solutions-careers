@@ -249,6 +249,8 @@ import {
   normalizeStage,
   stageOrder,
   siguienteEtapa,
+  KELLY_GATES,
+  kellyGateFromStage,
 } from "@/lib/stage-labels";
 
 type StageCategory = "screening" | "assessment" | "interview" | "decision" | "terminal-positive" | "terminal-negative";
@@ -286,6 +288,24 @@ const STAGES: Array<{ id: string; label: string; category: StageCategory; owner:
     owner: OWNER_BY_STAGE[s.id] ?? "recruiter",
   }));
 
+/**
+ * Columnas del tablero = gates de Kelly (27-oct), en su orden. Onboarding
+ * (gate 12 · contratado) sigue abajo en el pie, junto a los rechazados.
+ * Psicométricas y Entrevista HM solo se llenan con codes históricos: no
+ * tienen code v4 propio hasta que Kelly lo nombre.
+ */
+const OWNER_BY_GATE: Record<string, StageOwner> = {
+  psicometricas: "candidate",
+  entrevista_hm: "recruiter",
+};
+const GATE_COLUMNS: Array<{ id: string; n: number; label: string; owner: StageOwner }> =
+  KELLY_GATES.filter((g) => g.id !== "onboarding").map((g) => ({
+    id: g.id,
+    n: g.n,
+    label: g.label,
+    owner: OWNER_BY_GATE[g.id] ?? OWNER_BY_STAGE[g.stages[0]] ?? "recruiter",
+  }));
+
 const REJECTED_STAGE = { id: "rechazado", label: "Rechazado", category: "terminal-negative" as StageCategory, owner: "terminal" as StageOwner };
 
 const OWNER_STYLE: Record<StageOwner, { label: string; barColor: string; bgTint: string }> = {
@@ -301,7 +321,12 @@ const OWNER_STYLE: Record<StageOwner, { label: string; barColor: string; bgTint:
 // cargar significado, y con eso el tablero deja de competir con los nombres
 // de los candidatos.
 
-export default function PipelineFunnel() {
+export default function PipelineFunnel({
+  onBuscarBanco,
+}: {
+  /** Abre el rediscovery HT de la vacante filtrada. Opcional: el dashboard ya lo tiene en la card. */
+  onBuscarBanco?: (vacancy: { id: string; title: string }) => void;
+} = {}) {
   const [candidates, setCandidates] = useState<Cand[]>([]);
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
   /** El equipo de Talent. Si la tabla todavía no existe, queda vacío y el
@@ -407,7 +432,7 @@ export default function PipelineFunnel() {
     // Sobre lo que se está viendo, no sobre la base entera: si no, «seleccionar
     // toda la columna» alcanzaba a gente de procesos cerrados que no aparece
     // en pantalla, y la acción siguiente les caía encima sin que nadie lo viera.
-    const ids = filtered.filter(c => (c.stage || "aplico") === stageId).map(c => c.id);
+    const ids = filtered.filter(c => kellyGateFromStage(c.stage)?.id === stageId).map(c => c.id);
     setSelectedIds(prev => {
       const n = new Set(prev);
       ids.forEach(id => n.add(id));
@@ -419,8 +444,8 @@ export default function PipelineFunnel() {
     setLoading(true);
     try {
       const [cRes, vRes] = await Promise.all([
-        fetch(`/api/headhunting/candidates?clientId=${TS_CLIENT_ID}`),
-        fetch(`/api/headhunting/vacancies?clientId=${TS_CLIENT_ID}`),
+        fetch(`/api/headhunting/candidates?client_id=${TS_CLIENT_ID}`),
+        fetch(`/api/headhunting/vacancies?client_id=${TS_CLIENT_ID}`),
       ]);
       const cJ = await cRes.json();
       const vJ = await vRes.json();
@@ -564,10 +589,21 @@ export default function PipelineFunnel() {
     return m;
   }, [filtered, ordenarPorBateria]);
 
+  const byGate = useMemo(() => {
+    const m: Record<string, Cand[]> = {};
+    GATE_COLUMNS.forEach(g => { m[g.id] = []; });
+    filtered.forEach(c => {
+      const gate = kellyGateFromStage(c.stage);
+      if (gate && m[gate.id]) m[gate.id].push(c);
+    });
+    for (const k of Object.keys(m)) m[k] = ordenarPorBateria(m[k]);
+    return m;
+  }, [filtered, ordenarPorBateria]);
+
   const totals = filtered.length;
 
-  // Stages a renderizar (ocultar las terminales · van en footer aparte)
-  const visibleStages = STAGES.filter(s => s.category !== 'terminal-positive');
+  // Columnas a renderizar: gates 1..11 (Onboarding y rechazados van en el pie)
+  const visibleStages = GATE_COLUMNS;
   const hiredCount = (byStage['contratado'] || []).length;
   const rejectedCount = (byStage['rechazado'] || []).length;
   const activeCount = totals - hiredCount - rejectedCount;
@@ -685,6 +721,20 @@ export default function PipelineFunnel() {
                   ver cerradas ({opcionesVacante.cerradas.length})
                 </label>
               )}
+              {vacFilter !== "all" && onBuscarBanco && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const v = vacancies.find((x) => x.id === vacFilter);
+                    onBuscarBanco({ id: vacFilter, title: v?.title || "Vacante" });
+                  }}
+                  className="text-xs font-bold px-3 py-2.5 border border-black text-black hover:bg-black hover:text-white transition-colors whitespace-nowrap"
+                  style={{ borderRadius: 0 }}
+                  title="Buscar en el banco HT (rechazados o contratados de otras vacantes) y traerlos a esta"
+                >
+                  Buscar en banco
+                </button>
+              )}
               {vacFilter !== "all" && (
                 <a
                   href={`/hr-admin/comparar/${vacFilter}`}
@@ -787,7 +837,7 @@ export default function PipelineFunnel() {
           <div className="overflow-x-auto pb-4 -mx-6 px-6">
             <div className="flex gap-2 min-w-max">
               {visibleStages.map((stage) => {
-                const cands = byStage[stage.id] || [];
+                const cands = byGate[stage.id] || [];
                 const stageSelected = cands.filter(c => selectedIds.has(c.id)).length;
                 const ownerStyle = OWNER_STYLE[stage.owner];
                 const OwnerIcon = stage.owner === 'candidate' ? User : stage.owner === 'recruiter' ? UserCheck : stage.owner === 'shared' ? Users : null;
@@ -807,7 +857,7 @@ export default function PipelineFunnel() {
                           style={{ background: ownerStyle.barColor }}
                           title={`Depende de: ${ownerStyle.label}`}
                         />
-                        <span className="ts-etapa-nombre flex-1 min-w-0">{stage.label}</span>
+                        <span className="ts-etapa-nombre flex-1 min-w-0"><span className="ts-tabular text-[var(--texto-3)] mr-1">{stage.n}</span>{stage.label}</span>
                         {cands.length > 0 && (
                           <button
                             onClick={() => stageSelected === cands.length ? cands.forEach(c => toggleSelect(c.id)) : selectAllInStage(stage.id)}
@@ -1161,6 +1211,8 @@ function BulkActionBar({
   // al pasar de "hay seleccion" a "no hay seleccion".
   const [batMsg, setBatMsg] = useState<string | null>(null);
   const [citando, setCitando] = useState(false);
+  /** Rechazo masivo: pasa por el mismo modal con motivo que el individual. */
+  const [rechazando, setRechazando] = useState(false);
   const [cita, setCita] = useState({ fechaISO: "", horaLlegada: "08:00", horaFin: "12:00", direccion: "", referencia: "" });
   const [previaCita, setPreviaCita] = useState<any>(null);
 
@@ -1307,9 +1359,9 @@ function BulkActionBar({
     }
   }
 
-  async function runBulk(action: "stage_action" | "advance" | "reject") {
+  async function runBulk(action: "stage_action" | "advance") {
     if (running) return;
-    if (!confirm(`Aplicar acción a ${n} candidatos seleccionados? Se crearán drafts en tu Gmail (revisar antes de enviar).`)) return;
+    if (!confirm(`Aplicar acción a ${n} candidatos seleccionados? Quien quede en «Prefiltro pasado» recibe la Batería TS por correo de inmediato (desde jointheteam@); el resto de correos quedan como borrador en tu Gmail.`)) return;
     setRunning(true);
     setProgress({ done: 0, total: n, ok: 0, fail: 0 });
     let ok = 0, fail = 0;
@@ -1332,9 +1384,6 @@ function BulkActionBar({
           if (!next) { fail++; setProgress({ done: i + 1, total: n, ok, fail }); continue; }
           url = `/api/headhunting/candidates/${c.id}/stage`;
           body = { stage: next.id };
-        } else if (action === "reject") {
-          url = `/api/headhunting/candidates/${c.id}/stage`;
-          body = { stage: "rechazado" };
         }
         const r = await fetch(url, {
           method: "POST",
@@ -1357,6 +1406,16 @@ function BulkActionBar({
 
   return (
     <>
+    {rechazando && (
+      <RejectionModal
+        candidateId={selectedCands[0].id}
+        candidateName={selectedCands[0].name}
+        vacancyTitle={selectedCands[0].ht_vacancies?.title || "la posición"}
+        bulk={selectedCands.map((c) => ({ id: c.id, name: c.name, vacancyTitle: c.ht_vacancies?.title || "la posición" }))}
+        onClose={() => setRechazando(false)}
+        onRejected={() => { setRechazando(false); onActionComplete(); }}
+      />
+    )}
     {citando && (
       <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center overflow-y-auto p-6"
         onClick={(e) => { if (e.target === e.currentTarget) setCitando(false); }}>
@@ -1505,7 +1564,7 @@ function BulkActionBar({
             → Avanzar etapa
           </button>
           <button
-            onClick={() => runBulk("reject")}
+            onClick={() => setRechazando(true)}
             className="text-xs font-bold px-3 py-1.5 rounded-full bg-red-600 hover:bg-red-700"
           >
             ❌ Rechazar
@@ -1877,9 +1936,11 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
       });
       const j = await res.json();
       if (j.success) {
-        setFeedback(targetStage === "rechazado"
-          ? "✅ Rechazado · draft de descarte creado en tu Gmail"
-          : `✅ Movido a ${targetStage}`);
+        setFeedback(j.bateria_auto?.enviado
+          ? "✅ Prefiltro pasado · Batería TS enviada por correo"
+          : j.bateria_auto
+            ? `✅ Prefiltro pasado · la Batería TS no salió: ${j.bateria_auto.motivo}`
+            : `✅ Movido a ${label.replace(/^Movido a /, "")}`);
         // Re-fetch sin reload: preserva filtro de vacante
         setTimeout(() => {
           onChanged?.();
@@ -1932,7 +1993,10 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
             onChange={(e) => {
               const v = e.target.value;
               if (!v) return;
-              const s = [...STAGES, REJECTED_STAGE].find(x => x.id === v);
+              // Rechazar siempre pasa por el modal con motivo, nunca por el
+              // cambio de etapa pelado: sin motivo no hay clasificación.
+              if (v === REJECTED_STAGE.id) { setShowRejectModal(true); e.target.value = ""; return; }
+              const s = STAGES.find(x => x.id === v);
               if (s) moveToStage(s.id, `Movido a ${s.label}`);
               e.target.value = "";
             }}
