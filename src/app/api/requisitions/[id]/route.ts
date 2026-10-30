@@ -106,11 +106,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     // Guardar sin mover de estado.
     if (!accion) {
-      const { error } = await supabaseAdmin
+      const { data: guardadas, error } = await supabaseAdmin
         .from("ht_requisitions")
         .update(cambios)
-        .eq("id", params.id);
+        .eq("id", params.id)
+        .is("hidden_at", null)
+        .select("id");
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (!guardadas || guardadas.length === 0) {
+        return NextResponse.json(
+          { error: "Esta requisición está oculta. No se guarda ni se mueve de estado." },
+          { status: 409 },
+        );
+      }
       return NextResponse.json({ success: true, guardado: true, status: estadoActual });
     }
 
@@ -319,12 +327,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       cambios.approved_by = actor;
     }
 
-    const { error: updErr } = await supabaseAdmin
+    const { data: guardadas, error: updErr } = await supabaseAdmin
       .from("ht_requisitions")
       .update(cambios)
-      .eq("id", params.id);
+      .eq("id", params.id)
+      .is("hidden_at", null)
+      .select("id");
 
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+    if (!guardadas || guardadas.length === 0) {
+      return NextResponse.json(
+        { error: "Esta requisición está oculta. No se guarda ni se mueve de estado." },
+        { status: 409 },
+      );
+    }
 
     const { error: evErr } = await supabaseAdmin.from("ht_requisition_events").insert({
       requisition_id: params.id,

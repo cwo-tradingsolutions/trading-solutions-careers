@@ -4,27 +4,24 @@
 --
 -- SOLO ARCHIVO. No aplicar esta migración hasta el GO de Kelly.
 -- No correr este SQL contra Supabase, Neon, ni ninguna otra base real
--- desde el PR. El deploy con GO es el único momento en que se aplica.
+-- desde el PR.
 --
--- No borra filas. Ocultar es hidden_at + hidden_reason + hidden_by, y una
--- fila nueva en ht_requisition_events. El status no se toca: el CHECK sigue
--- siendo pedida, con_perfil, devuelta, aprobada, rechazada, publicada.
+-- Dos transacciones.
+--   A) DDL de hidden_at / hidden_reason / hidden_by y el índice. Siempre
+--      se commitea. Si la base no es la foto del 30-oct, las columnas
+--      igual quedan: el API filtra por hidden_at y no puede quedarse sin ellas.
+--   B) Oculta las dos filas. El chequeo compara contra un «antes» tomado
+--      en esta misma corrida y valida esos ids, no un total fijo de 11/9/1/1/28.
+--      Si B falla, solo B se revierte. A ya está commiteado.
 --
--- Las dos claves de hidden_reason viven en un solo sitio del código:
--- HIDDEN_REASONS en src/lib/requisition-board.ts. Este CHECK repite esas
--- mismas cadenas.
---
--- Es idempotente: se puede correr más de una vez. El backup conserva la
--- foto de la primera corrida (antes de ocultar). El UPDATE no pisa una fila
--- que ya tiene hidden_at. El evento no se duplica.
---
--- Va en una transacción: si el assert del paso 5 falla, los UPDATE se
--- revierten. Las tablas nuevas no tienen policy para anon ni authenticated.
+-- No borra filas. El status no se toca. Es idempotente.
+-- HIDDEN_REASONS en src/lib/requisition-board.ts es el único sitio del código
+-- con las dos claves. Este CHECK repite esas cadenas.
 -- ============================================================================
 
+-- ─── A) Columnas. Siempre se quedan. ────────────────────────────────────────
 begin;
 
--- ─── 1) Columnas ────────────────────────────────────────────────────────────
 alter table ht_requisitions add column if not exists hidden_at timestamptz;
 alter table ht_requisitions add column if not exists hidden_reason text;
 alter table ht_requisitions add column if not exists hidden_by text;
@@ -38,10 +35,11 @@ create index if not exists idx_req_visible
   on ht_requisitions (client_id, created_at desc)
   where hidden_at is null;
 
--- ─── 2) Backup de las dos filas y sus eventos, ANTES del cambio ────────────
--- Tabla de backup (la foto operativa) y, en el README de esta migración,
--- el SELECT que la exporta a JSON. on conflict do nothing: una segunda
--- corrida no pisa la foto previa al ocultamiento.
+commit;
+
+-- ─── B) Ocultar las dos filas. Si esto aborta, las columnas siguen. ─────────
+begin;
+
 create table if not exists ht_requisitions_backup_20261030 (
   requisition_id uuid primary key,
   backed_up_at   timestamptz not null default now(),
@@ -49,6 +47,22 @@ create table if not exists ht_requisitions_backup_20261030 (
   events_data    jsonb not null
 );
 
+alter table ht_requisitions_backup_20261030 enable row level security;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    execute 'revoke all on table ht_requisitions_backup_20261030 from anon';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    execute 'revoke all on table ht_requisitions_backup_20261030 from authenticated';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    execute 'grant all on table ht_requisitions_backup_20261030 to service_role';
+  end if;
+end $$;
+
+-- Foto de las dos filas ANTES de tocarlas. on conflict do nothing: una
+-- segunda corrida no pisa la primera foto.
 insert into ht_requisitions_backup_20261030 (requisition_id, row_data, events_data)
 select
   r.id,
@@ -68,25 +82,24 @@ where r.id in (
 )
 on conflict (requisition_id) do nothing;
 
-alter table ht_requisitions_backup_20261030 enable row level security;
-do $$
-begin
-  if exists (select 1 from pg_roles where rolname = 'anon') then
-    execute 'revoke all on table ht_requisitions_backup_20261030 from anon';
-  end if;
-  if exists (select 1 from pg_roles where rolname = 'authenticated') then
-    execute 'revoke all on table ht_requisitions_backup_20261030 from authenticated';
-  end if;
-  if exists (select 1 from pg_roles where rolname = 'service_role') then
-    execute 'grant all on table ht_requisitions_backup_20261030 to service_role';
-  end if;
-end $$;
+-- «Antes» de esta corrida. Vive solo en la transacción B.
+create temp table _req_hide_before on commit drop as
+select
+  r.id,
+  r.status,
+  r.hidden_at,
+  (
+    select count(*)::int
+    from ht_requisition_events e
+    where e.requisition_id = r.id
+  ) as event_count
+from ht_requisitions r
+where r.id in (
+  '22c60d38-590b-4789-a1df-fe3d8f77d2ec',
+  '8e597f02-a1dd-47ba-94f6-db4521224077'
+);
 
--- ─── 3) Conteos ANTES, una sola vez ─────────────────────────────────────────
--- Esperado en la línea base del 30-oct-2026 ~12:25 Bogotá:
---   ht_requisitions 11 (publicada 9, pedida 1, rechazada 1)
---   hidden 0
---   ht_requisition_events 28
+-- Conteos informativos. No abortan la migración si no son 11/9/1/1/28.
 create table if not exists ht_migration_verify_20261030 (
   phase       text not null check (phase in ('before','after')),
   metric      text not null,
@@ -128,10 +141,10 @@ where not exists (
   select 1 from ht_migration_verify_20261030 where phase = 'before'
 );
 
--- ─── 4) Ocultar. El status no entra en el SET. ─────────────────────────────
 -- 22c60d38 es la duplicada. La canónica 63f67118-1827-484d-8623-3f90e3758d35
--- no se nombra en ningún UPDATE: sigue publicada.
+-- no se nombra en ningún UPDATE.
 -- 8e597f02 es Coordinador de Flota, armada fuera del ATS.
+-- El status no entra en el SET.
 
 update ht_requisitions
 set hidden_at = now(),
@@ -147,8 +160,6 @@ set hidden_at = now(),
 where id = '8e597f02-a1dd-47ba-94f6-db4521224077'
   and hidden_at is null;
 
--- Un evento por id. from_status = to_status = el status que ya tenía.
--- No inventa un estado. No se inserta de nuevo si la nota ya está.
 insert into ht_requisition_events (requisition_id, from_status, to_status, actor_email, note)
 select
   r.id,
@@ -172,16 +183,51 @@ where r.id in (
       and e.to_status = r.status
   );
 
--- ─── 5) El status de las dos filas tiene que seguir igual que el backup ────
+-- Chequeo contra el «antes» de esta corrida. No mira el total de la tabla.
 do $$
 begin
   if exists (
     select 1
-    from ht_requisitions_backup_20261030 b
-    join ht_requisitions r on r.id = b.requisition_id
-    where r.status is distinct from (b.row_data->>'status')
+    from _req_hide_before b
+    join ht_requisitions r on r.id = b.id
+    where r.status is distinct from b.status
   ) then
-    raise exception 'el status de una requisicion ocultada cambio; esta migracion no debe tocarlo';
+    raise exception 'el status de un id objetivo cambio; se revierte solo el ocultamiento, las columnas quedan';
+  end if;
+
+  if exists (
+    select 1 from ht_requisitions
+    where id = '22c60d38-590b-4789-a1df-fe3d8f77d2ec'
+      and (
+        hidden_at is null
+        or hidden_reason is distinct from 'duplicada'
+        or hidden_by is distinct from 'cwo@tradingsolutions.com'
+      )
+  ) then
+    raise exception '22c60d38 existe y no quedo oculta como duplicada';
+  end if;
+
+  if exists (
+    select 1 from ht_requisitions
+    where id = '8e597f02-a1dd-47ba-94f6-db4521224077'
+      and (
+        hidden_at is null
+        or hidden_reason is distinct from 'fuera_del_ats'
+        or hidden_by is distinct from 'cwo@tradingsolutions.com'
+      )
+  ) then
+    raise exception '8e597f02 existe y no quedo oculta como fuera_del_ats';
+  end if;
+
+  if exists (
+    select 1
+    from _req_hide_before b
+    where b.hidden_at is null
+      and (
+        select count(*)::int from ht_requisition_events e where e.requisition_id = b.id
+      ) is distinct from b.event_count + 1
+  ) then
+    raise exception 'falta el evento de ocultar respecto del antes de esta corrida';
   end if;
 
   if exists (
@@ -191,29 +237,8 @@ begin
   ) then
     raise exception 'la requisicion canonica 63f67118 no se oculta';
   end if;
-
-  if exists (
-    select 1 from ht_requisitions
-    where id = '22c60d38-590b-4789-a1df-fe3d8f77d2ec'
-      and hidden_reason is distinct from 'duplicada'
-  ) then
-    raise exception '22c60d38 existe y no quedo con hidden_reason duplicada';
-  end if;
-
-  if exists (
-    select 1 from ht_requisitions
-    where id = '8e597f02-a1dd-47ba-94f6-db4521224077'
-      and hidden_reason is distinct from 'fuera_del_ats'
-  ) then
-    raise exception '8e597f02 existe y no quedo con hidden_reason fuera_del_ats';
-  end if;
 end $$;
 
--- ─── 6) Conteos DESPUÉS ─────────────────────────────────────────────────────
--- Esperado sobre la línea base:
---   ht_requisitions 11 (publicada 9, pedida 1, rechazada 1) — igual que antes
---   hidden 2
---   ht_requisition_events 30
 insert into ht_migration_verify_20261030 (phase, metric, n)
 select 'after', x.metric, x.n
 from (
@@ -233,51 +258,12 @@ on conflict (phase, metric) do update
   set n = excluded.n,
       captured_at = now();
 
--- ─── 7) Verificación (también está en el README, para correrla sola) ───────
+-- Informativo. No aborta si el total no es el del 30-oct.
 select
   v.phase,
   v.metric,
-  v.n,
-  case v.metric
-    when 'ht_requisitions' then 11
-    when 'publicada' then 9
-    when 'pedida' then 1
-    when 'rechazada' then 1
-    when 'hidden' then case v.phase when 'before' then 0 when 'after' then 2 end
-    when 'events' then case v.phase when 'before' then 28 when 'after' then 30 end
-  end as esperado,
-  v.n = case v.metric
-    when 'ht_requisitions' then 11
-    when 'publicada' then 9
-    when 'pedida' then 1
-    when 'rechazada' then 1
-    when 'hidden' then case v.phase when 'before' then 0 when 'after' then 2 end
-    when 'events' then case v.phase when 'before' then 28 when 'after' then 30 end
-  end as coincide
+  v.n
 from ht_migration_verify_20261030 v
 order by v.phase, v.metric;
-
--- Si algún conteo no coincide con la línea base, se aborta. El commit de
--- abajo no corre y la transacción queda revertida (rollback, no commit).
-do $$
-declare
-  malas int;
-begin
-  select count(*) into malas
-  from ht_migration_verify_20261030 v
-  where v.n is distinct from (
-    case v.metric
-      when 'ht_requisitions' then 11
-      when 'publicada' then 9
-      when 'pedida' then 1
-      when 'rechazada' then 1
-      when 'hidden' then case v.phase when 'before' then 0 when 'after' then 2 end
-      when 'events' then case v.phase when 'before' then 28 when 'after' then 30 end
-    end
-  );
-  if malas > 0 then
-    raise exception 'coincide=false: la linea base no cuadra; rollback, no commit';
-  end if;
-end $$;
 
 commit;

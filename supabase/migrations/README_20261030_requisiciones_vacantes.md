@@ -8,6 +8,10 @@ Archivos. No se aplicaron contra ninguna base desde este PR. Se aplican en el de
 
 `20261030_requisicion_oculta.sql` va en el mismo paso, también antes de servir el código que filtra `hidden_at`.
 
+Ese archivo tiene dos transacciones. La primera solo agrega `hidden_at`, `hidden_reason`, `hidden_by` y el índice, y siempre se commitea. La segunda oculta los dos uuid. Su chequeo compara cada id contra un «antes» tomado en esa misma corrida (el status no cambió, el motivo es el esperado, hay un evento nuevo si recién se ocultó, la canónica no se tocó). No exige que la tabla siga en 11/9/1/1/28.
+
+Si la segunda aborta, las columnas se quedan y las dos filas vuelven al estado de antes de esa transacción. El API no se rompe. Hay que leer el mensaje: si un id existe y no quedó con el motivo esperado, o si el status se movió, no se fuerza. Se mira esa fila y la canónica `63f67118-1827-484d-8623-3f90e3758d35`, se decide con Kelly, y se vuelve a correr el archivo: es idempotente y no pisa un backup ya tomado. En una base vacía o de staging, donde esos uuid no están, la segunda transacción no hace nada y termina bien.
+
 El backup `ht_requisitions_backup_20261030` no se borra acá. Se deja hasta que Kelly pida dropearlo, después de verificar el GO.
 
 - `20261030_requisicion_oculta.sql` — `hidden_at`, `hidden_reason`, `hidden_by`. Oculta dos filas. No cambia `status`. No borra.
@@ -100,4 +104,4 @@ select
 
 Esperado después: 11, 9, 1, 1, 2, 30, `rechazada`, `duplicada`, `pedida`, `fuera_del_ats`, `publicada`, `true`.
 
-Si la base ya no es esa línea base (entró otra requisición entre el 30-oct y el GO), `coincide` sale en falso. La migración lanza `coincide=false` y no llega al `commit`: la transacción se revierte. No hay `delete` ni cambio de `status`.
+Esos números son la foto del 30-oct, no una condición para abortar. Si entró otra requisición, el archivo igual deja las columnas y oculta solo esos dos uuid. No hay `delete` ni cambio de `status`. Si la segunda transacción aborta por un id, las columnas de la primera ya quedaron.

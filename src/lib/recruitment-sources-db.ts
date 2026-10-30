@@ -44,28 +44,34 @@ const PAGINA = 1000;
 
 const TOPE = 50_000;
 
-/** PostgREST corta en 1000 filas. Se pide de a páginas, ordenadas por id, hasta que una venga corta. */
+/**
+ * PostgREST corta en 1000 filas. Se pide de a páginas, ordenadas por id.
+ * Truncado solo si hay más que el tope: se pide tope+1 y, si llega, se
+ * descarta esa fila de más.
+ */
 async function leerCandidatosPorPagina(): Promise<{
   rows: { vacancy_id: string; arrival_source: string | null }[];
   truncated: boolean;
 } | null> {
   const todos: { vacancy_id: string; arrival_source: string | null }[] = [];
-  for (let desde = 0; desde < TOPE; desde += PAGINA) {
+  for (let desde = 0; todos.length <= TOPE; desde += PAGINA) {
+    const falta = TOPE + 1 - todos.length;
+    const tam = Math.min(PAGINA, falta);
     const { data, error } = await supabaseAdmin
       .from("ht_candidates")
       .select("vacancy_id, arrival_source")
       .order("id", { ascending: true })
-      .range(desde, desde + PAGINA - 1);
+      .range(desde, desde + tam - 1);
     if (error) {
       console.error("[vacancy-sources] llegada:", error.message);
       return null;
     }
     const lote = (data || []) as { vacancy_id: string; arrival_source: string | null }[];
     todos.push(...lote);
-    if (lote.length < PAGINA) return { rows: todos, truncated: false };
+    if (lote.length < tam) return { rows: todos, truncated: false };
   }
-  console.error("[vacancy-sources] llegada truncada en", TOPE, "filas");
-  return { rows: todos, truncated: true };
+  console.error("[vacancy-sources] llegada truncada: hay más de", TOPE, "filas");
+  return { rows: todos.slice(0, TOPE), truncated: true };
 }
 
 export async function clavesFuenteActivas(): Promise<string[]> {

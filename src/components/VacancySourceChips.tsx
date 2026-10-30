@@ -6,10 +6,12 @@ export function SourceChips({
   fuentes,
   activas,
   onAlternar,
+  ocupado = false,
 }: {
   fuentes: FuenteLista[];
   activas: string[];
   onAlternar?: (key: string, publicada: boolean) => void;
+  ocupado?: boolean;
 }) {
   const visibles = fuentes.filter((f) => f.active || activas.includes(f.key));
   if (visibles.length === 0) return null;
@@ -20,8 +22,8 @@ export function SourceChips({
         const clase =
           "inline-flex items-center min-h-11 rounded-full border px-3 text-[12px] " +
           (on
-            ? "bg-[var(--ts-ink)] text-white border-[color:var(--ts-ink)]"
-            : "bg-white text-[var(--ts-ink)] border-[color:var(--ts-line)]");
+            ? "bg-[var(--ts-ink)] text-white border-[color:var(--ts-ink)] disabled:opacity-50"
+            : "bg-white text-[var(--ts-ink)] border-[color:var(--ts-line)] disabled:opacity-50");
         if (!onAlternar || !f.active) {
           if (!on) return null;
           return (
@@ -35,8 +37,10 @@ export function SourceChips({
             key={f.key}
             type="button"
             aria-pressed={on}
+            disabled={ocupado}
             onClick={(e) => {
               e.stopPropagation();
+              if (ocupado) return;
               onAlternar(f.key, on);
             }}
             className={clase}

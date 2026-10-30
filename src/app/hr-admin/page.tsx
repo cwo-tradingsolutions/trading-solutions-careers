@@ -3289,6 +3289,12 @@ function Vacantes() {
         </div>
       )}
 
+      {board.llegadaTruncada && (
+        <p className="mb-3 text-[13px] text-[var(--ts-ink)] border border-[color:var(--ts-line)] rounded-xl px-3 py-2">
+          La llegada está truncada: hay más postulaciones que las que se contaron.
+        </p>
+      )}
+
       {board.avisoChip && (
         <p className="mb-3 text-[13px] text-[var(--ts-ink)] border border-[color:var(--ts-line)] rounded-xl px-3 py-2">
           {board.avisoChip}
@@ -3350,6 +3356,7 @@ function Vacantes() {
                           <SourceChips
                             fuentes={board.fuentes}
                             activas={row.sources}
+                            ocupado={board.chipOcupado}
                             onAlternar={(key, on) => board.alternar(row.vacancy_id, key, on)}
                           />
                           <ArrivalCross sources={row.sources} llegada={row.llegada} fuentes={board.fuentes} />

@@ -15,15 +15,22 @@
  *   - NODE_ENV development.
  * Cualquier otro caso niega, incluido un entorno desconocido.
  */
+function limpio(value: string | undefined): string {
+  return String(value ?? "").trim().toLowerCase();
+}
+
 export function isPreviewAllowed(env: {
   VERCEL_ENV?: string;
   K_SERVICE?: string;
   NODE_ENV?: string;
 } = process.env): boolean {
-  if (env.VERCEL_ENV === "production") return false;
-  if (typeof env.K_SERVICE === "string" && env.K_SERVICE.startsWith("prd-")) return false;
-  if (env.VERCEL_ENV === "preview" || env.VERCEL_ENV === "development") return true;
-  if (typeof env.K_SERVICE === "string" && env.K_SERVICE.startsWith("stg-")) return true;
-  if (env.NODE_ENV === "development") return true;
+  const vercel = limpio(env.VERCEL_ENV);
+  const servicio = limpio(env.K_SERVICE);
+  const nodeEnv = limpio(env.NODE_ENV);
+  if (vercel === "production") return false;
+  if (servicio.startsWith("prd-")) return false;
+  if (vercel === "preview" || vercel === "development") return true;
+  if (servicio.startsWith("stg-")) return true;
+  if (nodeEnv === "development") return true;
   return false;
 }

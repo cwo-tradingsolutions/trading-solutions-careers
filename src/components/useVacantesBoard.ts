@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { clasificarConteo, contarTarjetas, etiquetaOculta, type ConteoClave, type FilaConteo } from "@/lib/requisition-board";
 import type { FuenteLista, LlegadaFila } from "@/lib/recruitment-sources";
 
@@ -27,16 +27,23 @@ export function useVacantesBoard() {
   const [fuenteFiltro, setFuenteFiltro] = useState("");
   const [admin, setAdmin] = useState(false);
   const [avisoChip, setAvisoChip] = useState<string | null>(null);
+  const [llegadaTruncada, setLlegadaTruncada] = useState(false);
+  const [chipOcupado, setChipOcupado] = useState(false);
+  const seq = useRef(0);
+  const enVuelo = useRef(false);
 
   const recargar = useCallback(async () => {
+    const ticket = ++seq.current;
     const [boardRes, reqRes] = await Promise.all([
       fetch("/api/hr-admin/vacancy-sources", { cache: "no-store" }),
       fetch("/api/requisitions?include_hidden=1", { cache: "no-store" }),
     ]);
+    if (ticket !== seq.current) return;
     if (boardRes.ok) {
       const board = await boardRes.json();
       setFuentes(board.fuentes || []);
       setVacantes(board.vacantes || []);
+      setLlegadaTruncada(board.llegada_truncada === true);
     }
     if (reqRes.ok) {
       const body = await reqRes.json();
@@ -77,8 +84,12 @@ export function useVacantesBoard() {
       : [];
 
   async function alternar(vacancyId: string, key: string, publicada: boolean) {
+    if (enVuelo.current) return;
+    enVuelo.current = true;
+    setChipOcupado(true);
     setAvisoChip(null);
     const previas = vacantes;
+    const ticket = ++seq.current;
     setVacantes((curr) => curr.map((v) => {
       if (v.vacancy_id !== vacancyId) return v;
       const sources = publicada ? v.sources.filter((s) => s !== key) : [...v.sources, key];
@@ -92,16 +103,26 @@ export function useVacantesBoard() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ source: key }),
           });
+      if (ticket !== seq.current) return;
       if (!r.ok) {
         setVacantes(previas);
         const j = await r.json().catch(() => ({}));
         setAvisoChip(j.error || "No se pudo actualizar la fuente");
         return;
       }
-      await recargar();
+      try {
+        await recargar();
+      } catch {
+        // El POST ya quedó. No se muestra error por un reload que falló.
+      }
     } catch {
-      setVacantes(previas);
-      setAvisoChip("No se pudo actualizar la fuente");
+      if (ticket === seq.current) {
+        setVacantes(previas);
+        setAvisoChip("No se pudo actualizar la fuente");
+      }
+    } finally {
+      enVuelo.current = false;
+      setChipOcupado(false);
     }
   }
 
@@ -130,6 +151,8 @@ export function useVacantesBoard() {
     pasa,
     filasSinVacante,
     avisoChip,
+    chipOcupado,
+    llegadaTruncada,
     alternar,
     guardarFuente,
   };

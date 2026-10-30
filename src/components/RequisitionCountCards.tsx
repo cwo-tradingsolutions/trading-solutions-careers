@@ -2,9 +2,7 @@
 
 import { Archive, Ban, EyeOff, Megaphone } from "lucide-react";
 import {
-  POR_CONSTRUIR,
   TARJETAS_CONTEO,
-  textoConteo,
   type ConteoClave,
 } from "@/lib/requisition-board";
 
@@ -32,8 +30,7 @@ export default function RequisitionCountCards({
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
       {TARJETAS_CONTEO.map((tarjeta) => {
         const n = counts[tarjeta.key];
-        const texto = textoConteo(n);
-        const vacio = texto === POR_CONSTRUIR;
+        const texto = n == null ? "—" : String(n);
         const seleccionado = activo === tarjeta.key;
         const Icono = ICONO[tarjeta.key];
         return (
@@ -54,10 +51,7 @@ export default function RequisitionCountCards({
               {tarjeta.label}
             </span>
             <span
-              className={
-                "mt-1 block text-[var(--ts-ink)] tracking-tight leading-tight " +
-                (vacio ? "text-[15px] font-medium" : "text-[22px] font-light")
-              }
+              className="mt-1 block text-[22px] font-light text-[var(--ts-ink)] tracking-tight leading-tight"
             >
               {texto}
             </span>

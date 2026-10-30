@@ -59,7 +59,7 @@ export default function FuentesAdmin({
             <input
               value={nombres[f.key] ?? f.label}
               onChange={(e) => setNombres((prev) => ({ ...prev, [f.key]: e.target.value }))}
-              className="rounded-full border border-[color:var(--ts-line)] px-3 py-1 text-[13px] min-w-0 flex-1"
+              className="rounded-full border border-[color:var(--ts-line)] px-3 py-1 text-[13px] min-w-[8rem] flex-1"
               aria-label={`Nombre de ${f.key}`}
             />
             <button
