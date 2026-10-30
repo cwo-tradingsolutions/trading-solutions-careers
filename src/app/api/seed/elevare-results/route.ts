@@ -16,7 +16,8 @@
  */
 import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 import { randomBytes } from "crypto";
 import seedData from "@/data/seed/elevare_results.json";
 
@@ -47,7 +48,11 @@ function generateToken(): string {
   return `ats-${randomBytes(8).toString("hex")}-${Date.now().toString(36)}`;
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+  const authError = requireAdmin(req);
+  if (authError) return authError;
+  if (isPreviewTestMode()) return previewTestJson("POST /api/seed/elevare-results");
+
   const sql = neon(process.env.DATABASE_URL!);
   const data = seedData as { results: ElevareRow[] };
 
