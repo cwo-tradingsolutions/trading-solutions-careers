@@ -24,7 +24,7 @@ async function ensureDB() {
 async function sendStatusTransitionEmail(
   appRow: { id: number; full_name: string; email: string; job_title: string; job_id: number | null },
   newStatus: string
-): Promise<"sent" | "pending" | "skipped" | "unavailable" | "bloqueado_staging" | "agotado"> {
+): Promise<"sent" | "pending" | "skipped" | "unavailable" | "bloqueado_staging" | "invalid_recipient" | "agotado" | "duplicado"> {
   if (!appRow.email) return "skipped";
   // Determinar qué template usar según status
   let subject = "";

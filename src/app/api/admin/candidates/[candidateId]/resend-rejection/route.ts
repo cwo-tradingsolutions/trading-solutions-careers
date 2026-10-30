@@ -233,6 +233,22 @@ export async function POST(
         message: "El correo quedó pendiente hasta reconectar jointheteam@.",
       });
     }
+    if (delivered.status === "duplicado") {
+      return NextResponse.json({
+        success: false,
+        mode: "send",
+        status: "duplicado",
+        message: "Ese envío ya está en curso o acaba de salir. No se escribió la fecha de envío otra vez.",
+      }, { status: 409 });
+    }
+    if (delivered.status === "invalid_recipient") {
+      return NextResponse.json({
+        success: false,
+        mode: "send",
+        status: "invalid_recipient",
+        message: "La dirección no es válida. No se envió el correo.",
+      }, { status: 400 });
+    }
 
     const sentAt = rejectionSentAt(true);
     const { error: updErr } = await supabaseAdmin

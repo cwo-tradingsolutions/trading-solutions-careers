@@ -157,6 +157,9 @@ export async function POST(req: NextRequest) {
         } else if (delivered.status === 'bloqueado_staging') {
           canal = 'bloqueado_staging';
           emailStatus = 'bloqueado_staging';
+        } else if (delivered.status === 'duplicado' || delivered.status === 'invalid_recipient') {
+          canal = delivered.status;
+          emailStatus = 'not_sent';
         } else {
           canal = 'pending';
           emailStatus = 'pending';

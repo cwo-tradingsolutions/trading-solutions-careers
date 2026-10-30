@@ -5,12 +5,16 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { ATS_FROM_EMAIL, ATS_FROM_NAME, atsFromHeader } from "./ats-from.ts";
 import {
+  attemptDedupKey,
   candidateMailStatus,
   dailySendWarning,
+  DEDUP_WINDOW_MS,
   deliverCandidateMail,
   mailboxDisconnectedBanner,
   resendPendingOnce,
+  type CandidateMailInput,
   type ClaimedMail,
+  type MailDeps,
 } from "./ats-mail.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -206,6 +210,52 @@ test("From is the team mailbox and the daily warning starts after 1500", () => {
     mailboxDisconnectedBanner(1),
     "Buzón jointheteam@ desconectado — 1 correo pendiente. Reconectar",
   );
+});
+
+test("a direct send reserves the key, and a second click in the window is duplicado", async () => {
+  const rows = new Map<string, string>();
+  let sends = 0;
+  let effects = 0;
+  const deps: MailDeps = {
+    reserve: async (input: CandidateMailInput) => {
+      const key = input.dedupKey || "";
+      const existing = rows.get(key);
+      if (existing) return { id: existing, duplicate: true };
+      const id = `row-${rows.size + 1}`;
+      rows.set(key, id);
+      return { id, duplicate: false };
+    },
+    send: async () => {
+      sends += 1;
+      return { ok: true as const, gmail_id: "g-1" };
+    },
+    savePending: async () => ({ id: "unused" }),
+    recordSend: async () => sends,
+    markSent: async () => {},
+    applySideEffect: async () => {
+      effects += 1;
+      return true;
+    },
+    markSideEffectApplied: async () => {},
+  };
+  const input: CandidateMailInput = {
+    to: "ana@example.com",
+    type: "rejection_resend",
+    subject: "Sobre tu aplicación",
+    html: "<p>no</p>",
+    dedupKey: "rejection_resend:cand-1",
+    sideEffect: { kind: "rejection_sent", candidateId: "cand-1" },
+  };
+  const first = await deliverCandidateMail(input, deps);
+  const second = await deliverCandidateMail(input, deps);
+  assert.equal(first.status, "sent");
+  assert.equal(second.status, "duplicado");
+  assert.equal(sends, 1);
+  assert.equal(effects, 1);
+  const later = attemptDedupKey(input.dedupKey, Date.now() + DEDUP_WINDOW_MS);
+  const nowKey = attemptDedupKey(input.dedupKey, Date.now());
+  assert.notEqual(later, nowKey);
+  assert.match(nowKey || "", /rejection_resend:cand-1@/);
 });
 
 test("a staging block is not put back on the pending queue", async () => {

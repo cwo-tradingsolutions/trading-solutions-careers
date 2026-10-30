@@ -5,14 +5,13 @@
  * Le manda a Kelly un correo con el resumen de entrevistas del día +
  * pendientes de evaluar, con links directos al prep doc por candidato.
  *
- * Auth: Vercel Cron envía `Authorization: Bearer ${CRON_SECRET}` · también
- * acepta requireAdmin para correr manual desde browser.
+ * Auth: Bearer CRON_SECRET or X-Cron-Secret. requireAdmin can run it by hand.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
 import { requireAdmin } from "@/lib/admin-auth";
-import { secretsEqual } from "@/lib/secret-compare";
+import { cronRequestAuthorized } from "@/lib/cron-request-auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -25,12 +24,7 @@ function startOfDay(d: Date): Date { const x = new Date(d); x.setHours(0, 0, 0, 
 function endOfDay(d: Date): Date { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
 
 function isVercelCron(req: NextRequest): boolean {
-  const auth = req.headers.get("authorization");
-  const secret = process.env.CRON_SECRET;
-  if (!auth || !secret) return false;
-  const bearer = auth.startsWith("Bearer ") ? auth.slice("Bearer ".length) : "";
-  if (!bearer) return false;
-  return secretsEqual(bearer, secret);
+  return cronRequestAuthorized(req.headers);
 }
 
 export async function GET(req: NextRequest) {

@@ -35,7 +35,8 @@ test("Cloud Run prd-careers with no VERCEL_ENV is production, not allowlist mode
   assert.equal(interviewInviteGuarded({ K_SERVICE: "prd-careers" }), false);
   assert.equal(interviewInviteGuarded({ K_SERVICE: "prd-careers", VERCEL_ENV: undefined }), false);
   assert.equal("VERCEL_ENV" in { K_SERVICE: "prd-careers" }, false);
-  assert.equal(interviewInviteGuarded({ K_SERVICE: "prd-careers-canary" }), false);
+  assert.equal(interviewInviteGuarded({ K_SERVICE: "prd-careers-stg" }), true);
+  assert.equal(interviewInviteGuarded({ K_SERVICE: "prd-careers-canary" }), true);
   assert.equal(interviewInviteGuarded({ VERCEL_ENV: "production" }), false);
   assert.equal(interviewInviteGuarded({ K_SERVICE: "stg-careers" }), true);
   assert.equal(interviewInviteGuarded({ K_SERVICE: "stg-careers", VERCEL_ENV: "production" }), true);

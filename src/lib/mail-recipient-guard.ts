@@ -22,11 +22,15 @@ export type RecipientFields = {
   bcc?: string | null;
 };
 
+export const INVALID_RECIPIENT_STATUS = "invalid_recipient" as const;
+
+export type MailBlockStatus = typeof BLOCKED_STAGING_STATUS | typeof INVALID_RECIPIENT_STATUS;
+
 export type MailGuardDecision =
   | { send: true }
   | {
       send: false;
-      status: typeof BLOCKED_STAGING_STATUS;
+      status: MailBlockStatus;
       reason: "not_on_allowlist" | "staging_allowlist_unset" | "bad_address";
       domains: string[];
     };
@@ -79,20 +83,19 @@ export function splitRecipients(value?: string | null): string[] {
 }
 
 /**
- * Production is VERCEL_ENV=production, or a Cloud Run service whose name
- * starts with prd- (prd-careers has no VERCEL_ENV). Staging and preview are
- * a service starting with stg-, VERCEL_ENV=preview, or development. Any
- * other name, a missing env, and STAGING_READ_ONLY of 1 or true stay
- * non-production so sends stay guarded. A stg- service wins over
- * VERCEL_ENV=production. This does not use the OAuth helper: that one
- * treats a missing VERCEL_ENV as production, which is wrong on Cloud Run.
+ * Production is VERCEL_ENV=production with no K_SERVICE, or K_SERVICE exactly
+ * prd-careers (Cloud Run prod has no VERCEL_ENV). prd-careers-stg is not
+ * production. Staging and preview are a service starting with stg-,
+ * VERCEL_ENV=preview, or development. Any other name, a missing env, and
+ * STAGING_READ_ONLY of 1 or true stay non-production. This does not use the
+ * OAuth helper: that one treats a missing VERCEL_ENV as production.
  */
 export function isProductionRuntime(env: MailGuardEnv = {}): boolean {
   const staging = String(env.STAGING_READ_ONLY ?? "").trim().toLowerCase();
   if (staging === "1" || staging === "true") return false;
   const service = (env.K_SERVICE || "").trim().toLowerCase();
   if (service.startsWith("stg-")) return false;
-  if (service.startsWith("prd-")) return true;
+  if (service === "prd-careers") return true;
   if (service) return false;
   const vercel = (env.VERCEL_ENV || "").trim().toLowerCase();
   if (vercel === "preview" || vercel === "development") return false;
@@ -105,7 +108,29 @@ export function mailEnvironment(env: MailGuardEnv = {}): "prod" | "nonprod" {
 
 export type ParsedAddress = { ok: true; address: string } | { ok: false };
 
-/** Exactly one addr-spec. Comments, breaks, extra brackets, and extra @ fail. */
+/** RFC 5322 atext, one or more, separated by single dots. */
+const DOT_ATOM = /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/;
+
+function asciiDomain(domain: string): string | null {
+  let ascii = domain;
+  try {
+    ascii = new URL(`http://${domain}`).hostname;
+  } catch {
+    return null;
+  }
+  ascii = ascii.toLowerCase().replace(/\.$/, "");
+  if (!ascii) return null;
+  const labels = ascii.split(".");
+  if (labels.length < 2) return null;
+  for (let i = 0; i < labels.length; i++) {
+    const label = labels[i];
+    if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label)) return null;
+    if (i === labels.length - 1 && label.length < 2) return null;
+  }
+  return ascii;
+}
+
+/** Exactly one addr-spec. Comments, breaks, extra brackets, and extra @ fail. Dot-atom local part. IDN domains become punycode. */
 export function parseOneAddress(raw: string): ParsedAddress {
   if (typeof raw !== "string") return { ok: false };
   if (/[\u0000\r\n]/.test(raw)) return { ok: false };
@@ -123,8 +148,11 @@ export function parseOneAddress(raw: string): ParsedAddress {
     address = match[2].trim();
   }
   if ((address.match(/@/g) || []).length !== 1) return { ok: false };
-  if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(address)) return { ok: false };
-  return { ok: true, address: address.toLowerCase() };
+  const at = address.lastIndexOf("@");
+  const local = address.slice(0, at);
+  const domain = asciiDomain(address.slice(at + 1));
+  if (!DOT_ATOM.test(local) || !domain) return { ok: false };
+  return { ok: true, address: `${local.toLowerCase()}@${domain}` };
 }
 
 /** Comma-separated header. Every piece must be one address. The result is only those addresses. */
@@ -149,7 +177,8 @@ function uniqueDomains(addresses: string[]): string[] {
 export function decideOutboundRecipients(fields: RecipientFields, env: MailGuardEnv = {}): MailGuardDecision {
   const lists = [parseAddressList(fields.to), parseAddressList(fields.cc), parseAddressList(fields.bcc)];
   if (lists.some((list) => !list.ok)) {
-    return { send: false, status: BLOCKED_STAGING_STATUS, reason: "bad_address", domains: [] };
+    const status = mailEnvironment(env) === "prod" ? INVALID_RECIPIENT_STATUS : BLOCKED_STAGING_STATUS;
+    return { send: false, status, reason: "bad_address", domains: [] };
   }
   const addresses = lists.flatMap((list) => (list.ok ? list.addresses : []));
   const allow = parseMailAllowlist(env.MAIL_RECIPIENT_ALLOWLIST);

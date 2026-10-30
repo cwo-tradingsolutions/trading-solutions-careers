@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
 import { requireAdmin } from "@/lib/admin-auth";
-import { secretsEqual } from "@/lib/secret-compare";
+import { cronRequestAuthorized } from "@/lib/cron-request-auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -22,12 +22,7 @@ const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://trading-solutions-careers.vercel.app";
 
 function isVercelCron(req: NextRequest): boolean {
-  const auth = req.headers.get("authorization");
-  const secret = process.env.CRON_SECRET;
-  if (!auth || !secret) return false;
-  const bearer = auth.startsWith("Bearer ") ? auth.slice("Bearer ".length) : "";
-  if (!bearer) return false;
-  return secretsEqual(bearer, secret);
+  return cronRequestAuthorized(req.headers);
 }
 
 export async function GET(req: NextRequest) {

@@ -200,6 +200,16 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
   const round = assertRoundOrder(form.value.round, prior.prior);
   if (!round.ok) return NextResponse.json({ error: round.error }, { status: 409 });
 
+  if (!inviteIsGuarded() && !invitesFlagOn(process.env.INTERVIEW_INVITES_ENABLED)) {
+    return NextResponse.json({
+      success: false,
+      sent: false,
+      persisted: false,
+      action: "refuse",
+      error: "INTERVIEW_INVITES_ENABLED no está activo. En producción no se envían invitaciones.",
+    }, { status: 403 });
+  }
+
   const delivery = decideDelivery({
     vercelEnv: process.env.VERCEL_ENV,
     invitesEnabledFlag: process.env.INTERVIEW_INVITES_ENABLED,

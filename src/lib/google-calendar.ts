@@ -182,12 +182,13 @@ export async function createMeetEvent(opts: {
 
   const requestId = `joint-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+  const audience = calendarAudience(opts.attendees.map((email) => ({ email })));
   const body = {
     summary: opts.summary,
     description: opts.description,
     start: { dateTime: opts.startISO, timeZone: opts.timezone || "America/Bogota" },
     end: { dateTime: opts.endISO, timeZone: opts.timezone || "America/Bogota" },
-    attendees: opts.attendees.map(email => ({ email })),
+    attendees: audience.attendees,
     conferenceData: {
       createRequest: {
         requestId,
@@ -197,7 +198,7 @@ export async function createMeetEvent(opts: {
     reminders: { useDefault: true },
   };
 
-  const r = await fetch(`${EVENTS_URL}?conferenceDataVersion=1&sendUpdates=all`, {
+  const r = await fetch(`${EVENTS_URL}?conferenceDataVersion=1&sendUpdates=${audience.sendUpdates}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${valid.access_token}`,
@@ -222,23 +223,35 @@ export async function createMeetEvent(opts: {
   };
 }
 
-function calendarAudience(attendees: { email: string }[]): {
-  attendees: { email: string }[];
-  sendUpdates: "all" | "none";
-} {
-  const env = {
+function calendarEnv() {
+  return {
     MAIL_RECIPIENT_ALLOWLIST: process.env.MAIL_RECIPIENT_ALLOWLIST,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     K_SERVICE: process.env.K_SERVICE,
     STAGING_READ_ONLY: process.env.STAGING_READ_ONLY,
     VERCEL_ENV: process.env.VERCEL_ENV,
   };
-  if (isProductionRuntime(env)) return { attendees, sendUpdates: "all" };
+}
+
+/** Drop CR/LF and anything that is not one address. The stored value is the parsed mailbox only. */
+function cleanAttendee(raw: string): string | null {
+  if (/[\u0000\r\n]/.test(raw)) return null;
+  const parsed = parseOneAddress(raw);
+  return parsed.ok ? parsed.address : null;
+}
+
+function calendarAudience(attendees: { email: string }[]): {
+  attendees: { email: string }[];
+  sendUpdates: "all" | "none";
+} {
+  const env = calendarEnv();
+  const cleaned = attendees
+    .map((attendee) => cleanAttendee(attendee.email || ""))
+    .filter((email): email is string => Boolean(email));
+  if (isProductionRuntime(env)) return { attendees: cleaned.map((email) => ({ email })), sendUpdates: "all" };
   const kept: { email: string }[] = [];
-  for (const attendee of attendees) {
-    const parsed = parseOneAddress(attendee.email || "");
-    if (!parsed.ok) continue;
-    if (decideOutboundRecipients({ to: parsed.address }, env).send) kept.push({ email: parsed.address });
+  for (const email of cleaned) {
+    if (decideOutboundRecipients({ to: email }, env).send) kept.push({ email });
   }
   return { attendees: kept, sendUpdates: "none" };
 }

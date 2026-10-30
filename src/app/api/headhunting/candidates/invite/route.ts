@@ -151,14 +151,12 @@ export async function POST(req: NextRequest) {
           });
         }
         console.error('headhunting invite draft failed');
-        if (mode === 'draft') {
-          return NextResponse.json({
-            ...okBase,
-            channel: 'gmail-draft-failed',
-            email_status: 'draft_required',
-            note: 'No se pudo dejar el borrador. Conecta jointheteam@ y vuelve a intentarlo. No se envió el correo.',
-          }, { status: 409 });
-        }
+        return NextResponse.json({
+          ...okBase,
+          channel: 'gmail-draft-failed',
+          email_status: 'draft_required',
+          note: 'El borrador no se creó o quedó bloqueado. No se envió el correo. Revísalo antes de un envío directo.',
+        }, { status: 409 });
       } else if (mode === 'draft') {
         return NextResponse.json({
           ...okBase,

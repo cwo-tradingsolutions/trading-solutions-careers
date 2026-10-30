@@ -17,6 +17,7 @@ type MailboxState = {
   connected: boolean;
   pending_count: number;
   blocked_count?: number;
+  invalid_count?: number;
   sends_today: number;
   warn_daily: boolean;
   pending: PendingItem[];
@@ -87,6 +88,13 @@ export function MailboxBanner() {
       )}
       {aiOff && (
         <p className="text-xs text-gray-600">{AI_INTERVIEW_OFF_NOTE}</p>
+      )}
+      {(mail?.invalid_count ?? 0) > 0 && (
+        <div role="status" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
+          {mail?.invalid_count === 1
+            ? "1 correo con una dirección inválida. No salió."
+            : `${mail?.invalid_count} correos con una dirección inválida. No salieron.`}
+        </div>
       )}
       {(mail?.blocked_count ?? 0) > 0 && (
         <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">

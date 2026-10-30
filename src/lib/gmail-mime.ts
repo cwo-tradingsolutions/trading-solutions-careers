@@ -1,13 +1,13 @@
 /** Header and MIME helpers. No network, no database. */
+import { parseOneAddress } from "./mail-recipient-guard";
 
 export function stripHeaderBreaks(value: string): string {
   return value.replace(/[\u0000\r\n]+/g, " ").replace(/[ \t]{2,}/g, " ").trim();
 }
 
+/** Same address rules as the outbound guard: dot-atom local part, IDN as punycode. */
 export function isSafeMailbox(value: string): boolean {
-  if (/[\u0000\r\n]/.test(value)) return false;
-  const address = stripHeaderBreaks(value).toLowerCase();
-  return /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(address);
+  return parseOneAddress(value).ok;
 }
 
 /** RFC 2047 encoded-words stay at or under 75 characters and are folded. */

@@ -86,22 +86,37 @@ async function claimForScoring(row: {
     await markNeedsManual(row.id);
     return false;
   }
+  const { data: held, error: readError } = await supabaseAdmin
+    .from("ht_ai_interviews")
+    .select("id, ai_score, scoring_claimed_at, scoring_attempts")
+    .eq("id", row.id)
+    .maybeSingle();
+  if (readError || !held || held.ai_score != null) return false;
+  if (rescoreRowEligible(held) !== "eligible") return false;
+  const heldAttempts = held.scoring_attempts ?? 0;
   const now = new Date().toISOString();
-  const cutoff = new Date(Date.now() - scoringClaimTtlMs()).toISOString();
-  const attemptFilter = attempts === 0
-    ? "scoring_attempts.is.null,scoring_attempts.eq.0"
-    : `scoring_attempts.eq.${attempts}`;
-  const { data } = await supabaseAdmin
+  let update = supabaseAdmin
     .from("ht_ai_interviews")
     .update({
       scoring_claimed_at: now,
-      scoring_attempts: attempts + 1,
+      scoring_attempts: heldAttempts + 1,
     })
     .eq("id", row.id)
-    .is("ai_score", null)
-    .or(`and(or(scoring_claimed_at.is.null,scoring_claimed_at.lt.${cutoff}),or(${attemptFilter}))`)
-    .select("id");
-  return (data?.length ?? 0) > 0;
+    .is("ai_score", null);
+  update = held.scoring_claimed_at
+    ? update.eq("scoring_claimed_at", held.scoring_claimed_at)
+    : update.is("scoring_claimed_at", null);
+  update = held.scoring_attempts == null
+    ? update.is("scoring_attempts", null)
+    : update.eq("scoring_attempts", held.scoring_attempts);
+  const { error: writeError } = await update;
+  if (writeError) return false;
+  const { data: after } = await supabaseAdmin
+    .from("ht_ai_interviews")
+    .select("id, scoring_claimed_at")
+    .eq("id", row.id)
+    .maybeSingle();
+  return after?.scoring_claimed_at === now;
 }
 
 export async function runInProgressRescore(input: {

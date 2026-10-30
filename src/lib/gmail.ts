@@ -231,6 +231,7 @@ async function blockedDraft(opts: {
         to: opts.to || "",
         type: opts.mailType ?? "gmail_draft",
         reason: decision.send ? "bad_address" : decision.reason,
+        status: decision.send ? "invalid_recipient" : decision.status,
       });
     } catch {
       console.warn("[ats-mail] bloqueado_staging no se pudo guardar");
@@ -283,7 +284,7 @@ export async function createDraftViaGmail(opts: {
 
 export type GmailSendResult =
   | { ok: true; gmail_id: string }
-  | { ok: false; error: string; blocked?: "bloqueado_staging"; blockedId?: string };
+  | { ok: false; error: string; blocked?: "bloqueado_staging" | "invalid_recipient"; blockedId?: string };
 
 export async function sendViaGmail(opts: {
   to: string;
@@ -331,7 +332,7 @@ export async function sendViaGmail(opts: {
         console.warn("[ats-mail] bloqueado_staging no se pudo guardar");
       }
     }
-    return { ok: false, blocked: "bloqueado_staging", blockedId, error: "bloqueado_staging" };
+    return { ok: false, blocked: decision.status, blockedId, error: decision.status };
   }
 
   const valid = await getValidAccessToken();

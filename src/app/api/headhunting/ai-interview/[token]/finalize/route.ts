@@ -332,7 +332,14 @@ export async function POST(
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://trading-solutions-careers.vercel.app";
         const finalAudioUrl = `${baseUrl}/api/headhunting/ai-interview/${token}/audio?cid=${conversationId}`;
 
-        const { error: writeError } = await supabaseAdmin
+        const { data: held, error: readError } = await supabaseAdmin
+          .from("ht_ai_interviews")
+          .select("id, status, ai_score")
+          .eq("id", interview.id)
+          .maybeSingle();
+        if (readError || !held) throw readError || new Error("interview missing");
+        if (held.status === "completed" && held.ai_score != null) return true;
+        let write = supabaseAdmin
           .from("ht_ai_interviews")
           .update({
             status: "completed",
@@ -353,10 +360,18 @@ export async function POST(
             english_score: englishAnalysis.overall_score ?? null,
             english_detail: englishAnalysis,
           })
-          .eq("id", interview.id)
-          .or("status.neq.completed,ai_score.is.null")
-          .select("id");
+          .eq("id", interview.id);
+        write = held.status === "completed"
+          ? write.eq("status", "completed").is("ai_score", null)
+          : write.eq("status", held.status);
+        const { error: writeError } = await write;
         if (writeError) throw writeError;
+        const { data: stored, error: storedError } = await supabaseAdmin
+          .from("ht_ai_interviews")
+          .select("id, status, ai_score")
+          .eq("id", interview.id)
+          .maybeSingle();
+        if (storedError || !stored || stored.status !== "completed") throw storedError || new Error("score was not stored");
         return true;
       },
     });

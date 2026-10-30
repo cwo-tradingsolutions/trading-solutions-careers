@@ -96,7 +96,13 @@ DECLARE
   n integer;
 BEGIN
   UPDATE ats_outbound_mail
-  SET status = CASE WHEN attempt_count >= 5 THEN 'agotado' ELSE 'pending' END,
+  SET attempt_count = attempt_count + 1,
+      status = CASE
+        WHEN gmail_id IS NOT NULL THEN 'sent'
+        WHEN attempt_count + 1 >= 5 THEN 'agotado'
+        ELSE 'pending'
+      END,
+      sent_at = CASE WHEN gmail_id IS NOT NULL THEN COALESCE(sent_at, NOW()) ELSE sent_at END,
       claimed_at = NULL
   WHERE status = 'sending'
     AND claimed_at IS NOT NULL
@@ -113,13 +119,28 @@ AS $$
 DECLARE
   n integer;
 BEGIN
+  -- 30 days. Clear the address, the HTML, and token links on sent, agotado,
+  -- pending, and bloqueado_staging rows. Candidate records are not deleted.
   UPDATE ats_outbound_mail
   SET html = NULL,
+      candidate = NULL,
+      reply_to = NULL,
+      bcc = NULL,
       subject = regexp_replace(COALESCE(subject, ''), 'https?://\S+', '[link]', 'g')
-  WHERE status = 'sent'
-    AND sent_at IS NOT NULL
-    AND sent_at < NOW() - INTERVAL '30 days'
-    AND html IS NOT NULL;
+  WHERE (
+      (status = 'sent' AND sent_at IS NOT NULL AND sent_at < NOW() - INTERVAL '30 days')
+      OR (
+        status IN ('agotado', 'pending', 'bloqueado_staging', 'invalid_recipient')
+        AND created_at < NOW() - INTERVAL '30 days'
+      )
+    )
+    AND (
+      html IS NOT NULL
+      OR candidate IS NOT NULL
+      OR reply_to IS NOT NULL
+      OR bcc IS NOT NULL
+      OR COALESCE(subject, '') ~ 'https?://'
+    );
   GET DIAGNOSTICS n = ROW_COUNT;
   RETURN n;
 END;

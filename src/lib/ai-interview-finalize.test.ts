@@ -319,6 +319,8 @@ test("the AI interview flag, cron secret, and rescore url stay closed", () => {
   assert.equal(readCronSecret({ CRON_SECRET: "short" }), null);
   assert.equal(readCronSecret({ CRON_SECRET: "a".repeat(16), ADMIN_SECRET: "a".repeat(16) }), null);
   assert.equal(readCronSecret({ CRON_SECRET: "c".repeat(16), ADMIN_SECRET: "a".repeat(16) }), "c".repeat(16));
+  assert.equal(readCronSecret({ CRON_SECRET: "c".repeat(16), WXM_SERVICE_SECRET: "c".repeat(16) }), null);
+  assert.equal(readCronSecret({ CRON_SECRET: "c".repeat(16), PORTAL_TOKEN_SECRET: "c".repeat(16) }), null);
   assert.equal(visibleRecommendation("SCORING:1"), null);
   assert.equal(visibleRecommendation("  SCORING:99"), null);
   assert.equal(visibleRecommendation("AVANZA"), "AVANZA");

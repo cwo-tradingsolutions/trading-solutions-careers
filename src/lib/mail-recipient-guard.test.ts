@@ -65,6 +65,7 @@ test("staging without an allowlist blocks every recipient", () => {
   assert.equal(isProductionRuntime({ K_SERVICE: "prd-careers", VERCEL_ENV: undefined }), true);
   assert.equal("VERCEL_ENV" in { K_SERVICE: "prd-careers" }, false);
   assert.equal(isProductionRuntime({ K_SERVICE: "prd-careers" }), true);
+  assert.equal(isProductionRuntime({ K_SERVICE: "prd-careers-stg" }), false);
   assert.equal(isProductionRuntime({ VERCEL_ENV: "development" }), false);
   assert.equal(isProductionRuntime({ VERCEL_ENV: "preview" }), false);
   assert.equal(isProductionRuntime({ K_SERVICE: "stg-careers", VERCEL_ENV: "production" }), false);
@@ -85,7 +86,10 @@ test("malformed recipients never pass, even when the allowlist would match a bur
   for (const sample of bypasses) {
     const decision = decideOutboundRecipients({ to: sample }, env);
     assert.equal(decision.send, false, sample);
-    if (!decision.send) assert.equal(decision.reason, "bad_address");
+    if (!decision.send) {
+      assert.equal(decision.reason, "bad_address");
+      assert.equal(decision.status, "invalid_recipient");
+    }
   }
   assert.equal(decideOutboundRecipients({ to: "Talent <cwo@tradingsolutions.com>" }, env).send, true);
 });
@@ -119,7 +123,7 @@ test("sendViaGmail checks the guard before the Gmail API, and the digest compare
   const fetchAt = gmail.indexOf("fetch(GMAIL_SEND_URL", sendAt);
   assert.ok(sendAt > 0 && guardAt > sendAt && fetchAt > guardAt);
   const digest = readFileSync(join(root, "src/app/api/cron/digest-email/route.ts"), "utf8");
-  assert.match(digest, /secretsEqual\(/);
+  assert.match(digest, /cronRequestAuthorized\(/);
   assert.doesNotMatch(digest, /auth === `Bearer/);
   const staging = readFileSync(join(root, "infra/gcp/stg-careers-gcp.service.yaml"), "utf8");
   assert.match(staging, /MAIL_RECIPIENT_ALLOWLIST/);

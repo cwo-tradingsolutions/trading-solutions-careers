@@ -95,7 +95,7 @@ export async function insertPending(row: {
   return { id: again?.id || id };
 }
 
-export async function findOpenDedup(dedupKey: string): Promise<OpenDedupRow | null> {
+async function findDedupRow(dedupKey: string): Promise<OpenDedupRow | null> {
   await ensureOutboundMail();
   const rows = await sql()`
     SELECT id, status, gmail_id, side_effect_applied_at
@@ -114,6 +114,53 @@ export async function findOpenDedup(dedupKey: string): Promise<OpenDedupRow | nu
       ? (row.side_effect_applied_at instanceof Date ? row.side_effect_applied_at.toISOString() : String(row.side_effect_applied_at))
       : null,
   };
+}
+
+export async function findOpenDedup(dedupKey: string): Promise<OpenDedupRow | null> {
+  return findDedupRow(dedupKey);
+}
+
+/** Claim the dedup key as sending before Gmail. An existing row is a duplicate. */
+export async function reserveOutbound(input: CandidateMailInput): Promise<{ id: string; duplicate: boolean }> {
+  await ensureOutboundMail();
+  const key = input.dedupKey || null;
+  if (key) {
+    const existing = await findDedupRow(key);
+    if (existing) return { id: existing.id, duplicate: true };
+  }
+  const id = randomUUID();
+  const address = input.candidate || input.to || "";
+  const parsed = parseAddressList(address);
+  const mailbox = parsed.ok ? parsed.addresses[0] || "" : "";
+  const domain = mailbox ? recipientDomain(mailbox) : "unknown";
+  const addressHash = mailbox ? createHash("sha256").update(mailbox).digest("hex") : null;
+  const db = sql();
+  const inserted = await db`
+    INSERT INTO ats_outbound_mail (
+      id, candidate, recipient_domain, address_hash, type, subject, html, reply_to, bcc, status, error, dedup_key, side_effect, claimed_at
+    ) VALUES (
+      ${id},
+      ${input.candidate ?? input.to},
+      ${domain},
+      ${addressHash},
+      ${input.type},
+      ${input.subject},
+      ${input.html},
+      ${input.replyTo ?? null},
+      ${input.bcc ?? null},
+      'sending',
+      ${null},
+      ${key},
+      ${input.sideEffect ? JSON.stringify(input.sideEffect) : null}::jsonb,
+      NOW()
+    )
+    ON CONFLICT (dedup_key) WHERE dedup_key IS NOT NULL AND status IN ('pending', 'sending')
+    DO NOTHING
+    RETURNING id
+  `;
+  if (inserted.length > 0) return { id: String(inserted[0].id), duplicate: false };
+  const again = key ? await findDedupRow(key) : null;
+  return { id: again?.id || id, duplicate: true };
 }
 
 export async function markSideEffectApplied(id: string) {
@@ -139,6 +186,7 @@ export async function recordBlockedSend(row: {
   to?: string | null;
   type?: string | null;
   reason: string;
+  status?: "bloqueado_staging" | "invalid_recipient";
 }): Promise<{ id: string }> {
   await ensureOutboundMail();
   const parsed = parseAddressList(row.to);
@@ -159,7 +207,7 @@ export async function recordBlockedSend(row: {
       ${null},
       ${null},
       ${null},
-      'bloqueado_staging',
+      ${row.status === "invalid_recipient" ? "invalid_recipient" : "bloqueado_staging"},
       ${row.reason}
     )
   `;
@@ -198,12 +246,12 @@ export type PendingListItem = {
   status: string;
 };
 
-export async function listBlocked(): Promise<{ recipient_domain: string | null; type: string | null; created_at: string }[]> {
+export async function listBlocked(): Promise<{ recipient_domain: string | null; type: string | null; created_at: string; status: string }[]> {
   if (!(await ensureOutboundMail())) return [];
   const rows = await sql()`
-    SELECT recipient_domain, type, created_at
+    SELECT recipient_domain, type, created_at, status
     FROM ats_outbound_mail
-    WHERE status = 'bloqueado_staging'
+    WHERE status IN ('bloqueado_staging', 'invalid_recipient')
     ORDER BY created_at DESC
     LIMIT 50
   `;
@@ -211,6 +259,7 @@ export async function listBlocked(): Promise<{ recipient_domain: string | null; 
     recipient_domain: (row.recipient_domain as string | null) ?? null,
     type: (row.type as string | null) ?? null,
     created_at: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+    status: String(row.status),
   }));
 }
 
@@ -298,11 +347,18 @@ async function markPending(id: string, error: string) {
   `;
 }
 
-async function markBlocked(id: string, reason: string) {
+async function markBlocked(id: string, status: "bloqueado_staging" | "invalid_recipient") {
   await sql()`
     UPDATE ats_outbound_mail
-    SET status = 'bloqueado_staging', error = ${reason}, claimed_at = NULL
-    WHERE id = ${id}::uuid AND status = 'sending'
+    SET status = ${status},
+        error = ${status},
+        candidate = NULL,
+        html = NULL,
+        subject = type,
+        reply_to = NULL,
+        bcc = NULL,
+        claimed_at = NULL
+    WHERE id = ${id}::uuid
   `;
 }
 
@@ -331,8 +387,11 @@ export async function sendCandidateMail(input: CandidateMailInput): Promise<Cand
       }),
     savePending: insertPending,
     recordSend: recordSuccessfulSend,
-    findOpen: (key) => findOpenDedup(key),
-    applySideEffect: applyMailSideEffect,
+    reserve: reserveOutbound,
+    markSent,
+    markPending,
+    markBlocked,
+    applySideEffect: (effect) => applyMailSideEffect(effect),
     markSideEffectApplied,
     log: (line) => console.info(line),
   });
