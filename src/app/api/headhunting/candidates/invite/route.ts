@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
       .eq('id', candidate_id);
 
     // Build assessment URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://careers.tradingsolutions.com';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.elevarecareer.com';
     const assessmentUrl = `${baseUrl}/assessment/ht/${token}`;
 
     // Get client info for branding
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
       <p>Si tienes alguna pregunta, simplemente responde este correo.</p>
       <p>Un abrazo,<br><strong>Talent Acquisition Team</strong><br>${clientName}</p>
     </div>
-    <div class="footer">Evaluación confidencial<br>Este enlace es personal e intransferible.</div>
+    <div class="footer">Powered by ELEVARE Career · Evaluación confidencial<br>Este enlace es personal e intransferible.</div>
   </div></body></html>`;
 
     // ── Dispatcher por modo ──────────────────────────────────────────────

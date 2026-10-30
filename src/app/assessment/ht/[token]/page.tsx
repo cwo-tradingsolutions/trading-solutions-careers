@@ -799,6 +799,9 @@ export default function AssessmentPage() {
               Volver al inicio
             </a>
           </div>
+          <div className="text-center text-xs mt-12" style={{ color: TS_COLORS.mediumGray }}>
+            Powered by ELEVARE Career
+          </div>
         </div>
       </div>
     );
@@ -816,6 +819,9 @@ export default function AssessmentPage() {
               alt="Trading Solutions"
               className="h-7"
             />
+            <span style={{ color: TS_COLORS.mediumGray }} className="text-xs font-medium tracking-wide">
+              Powered by ELEVARE
+            </span>
           </div>
         </div>
 
@@ -1016,6 +1022,9 @@ export default function AssessmentPage() {
               alt="Trading Solutions"
               className="h-7"
             />
+            <span style={{ color: TS_COLORS.mediumGray }} className="text-xs font-medium tracking-wide">
+              Powered by ELEVARE
+            </span>
           </div>
         </div>
 
@@ -1235,6 +1244,11 @@ export default function AssessmentPage() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center text-xs mt-12" style={{ color: TS_COLORS.mediumGray }}>
+          Powered by ELEVARE Career
         </div>
       </div>
     );
@@ -1590,6 +1604,11 @@ export default function AssessmentPage() {
 
         {/* Hidden Canvas for Snapshots */}
         <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+        {/* Footer */}
+        <div className="text-center text-xs px-6 py-6" style={{ color: TS_COLORS.mediumGray }}>
+          Powered by ELEVARE Career
+        </div>
       </div>
     );
   }
@@ -1707,6 +1726,11 @@ export default function AssessmentPage() {
               Finalizar evaluación
             </button>
           </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center text-xs px-6 py-6" style={{ color: TS_COLORS.mediumGray }}>
+          Powered by ELEVARE Career
         </div>
       </div>
     );
@@ -1827,6 +1851,10 @@ export default function AssessmentPage() {
           >
             Volver al inicio
           </a>
+        </div>
+
+        <div className="text-center text-xs mt-16 absolute bottom-8 left-0 right-0 px-6" style={{ color: TS_COLORS.mediumGray }}>
+          Powered by ELEVARE Career
         </div>
       </div>
     );
