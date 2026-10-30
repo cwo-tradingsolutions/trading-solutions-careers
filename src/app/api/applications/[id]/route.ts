@@ -6,8 +6,7 @@ import { getResend, EMAIL_FROM } from "@/lib/resend";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
 import { candidateSignatureHtml } from "@/lib/ats-from";
 import { batteryAutoSendEnabled } from "@/lib/battery-auto-send";
-import { buildRejectionHtml, REJECTION_REPLY_TO, rejectionEmailsEnabled, rejectionSubject } from "@/lib/rejection-email";
-import { resolveCandidateLang } from "@/lib/candidate-lang";
+import { buildRejectionHtml, rejectionEmailsEnabled, rejectionSubject } from "@/lib/rejection-email";
 
 let dbInitialized = false;
 
@@ -21,7 +20,7 @@ async function ensureDB() {
 // Email automático en transiciones clave de status — el humano sigue
 // decidiendo, pero NO tiene que escribir el correo de cada candidato.
 async function sendStatusTransitionEmail(
-  appRow: { id: number; full_name: string; email: string; job_title: string; job_id: number | null },
+  appRow: { id: number; full_name: string; email: string; job_title: string },
   newStatus: string
 ) {
   if (!appRow.email) return;
@@ -65,21 +64,8 @@ async function sendStatusTransitionEmail(
       ${candidateSignatureHtml("es")}
     `);
   } else if (newStatus === "rejected") {
-    let jobLocation: string | null = null;
-    if (appRow.job_id != null) {
-      try {
-        const locRows = await sql`SELECT location FROM vacancies WHERE id = ${appRow.job_id} LIMIT 1`;
-        if (locRows.length > 0) jobLocation = (locRows[0].location as string) ?? null;
-      } catch { /* el id y el título alcanzan para elegir el idioma */ }
-    }
-    const rejLang = resolveCandidateLang({
-      jobId: appRow.job_id,
-      jobTitle: appRow.job_title,
-      country: jobLocation,
-    });
-    subject = rejectionSubject(appRow.job_title, rejLang);
-    html = buildRejectionHtml(firstName, appRow.job_title, rejLang);
-    replyTo = replyTo || REJECTION_REPLY_TO;
+    subject = rejectionSubject(appRow.job_title, "es");
+    html = buildRejectionHtml(firstName, appRow.job_title, "es");
   } else if (newStatus === "hired") {
     subject = `Trading Solutions · ¡Bienvenido al equipo! 🎉`;
     html = wrap(`
@@ -157,12 +143,12 @@ export async function PATCH(
 
     // Pull el status anterior + datos para email
     const before = await sql`
-      SELECT id, full_name, email, job_title, job_id, status FROM applications WHERE id = ${id} LIMIT 1
+      SELECT id, full_name, email, job_title, status FROM applications WHERE id = ${id} LIMIT 1
     `;
     if (before.length === 0) {
       return NextResponse.json({ error: "Application not found" }, { status: 404 });
     }
-    const prev = before[0] as { id: number; full_name: string; email: string; job_title: string; job_id: number | null; status: string };
+    const prev = before[0] as { id: number; full_name: string; email: string; job_title: string; status: string };
 
     const result = await sql`
       UPDATE applications

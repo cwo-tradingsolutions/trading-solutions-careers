@@ -62,7 +62,7 @@ export async function GET() {
     const rows = await sql`SELECT * FROM recruiter_config WHERE id = 1`;
     const row = rows[0] ?? {};
 
-    const emailFrom = process.env.EMAIL_FROM ?? "";
+    const emailFrom = process.env.EMAIL_FROM ?? "Elevare Careers <orders@elevarecareer.com>";
     const isTSDomain = /tradingsolutions\.com/i.test(emailFrom);
 
     return NextResponse.json(
@@ -71,7 +71,7 @@ export async function GET() {
         email_bcc: row.email_bcc ?? process.env.EMAIL_BCC ?? "",
         email_reply_to: row.email_reply_to ?? "",
         booking_url: row.booking_url ?? "",
-        resend_domain_status: isTSDomain ? "verified_ts" : "unset",
+        resend_domain_status: isTSDomain ? "verified_ts" : "default_elevare",
       },
       { headers: corsHeaders }
     );
