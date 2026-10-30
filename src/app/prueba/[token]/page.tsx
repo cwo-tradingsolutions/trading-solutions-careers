@@ -189,14 +189,14 @@ const T: Record<Lang, Dict> = {
    */
   en: {
     loading: "Loading…",
-    errorTitle: "We could not open the assessment",
+    errorTitle: "We couldn't open the assessment",
     errorHelp: `Write to us at ${CANDIDATE_MAIL} and we'll help.`,
-    errOpen: "We could not open the assessment.",
+    errOpen: "We couldn't open the assessment.",
     errNetwork: `We couldn't connect. Write to us at ${CANDIDATE_MAIL} if this link doesn't open.`,
     errInvalidLink: INVALID_LINK_EN,
     errAlreadyTaken: "This assessment has already been taken",
-    errConsentSave: "We could not record your consent. Write to us and we will send you a new link.",
-    errConsentNetwork: `We could not record your consent. Write to us at ${CANDIDATE_MAIL}.`,
+    errConsentSave: "We couldn't record your consent. Write to us and we'll send you a new link.",
+    errConsentNetwork: `We couldn't record your consent. Write to us at ${CANDIDATE_MAIL}.`,
 
     consentTitle: "Consent to the processing of your personal information",
     consentIntro:

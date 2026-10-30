@@ -101,7 +101,7 @@ export default function EncuestaPage() {
           <h2 className="text-xl font-bold mb-2">No pudimos abrir tu encuesta</h2>
           {error === "missing" ? (
             <>
-              <p className="text-sm text-gray-600">No encontramos esta encuesta. Escríbenos a jointheteam@tradingsolutions.com</p>
+              <p className="text-sm text-gray-600">No encontramos esta encuesta. Escríbenos a jointheteam@tradingsolutions.com y te ayudamos.</p>
               <p className="mt-2 text-sm text-gray-600">We couldn&apos;t find this survey. Write to us at jointheteam@tradingsolutions.com and we&apos;ll help.</p>
             </>
           ) : error === "expired" ? (

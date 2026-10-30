@@ -21,7 +21,7 @@ import Script from "next/script";
 import { invalidLinkBoth, loadRetryBoth } from "@/lib/candidate-invalid-link";
 import { CANDIDATE_MAIL } from "@/lib/candidate-public-error";
 
-type Phase = "loading" | "welcome" | "consent" | "live" | "processing" | "ended" | "error";
+type Phase = "loading" | "welcome" | "consent" | "live" | "processing" | "timeout" | "ended" | "error";
 
 type Config = {
   interview_id: string;
@@ -206,26 +206,49 @@ export default function AiInterviewPage() {
     const started = Date.now();
     const budgetMs = 2 * 60 * 1000;
     let waitMs = 0;
+    let failures = 0;
+    const stop = () => {
+      if (mountedRef.current) setPhase("timeout");
+    };
     while (Date.now() - started <= budgetMs) {
       if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
       waitMs = 5000;
+      if (!mountedRef.current) return;
       try {
         const r = await fetch(`/api/headhunting/ai-interview/${token}/finalize`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ conversation_id: finalId }),
         });
-        const j = await r.json().catch(() => ({}));
         if (!mountedRef.current) return;
+        if (r.status === 503 || r.status === 429) {
+          stop();
+          return;
+        }
+        if (r.status >= 400) {
+          failures += 1;
+          if (failures >= 2) {
+            stop();
+            return;
+          }
+          continue;
+        }
+        failures = 0;
+        const j = await r.json().catch(() => ({}));
         if (j.status === "completed" || j.status === "needs_review") {
           setPhase("ended");
           return;
         }
       } catch (e) {
         console.error("finalize failed:", e);
+        failures += 1;
+        if (failures >= 2) {
+          stop();
+          return;
+        }
       }
     }
-    if (mountedRef.current) setPhase("ended");
+    stop();
   }
 
   // ─── Render ────────────────────────────────────────────────────
@@ -254,9 +277,22 @@ export default function AiInterviewPage() {
     return (
       <div style={shell}>
         <div style={card}>
-          <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>Estamos procesando tu entrevista</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>Estamos procesando tu entrevista / We're processing your interview</h1>
           <p style={{ color: "#374151", lineHeight: 1.6 }}>
-            Puedes dejar esta ventana abierta. We're processing your interview.
+            Puedes dejar esta ventana abierta. / You can leave this window open.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "timeout") {
+    return (
+      <div style={shell}>
+        <div style={card}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>Seguimos procesando tu entrevista / We're still processing your interview</h1>
+          <p style={{ color: "#374151", lineHeight: 1.6 }}>
+            Puedes cerrar esta ventana. / You can close this window.
           </p>
         </div>
       </div>

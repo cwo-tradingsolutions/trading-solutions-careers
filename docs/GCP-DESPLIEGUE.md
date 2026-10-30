@@ -101,12 +101,12 @@ Repetir para los otros tres cambiando nombre, `--schedule` y `--uri`.
 
 ### AI interview rescore (do not create yet)
 
-The AI interview stays disabled on GCP. None of the four jobs above scores it. When it is turned on, add this Cloud Scheduler job by hand. This hotfix does not create it.
+Automatic rescore needs a Cloud Scheduler job on Cloud Run. It is not a Vercel Cron, and this hotfix does not create the job. The route accepts GET and POST. The AI interview stays off until `AI_INTERVIEW_ENABLED` is set; the route then returns 503 and does not call ElevenLabs.
 
-`POST /api/cron/rescore-ai-interviews` with `Authorization: Bearer CRON_SECRET` scores interviews still `in_progress` whose ElevenLabs conversation is `done`. The candidate page also polls finalize for about two minutes; this job catches the ones that finish later.
+Use OIDC so Cloud Run IAM accepts the call. If IAP is in front and replaces `Authorization`, send the cron secret in `X-Cron-Secret` instead. `CRON_SECRET` must be at least 16 characters. At integration time it should be added to `AUTH_SECRET_NAMES` in `hr-admin-secrets.ts` (that file belongs to #29 and is not edited here).
 
 ```bash
-gcloud scheduler jobs create http careers-rescore-ai-interviews --location us-west1 --schedule "*/10 * * * *" --time-zone "America/Bogota" --uri "https://CAREERS_URL/api/cron/rescore-ai-interviews" --http-method POST --update-headers "Authorization=Bearer EL_CRON_SECRET"
+gcloud scheduler jobs create http careers-rescore-ai-interviews --location us-west1 --schedule "*/10 * * * *" --time-zone "America/Bogota" --uri "https://CAREERS_URL/api/cron/rescore-ai-interviews" --http-method POST --headers "X-Cron-Secret=EL_CRON_SECRET" --oidc-service-account-email SCHEDULER_SA --oidc-token-audience "https://CAREERS_URL"
 ```
 
 ## 4. Verificación antes de cortar

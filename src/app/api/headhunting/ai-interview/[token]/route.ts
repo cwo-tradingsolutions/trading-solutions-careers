@@ -19,6 +19,8 @@ import {
   conversationMatchesInterview,
   fetchElevenConversation,
 } from "@/lib/ai-interview-finalize";
+import { aiInterviewEnabled } from "@/lib/ai-interview-flag";
+import { validConversationId } from "@/lib/ai-interview-rescore";
 
 export async function GET(
   _req: NextRequest,
@@ -123,6 +125,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { token: string } },
 ) {
+  if (!aiInterviewEnabled()) {
+    return NextResponse.json({ status: "disabled" }, { status: 503 });
+  }
   if (isPreviewTestMode()) {
     return NextResponse.json({ ok: true });
   }
@@ -130,8 +135,8 @@ export async function POST(
   const { token } = params;
   const body = await req.json().catch(() => ({}));
   const conversationId = typeof body.conversation_id === "string" ? body.conversation_id.trim() : "";
-  if (!conversationId) {
-    return NextResponse.json({ error: "invalid_token" }, { status: 400 });
+  if (!validConversationId(conversationId)) {
+    return NextResponse.json({ error: "invalid_conversation" }, { status: 400 });
   }
 
   const { data: interview, error } = await supabaseAdmin
@@ -145,6 +150,12 @@ export async function POST(
   }
   if (interview.status === "completed") {
     return NextResponse.json({ status: "completed" });
+  }
+  if (interview.conversation_id && interview.conversation_id !== conversationId) {
+    return NextResponse.json({ ok: false }, { status: 409 });
+  }
+  if (interview.conversation_id === conversationId) {
+    return NextResponse.json({ ok: true });
   }
   if (!allowFinalizeLookup(token)) {
     return NextResponse.json({ status: "in_progress" }, { status: 429 });
@@ -174,7 +185,7 @@ export async function POST(
     .neq("status", "completed");
   if (writeError) {
     console.error("ai-interview bind failed");
-    return NextResponse.json({ error: "invalid_token" }, { status: 500 });
+    return NextResponse.json({ error: "Error" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

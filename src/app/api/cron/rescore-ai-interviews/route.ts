@@ -1,41 +1,44 @@
 /**
- * POST /api/cron/rescore-ai-interviews
+ * GET and POST /api/cron/rescore-ai-interviews
  *
- * Same scoring pass as the admin rescore route, for Cloud Scheduler.
- * Auth: Authorization: Bearer CRON_SECRET, or an HR Admin session.
- * The scheduler job is documented and is not created by this change.
- * The AI interview stays disabled on GCP until that job is added on purpose.
+ * Scores in-progress interviews, and completed ones that never received a score,
+ * once ElevenLabs marks the conversation done. Cloud Scheduler on Cloud Run
+ * should call this. It is not a Vercel Cron and the job is not created here.
+ * If IAP sits in front, send the secret in X-Cron-Secret; OIDC covers Cloud Run IAM.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { aiInterviewEnabled } from "@/lib/ai-interview-flag";
+import { cronAuthorized, cronPresentedSecret } from "@/lib/cron-auth";
 import { runInProgressRescore } from "@/lib/ai-interview-rescore";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-function isCron(req: NextRequest): boolean {
-  const auth = req.headers.get("authorization");
-  const secret = process.env.CRON_SECRET;
-  if (!auth || !secret) return false;
-  return auth === `Bearer ${secret}`;
+function allowed(req: NextRequest): boolean {
+  const presented = cronPresentedSecret(
+    req.headers.get("authorization"),
+    req.headers.get("x-cron-secret"),
+  );
+  return cronAuthorized(presented, process.env.CRON_SECRET);
 }
 
-function baseUrlFrom(req: NextRequest): string {
-  const proto = req.headers.get("x-forwarded-proto") || "https";
-  const host = req.headers.get("host");
-  return host && !host.includes("localhost")
-    ? `${proto}://${host}`
-    : process.env.NEXT_PUBLIC_APP_URL || "https://trading-solutions-careers.vercel.app";
-}
-
-export async function POST(req: NextRequest) {
-  if (!isCron(req)) {
+async function handle(req: NextRequest) {
+  if (!allowed(req)) {
     const authError = requireAdmin(req);
     if (authError) return authError;
   }
+  if (!aiInterviewEnabled()) {
+    return NextResponse.json({ status: "disabled" }, { status: 503 });
+  }
 
   try {
-    const { pending, results } = await runInProgressRescore({ baseUrl: baseUrlFrom(req) });
+    const { pending, results, disabled } = await runInProgressRescore({
+      cronSecret: process.env.CRON_SECRET,
+    });
+    if (disabled) {
+      return NextResponse.json({ status: "disabled" }, { status: 503 });
+    }
     return NextResponse.json({
       success: true,
       pending,
@@ -46,4 +49,12 @@ export async function POST(req: NextRequest) {
     console.error("cron rescore-ai-interviews error");
     return NextResponse.json({ error: "Error" }, { status: 500 });
   }
+}
+
+export async function GET(req: NextRequest) {
+  return handle(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handle(req);
 }

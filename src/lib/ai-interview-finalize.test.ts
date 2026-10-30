@@ -14,7 +14,9 @@ import {
   type ConversationDetail,
   type InterviewBind,
 } from "./ai-interview-finalize.ts";
-import { rescoreAction } from "./ai-interview-rescore.ts";
+import { rescoreAction, rescoreBaseUrl, validConversationId } from "./ai-interview-rescore.ts";
+import { aiInterviewEnabled } from "./ai-interview-flag.ts";
+import { cronAuthorized } from "./cron-auth.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -261,10 +263,28 @@ test("a verified hint replaces the conversation stored from an earlier page load
   assert.deepEqual(result.body, { status: "completed" });
 });
 
+test("the AI interview flag, cron secret, and rescore url stay closed", () => {
+  assert.equal(aiInterviewEnabled(""), false);
+  assert.equal(aiInterviewEnabled("on"), true);
+  assert.equal(cronAuthorized("short-secret", "short-secret"), false);
+  assert.equal(cronAuthorized("a".repeat(16), "b".repeat(16)), false);
+  assert.equal(cronAuthorized("a".repeat(16), "a".repeat(16)), true);
+  assert.equal(rescoreBaseUrl({ APP_URL: "https://careers.example/" }), "https://careers.example");
+  assert.equal(rescoreBaseUrl({ NEXT_PUBLIC_APP_URL: "careers.example" }), "https://trading-solutions-careers.vercel.app");
+  assert.equal(validConversationId(""), false);
+  assert.equal(validConversationId("conv_" + "a".repeat(10)), true);
+  assert.equal(validConversationId("not-a-conversation"), false);
+  assert.equal(allowFinalizeLookup("tok-bucket", 5_000, "candidate"), true);
+  for (let i = 1; i < FINALIZE_LOOKUP_MAX; i++) allowFinalizeLookup("tok-bucket", 5_000, "candidate");
+  assert.equal(allowFinalizeLookup("tok-bucket", 5_000, "candidate"), false);
+  assert.equal(allowFinalizeLookup("tok-bucket", 5_000, "server"), true);
+});
+
 test("rescore scores an in-progress interview only after ElevenLabs is done", () => {
   const row = { status: "in_progress", conversation_id: "conv_1", ai_score: null };
   assert.equal(rescoreAction(row, "done"), "score");
   assert.equal(rescoreAction(row, "in-progress"), "wait");
-  assert.equal(rescoreAction({ ...row, status: "completed" }, "done"), "skip");
+  assert.equal(rescoreAction({ ...row, status: "completed" }, "done"), "score");
+  assert.equal(rescoreAction({ ...row, status: "completed" }, "in-progress"), "wait");
   assert.equal(rescoreAction({ ...row, ai_score: 80 }, "done"), "skip");
 });

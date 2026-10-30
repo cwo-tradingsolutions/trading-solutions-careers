@@ -72,25 +72,30 @@ export const FINALIZE_LOOKUP_MAX = 40;
 const lookupHits = new Map<string, number[]>();
 
 function sweepFinalizeLookups(now: number) {
-  for (const [token, hits] of lookupHits) {
+  for (const [key, hits] of lookupHits) {
     const recent = hits.filter((at) => now - at < FINALIZE_LOOKUP_WINDOW_MS);
-    if (recent.length === 0) lookupHits.delete(token);
-    else lookupHits.set(token, recent);
+    if (recent.length === 0) lookupHits.delete(key);
+    else lookupHits.set(key, recent);
   }
 }
 
 /** Caps ElevenLabs reads from public finalize and bind calls, including a stored conversation. */
-export function allowFinalizeLookup(token: string, now = Date.now()): boolean {
+export function allowFinalizeLookup(
+  token: string,
+  now = Date.now(),
+  bucket: "candidate" | "server" = "candidate",
+): boolean {
   sweepFinalizeLookups(now);
-  const recent = lookupHits.get(token) ?? [];
+  const key = `${bucket}:${token}`;
+  const recent = lookupHits.get(key) ?? [];
   if (recent.length >= FINALIZE_LOOKUP_MAX) return false;
   recent.push(now);
-  lookupHits.set(token, recent);
+  lookupHits.set(key, recent);
   return true;
 }
 
-export function finalizeLookupHas(token: string): boolean {
-  return lookupHits.has(token);
+export function finalizeLookupHas(token: string, bucket: "candidate" | "server" = "candidate"): boolean {
+  return lookupHits.has(`${bucket}:${token}`);
 }
 
 export function normalizeElevenConversation(raw: unknown): ConversationDetail | null {
@@ -140,12 +145,15 @@ export async function runCandidateFinalize(input: {
   rememberConversation?: (conversationId: string) => Promise<void>;
   markManualReview: () => Promise<void>;
   scoreServerTranscript: (conversationId: string, transcript: unknown) => Promise<boolean>;
-}): Promise<{ status: number; body: { status: PublicFinalizeStatus } }> {
-  if (input.interview.status === "completed") {
+  /** Server rescore of a completed row that never received a score. */
+  rescoreNullScore?: boolean;
+  lookupBucket?: "candidate" | "server";
+}): Promise<{ status: number; body: { status: PublicFinalizeStatus; rescored?: true } }> {
+  if (input.interview.status === "completed" && !input.rescoreNullScore) {
     return { status: 200, body: publicFinalizeBody("completed") };
   }
 
-  if (!allowFinalizeLookup(input.interview.token)) {
+  if (!allowFinalizeLookup(input.interview.token, Date.now(), input.lookupBucket ?? "candidate")) {
     return { status: 429, body: publicFinalizeBody("in_progress") };
   }
 
@@ -176,7 +184,10 @@ export async function runCandidateFinalize(input: {
     return { status: 200, body: publicFinalizeBody("in_progress") };
   }
 
-  await input.scoreServerTranscript(detail.conversation_id, detail.transcript);
+  const wrote = await input.scoreServerTranscript(detail.conversation_id, detail.transcript);
+  if (wrote && input.lookupBucket === "server") {
+    return { status: 200, body: { status: "completed", rescored: true } };
+  }
   return { status: 200, body: publicFinalizeBody("completed") };
 }
 
