@@ -115,8 +115,6 @@ export async function POST(
     <p>Cuando termines, cuéntanos por este mismo correo. Si surge cualquier duda en el camino, escríbenos.</p>
 
     ${candidateSignatureHtml("es")}
-
-    <div class="footer">Antes de enviar, pegá los enlaces personalizados de Bluesite y Psicoalianza.</div>
   </div>
 </body></html>`;
 
@@ -166,8 +164,6 @@ export async function POST(
     <p>Let us know through this same email when you are done. If anything comes up along the way, just write to us.</p>
 
     ${candidateSignatureHtml("en")}
-
-    <div class="footer">Before sending, paste the personal Bluesite and Psicoalianza links.</div>
   </div>
 </body></html>`;
 

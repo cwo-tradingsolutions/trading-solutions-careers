@@ -1717,6 +1717,8 @@ function BulkActionBar({
     if (running || !destino) return;
     const etiqueta = CANON_STAGES.find((e) => e.id === destino)?.label ?? destino;
     if (!confirm(`Mover ${n} candidato${n > 1 ? "s" : ""} a "${etiqueta}"?`)) return;
+    setBatIsError(false);
+    setBatMsg(null);
     setRunning(true);
     setProgress({ done: 0, total: n, ok: 0, fail: 0 });
     let ok = 0, fail = 0;
@@ -1759,6 +1761,8 @@ function BulkActionBar({
   async function runBulk(action: "stage_action" | "advance") {
     if (running) return;
     if (!confirm(`Aplicar acción a ${n} candidatos seleccionados? Quien quede en «Prefiltro pasado» recibe la Batería TS por correo de inmediato (desde jointheteam@); el resto de correos quedan como borrador en tu Gmail.`)) return;
+    setBatIsError(false);
+    setBatMsg(null);
     setRunning(true);
     setProgress({ done: 0, total: n, ok: 0, fail: 0 });
     let ok = 0, fail = 0;
@@ -2520,6 +2524,38 @@ function CandDetailPanel({ cand, onClose, onChanged, hiringLeadEmail }: { cand: 
               title="Genera draft Gmail con link Calendly + copia link WhatsApp al portapapeles"
             >
               📅 Enviar Calendly
+            </button>
+          )}
+
+          {!isTerminal && (
+            <button
+              onClick={async () => {
+                if (busy) return;
+                setBusy(true);
+                setFeedback("Creando borrador de pruebas…");
+                try {
+                  const r = await fetch(`/api/headhunting/candidates/${cand.id}/send-test-battery`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({}),
+                  });
+                  const j = await r.json();
+                  if (j.success) {
+                    setFeedback(`✅ ${j.note || "Borrador listo en Gmail. Antes de enviarlo, pega los enlaces de Bluesite y Psicoalianza."}`);
+                  } else {
+                    setFeedback(`❌ ${[j.error, j.detail].filter(Boolean).join(" · ") || "Error"}`);
+                  }
+                } catch (e) {
+                  setFeedback(`❌ ${(e as Error).message}`);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              disabled={busy}
+              className="text-xs font-bold px-4 py-2 rounded-full border-2 border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 disabled:opacity-50"
+              title="Crea un borrador en Gmail. Antes de enviarlo, pega los enlaces personalizados de Bluesite y Psicoalianza."
+            >
+              Pruebas complementarias
             </button>
           )}
 

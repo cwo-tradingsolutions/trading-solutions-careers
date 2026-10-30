@@ -1,7 +1,8 @@
--- NOT APPLIED. Rewrites the Spanish and English reminder voice inside
--- ts_reminder_rules.templates so the candidate is addressed as tú and the
--- team speaks as "nosotros". It does not change English copy, subjects,
--- stages, or the signature line.
+-- NOT APPLIED. Rewrites the reminder voice inside ts_reminder_rules.templates.
+-- Spanish addresses the candidate as tú and the team as "nosotros".
+-- English drops first person ("Let me know", "I'm available") for the team
+-- ("Let us know", "We're available"). It does not change subjects, stages,
+-- or the signature line.
 -- Idempotent: each replace() is a no-op once the old phrase is gone.
 --
 -- Preview (run before applying). On the 20260507 seed each of these is 1,
