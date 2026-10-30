@@ -101,7 +101,7 @@ describe("tarjetas de conteo", () => {
         ["publicadas", "Publicadas"],
         ["archivadas", "Archivadas"],
         ["cerradas", "Cerradas"],
-        ["ocultas", "Duplicadas/ocultas"],
+        ["ocultas", "Ocultas"],
       ],
     );
   });

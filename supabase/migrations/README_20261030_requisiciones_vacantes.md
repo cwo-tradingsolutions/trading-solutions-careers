@@ -7,7 +7,7 @@ Archivos. No se aplicaron contra ninguna base desde este PR. Se aplican en el de
 
 Las claves de `hidden_reason` (`duplicada`, `fuera_del_ats`) están en `HIDDEN_REASONS` (`src/lib/requisition-board.ts`). El CHECK de la migración usa las mismas cadenas.
 
-Las definiciones de las tarjetas están en `TARJETAS_CONTEO`, en el mismo archivo.
+Las cuatro tarjetas son Publicadas, Archivadas, Cerradas y Ocultas. El nombre de la cuarta es exactamente «Ocultas». Adentro, cada fila lleva el chip de su motivo: «Duplicada» o «Fuera del ATS». Las definiciones están en `TARJETAS_CONTEO`, en el mismo archivo.
 
 ## Backup
 

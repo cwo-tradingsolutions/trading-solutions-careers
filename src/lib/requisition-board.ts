@@ -51,8 +51,8 @@ export const TARJETAS_CONTEO: {
   },
   {
     key: "ocultas",
-    label: "Duplicadas/ocultas",
-    definicion: "Ocultas",
+    label: "Ocultas",
+    definicion: "Requisición oculta",
   },
 ];
 
