@@ -91,6 +91,7 @@ export async function PATCH(
     const tocaFechas = ["fecha_apertura", "posted_at", "fecha_objetivo", "target_close_date"]
       .some((k) => body[k] !== undefined);
     let avisoFechas: string | null = null;
+    const cierreExiste = tocaFechas ? await columnaCierreWebExiste() : false;
     if (tocaFechas) {
       const fechas = await validarFechasWeb(
         body.fecha_apertura ?? body.posted_at,
@@ -100,7 +101,8 @@ export async function PATCH(
         return NextResponse.json({ error: fechas.error }, { status: 400, headers: corsHeaders });
       }
       body.posted_at = fechas.apertura;
-      if (fechas.objetivo && await columnaCierreWebExiste()) body.target_close_date = fechas.objetivo;
+      if (fechas.objetivo && cierreExiste) body.target_close_date = fechas.objetivo;
+      else delete body.target_close_date;
       avisoFechas = fechas.aviso;
     }
 
@@ -161,7 +163,7 @@ export async function PATCH(
       updates.push(`posted_at = $${paramCount++}`);
       values.push(body.posted_at);
     }
-    if (body.target_close_date !== undefined && tocaFechas) {
+    if (cierreExiste && body.target_close_date !== undefined && tocaFechas) {
       updates.push(`target_close_date = $${paramCount++}`);
       values.push(body.target_close_date);
     }
