@@ -96,12 +96,36 @@ export function legacyPortalUntilMs(raw: string | undefined | null): number | nu
   return end;
 }
 
-/** A real calendar date past the cap. Placeholders and empty values are not fatal. */
+/** A real calendar date past the cap, or an impossible ISO date. Placeholders and empty values are not fatal. */
 export function legacyPortalDateFailure(env: NodeJS.ProcessEnv = process.env): string | null {
   const value = (env.PORTAL_TOKEN_LEGACY_UNTIL ?? "").trim();
   if (!ISO_DATE.test(value)) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const check = new Date(Date.UTC(year, month - 1, day));
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) {
+    return `PORTAL_TOKEN_LEGACY_UNTIL is not a real calendar date: ${value}`;
+  }
   if (legacyPortalUntilMs(value) !== null) return null;
   return `PORTAL_TOKEN_LEGACY_UNTIL is more than 14 days after ${PORTAL_LEGACY_REFERENCE_UTC}`;
+}
+
+/**
+ * Deploy check for the scheduled cron routes.
+ * 500 when the value equals the session or portal secret.
+ * 401 when it is missing, shorter than 16 characters, or equal to ADMIN_SECRET or the scripts secret.
+ * Null when a cron bearer may be accepted.
+ */
+export function cronSecretHttpStatus(env: NodeJS.ProcessEnv = process.env): 401 | 500 | null {
+  const value = (env.CRON_SECRET ?? "").trim();
+  const session = (env.HR_ADMIN_SESSION_SECRET ?? "").trim();
+  const portal = (env.PORTAL_TOKEN_SECRET ?? "").trim();
+  if (value && ((session && value === session) || (portal && value === portal))) return 500;
+  if (!readCronSecret(env)) return 401;
+  return null;
 }
 
 /** Session signer, portal signer, or a legacy date past the cap. Unset cron does not. */

@@ -25,7 +25,7 @@ import {
   getLanguage,
 } from "@/lib/reminder-templates";
 import { requireAdmin } from "@/lib/admin-auth";
-import { readCronSecret } from "@/lib/hr-admin-secrets";
+import { cronBearerAccepted, cronDeployRejection } from "@/lib/cron-auth";
 import crypto from "crypto";
 import { ATS_FROM_NAME } from "@/lib/ats-from";
 
@@ -83,17 +83,10 @@ async function ensureFreshTokensForReminder(cand: any): Promise<{ prefilterUrl: 
   };
 }
 
-function isVercelCron(req: NextRequest): boolean {
-  const auth = req.headers.get("authorization");
-  if (!auth) return false;
-  const secret = readCronSecret();
-  if (!secret) return false;
-  return auth === `Bearer ${secret}`;
-}
-
 export async function GET(req: NextRequest) {
-  // Permitir Vercel Cron O admin manual
-  if (!isVercelCron(req)) {
+  const rejected = cronDeployRejection(req);
+  if (rejected) return rejected;
+  if (!cronBearerAccepted(req)) {
     const authError = requireAdmin(req);
     if (authError) return authError;
   }

@@ -53,11 +53,16 @@ export function verifyPortalToken(token: string): { application_id: number; sign
   return { application_id: id, signature };
 }
 
-export function isValidSignatureFor(applicationId: number, email: string, providedSignature: string): boolean {
+export function isValidSignatureFor(
+  applicationId: number,
+  email: string,
+  providedSignature: string,
+  now = Date.now(),
+): boolean {
   const provided = providedSignature.toLowerCase();
   const current = readPortalSecret();
   if (current && timingSafeHex(hmac16(current, applicationId, email), provided)) return true;
-  const legacy = legacyPortalSecret();
+  const legacy = legacyPortalSecret(now);
   if (legacy && timingSafeHex(hmac16(legacy, applicationId, email), provided)) return true;
   return false;
 }

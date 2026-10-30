@@ -10,20 +10,17 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { readCronSecret } from "@/lib/hr-admin-secrets";
+import { cronBearerAccepted, cronDeployRejection } from "@/lib/cron-auth";
 import { sincronizarLote } from "@/lib/contactos";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-function esCron(req: NextRequest): boolean {
-  const secret = readCronSecret();
-  return Boolean(secret) && req.headers.get("authorization") === `Bearer ${secret}`;
-}
-
 export async function GET(req: NextRequest) {
-  if (!esCron(req)) {
+  const rejected = cronDeployRejection(req);
+  if (rejected) return rejected;
+  if (!cronBearerAccepted(req)) {
     const authError = requireAdmin(req);
     if (authError) return authError;
   }

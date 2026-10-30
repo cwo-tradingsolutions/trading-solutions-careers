@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
 import { requireAdmin } from "@/lib/admin-auth";
-import { readCronSecret } from "@/lib/hr-admin-secrets";
+import { cronBearerAccepted, cronDeployRejection } from "@/lib/cron-auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -24,16 +24,10 @@ const KELLY_EMAIL = "jointheteam@tradingsolutions.com";
 function startOfDay(d: Date): Date { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function endOfDay(d: Date): Date { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
 
-function isVercelCron(req: NextRequest): boolean {
-  const auth = req.headers.get("authorization");
-  if (!auth) return false;
-  const secret = readCronSecret();
-  if (!secret) return false;
-  return auth === `Bearer ${secret}`;
-}
-
 export async function GET(req: NextRequest) {
-  if (!isVercelCron(req)) {
+  const rejected = cronDeployRejection(req);
+  if (rejected) return rejected;
+  if (!cronBearerAccepted(req)) {
     const authError = requireAdmin(req);
     if (authError) return authError;
   }

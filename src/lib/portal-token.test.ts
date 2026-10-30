@@ -7,9 +7,10 @@ import {
   legacyPortalSecret,
   legacyPortalUntilMs,
 } from "./portal-token.ts";
-import { readCronSecret, shouldExitOnStartupFailure, startupSecretFailure } from "./hr-admin-secrets.ts";
+import { cronSecretHttpStatus, readCronSecret, shouldExitOnStartupFailure, startupSecretFailure } from "./hr-admin-secrets.ts";
 
-const KEYS = ["PORTAL_TOKEN_SECRET", "ADMIN_SECRET", "HR_ADMIN_SESSION_SECRET", "ADMIN_SCRIPTS_SECRET", "PORTAL_TOKEN_LEGACY_UNTIL", "K_SERVICE", "VERCEL_ENV", "NEXT_PHASE", "npm_lifecycle_event"] as const;
+const KEYS = ["PORTAL_TOKEN_SECRET", "ADMIN_SECRET", "HR_ADMIN_SESSION_SECRET", "ADMIN_SCRIPTS_SECRET", "CRON_SECRET", "PORTAL_TOKEN_LEGACY_UNTIL", "K_SERVICE", "VERCEL_ENV", "NEXT_PHASE", "npm_lifecycle_event"] as const;
+const FIXED_NOW = Date.parse("2026-11-01T15:00:00.000Z");
 const originals = Object.fromEntries(KEYS.map((key) => [key, process.env[key]]));
 const PORTAL = "portal-token-secret-value-32chars-min";
 const ADMIN = "admin-secret-value-sixteen";
@@ -21,10 +22,6 @@ afterEach(() => {
     else process.env[key] = originals[key];
   }
 });
-
-function dayOffset(days: number): string {
-  return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
 
 function legacySig(applicationId: number, email: string, secret: string): string {
   const data = `${applicationId}|${email.toLowerCase().trim()}`;
@@ -46,24 +43,30 @@ test("legacy portal links accept only a YYYY-MM-DD within 14 days and a 16 chara
   process.env.ADMIN_SECRET = ADMIN;
   process.env.HR_ADMIN_SESSION_SECRET = SESSION;
   const old = legacySig(7, "ada@example.com", ADMIN);
-  process.env.PORTAL_TOKEN_LEGACY_UNTIL = dayOffset(7);
-  assert.notEqual(legacyPortalSecret(), null);
-  assert.equal(isValidSignatureFor(7, "ada@example.com", old), true);
+  process.env.PORTAL_TOKEN_LEGACY_UNTIL = "2026-11-06";
+  assert.notEqual(legacyPortalSecret(FIXED_NOW), null);
+  assert.equal(isValidSignatureFor(7, "ada@example.com", old, FIXED_NOW), true);
 
   assert.notEqual(legacyPortalUntilMs("2026-11-12"), null);
   assert.equal(legacyPortalUntilMs("2026-11-13"), null);
   assert.equal(legacyPortalUntilMs("2099-12-31"), null);
+  assert.equal(legacyPortalUntilMs("2026-02-30"), null);
   process.env.PORTAL_TOKEN_LEGACY_UNTIL = "2026-11-13";
-  assert.equal(isValidSignatureFor(7, "ada@example.com", old), false);
+  assert.equal(isValidSignatureFor(7, "ada@example.com", old, FIXED_NOW), false);
+  assert.match(startupSecretFailure() ?? "", /more than 14 days/);
+
+  process.env.PORTAL_TOKEN_LEGACY_UNTIL = "2026-02-30";
+  assert.match(startupSecretFailure() ?? "", /not a real calendar date: 2026-02-30/);
+  assert.equal(isValidSignatureFor(7, "ada@example.com", old, FIXED_NOW), false);
 
   for (const bad of ["2099-12-31", "Nov 6 2026", "2099-01-02T00:00:00.000Z", "99999", ""]) {
     assert.equal(legacyPortalUntilMs(bad), null, bad);
   }
 
-  process.env.PORTAL_TOKEN_LEGACY_UNTIL = dayOffset(3);
+  process.env.PORTAL_TOKEN_LEGACY_UNTIL = "2026-11-04";
   process.env.ADMIN_SECRET = "short-secret";
-  assert.equal(legacyPortalSecret(), null);
-  assert.equal(isValidSignatureFor(7, "ada@example.com", old), false);
+  assert.equal(legacyPortalSecret(FIXED_NOW), null);
+  assert.equal(isValidSignatureFor(7, "ada@example.com", old, FIXED_NOW), false);
 });
 
 test("a portal secret that matches another auth secret is refused", () => {
@@ -105,5 +108,13 @@ test("startup exits only for a live production host, and a bad portal secret is 
   assert.equal(startupSecretFailure(), null);
   process.env.CRON_SECRET = SESSION;
   assert.equal(readCronSecret(), null);
+  assert.equal(cronSecretHttpStatus(), 500);
   assert.match(startupSecretFailure() ?? "", /HR_ADMIN_SESSION_SECRET/);
+  process.env.CRON_SECRET = PORTAL;
+  assert.equal(cronSecretHttpStatus(), 500);
+  process.env.CRON_SECRET = ADMIN;
+  assert.equal(cronSecretHttpStatus(), 401);
+  process.env.CRON_SECRET = "cron-secret-sixteen-chars";
+  assert.equal(cronSecretHttpStatus(), null);
+  assert.equal(readCronSecret(), "cron-secret-sixteen-chars");
 });
