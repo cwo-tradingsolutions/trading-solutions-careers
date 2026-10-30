@@ -18,6 +18,7 @@ export const AUTH_SECRET_NAMES = [
   "ADMIN_SECRET",
   "ADMIN_SCRIPTS_SECRET",
   "PORTAL_TOKEN_SECRET",
+  "WXM_SERVICE_SECRET",
   // Optional. Unset does not fail startup. When set it must be 16+ characters
   // and different from the other names, or readCronSecret() refuses it.
   "CRON_SECRET",
@@ -99,8 +100,7 @@ export function legacyPortalUntilMs(raw: string | undefined | null): number | nu
 /** A real calendar date past the cap, or an impossible ISO date. Placeholders and empty values are not fatal. */
 export function legacyPortalDateFailure(env: NodeJS.ProcessEnv = process.env): string | null {
   const value = (env.PORTAL_TOKEN_LEGACY_UNTIL ?? "").trim();
-  if (!ISO_DATE.test(value)) return null;
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const match = ISO_DATE.exec(value);
   if (!match) return null;
   const year = Number(match[1]);
   const month = Number(match[2]);
@@ -116,7 +116,7 @@ export function legacyPortalDateFailure(env: NodeJS.ProcessEnv = process.env): s
 /**
  * Deploy check for the scheduled cron routes.
  * 500 when the value equals the session or portal secret.
- * 401 when it is missing, shorter than 16 characters, or equal to ADMIN_SECRET or the scripts secret.
+ * 401 when it is missing, shorter than 16 characters, or equal to ADMIN_SECRET, the scripts secret, or WXM_SERVICE_SECRET.
  * Null when a cron bearer may be accepted.
  */
 export function cronSecretHttpStatus(env: NodeJS.ProcessEnv = process.env): 401 | 500 | null {
@@ -166,7 +166,11 @@ export function readPortalSecret(env: NodeJS.ProcessEnv = process.env): string |
   return value;
 }
 
-/** Null when unset, shorter than 16 characters, or equal to another auth secret. */
+/**
+ * Single source for CRON_SECRET. Null when unset, shorter than 16 characters,
+ * or equal to ADMIN_SECRET, ADMIN_SCRIPTS_SECRET, HR_ADMIN_SESSION_SECRET,
+ * PORTAL_TOKEN_SECRET, or WXM_SERVICE_SECRET. #30 and #32 import this.
+ */
 export function readCronSecret(env: NodeJS.ProcessEnv = process.env): string | null {
   const value = (env.CRON_SECRET ?? "").trim();
   if (value.length < MIN_AUTH_SECRET_LENGTH) return null;

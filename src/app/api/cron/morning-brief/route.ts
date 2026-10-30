@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
 import { requireAdmin } from "@/lib/admin-auth";
-import { cronBearerAccepted, cronDeployRejection } from "@/lib/cron-auth";
+import { cronRequestDecision } from "@/lib/cron-request-auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -25,9 +25,11 @@ function startOfDay(d: Date): Date { const x = new Date(d); x.setHours(0, 0, 0, 
 function endOfDay(d: Date): Date { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
 
 export async function GET(req: NextRequest) {
-  const rejected = cronDeployRejection(req);
-  if (rejected) return rejected;
-  if (!cronBearerAccepted(req)) {
+  const cronDecision = cronRequestDecision(req.headers.get("authorization"), req.headers.get("x-cron-secret"));
+  if (cronDecision === 401 || cronDecision === 500) {
+    return NextResponse.json({ ok: false }, { status: cronDecision });
+  }
+  if (cronDecision !== "ok") {
     const authError = requireAdmin(req);
     if (authError) return authError;
   }

@@ -8,8 +8,9 @@ import {
   legacyPortalUntilMs,
 } from "./portal-token.ts";
 import { cronSecretHttpStatus, readCronSecret, shouldExitOnStartupFailure, startupSecretFailure } from "./hr-admin-secrets.ts";
+import { cronAuthorized, cronPresentedSecret, cronRequestDecision } from "./cron-request-auth.ts";
 
-const KEYS = ["PORTAL_TOKEN_SECRET", "ADMIN_SECRET", "HR_ADMIN_SESSION_SECRET", "ADMIN_SCRIPTS_SECRET", "CRON_SECRET", "PORTAL_TOKEN_LEGACY_UNTIL", "K_SERVICE", "VERCEL_ENV", "NEXT_PHASE", "npm_lifecycle_event"] as const;
+const KEYS = ["PORTAL_TOKEN_SECRET", "ADMIN_SECRET", "HR_ADMIN_SESSION_SECRET", "ADMIN_SCRIPTS_SECRET", "WXM_SERVICE_SECRET", "CRON_SECRET", "PORTAL_TOKEN_LEGACY_UNTIL", "K_SERVICE", "VERCEL_ENV", "NEXT_PHASE", "npm_lifecycle_event"] as const;
 const FIXED_NOW = Date.parse("2026-11-01T15:00:00.000Z");
 const originals = Object.fromEntries(KEYS.map((key) => [key, process.env[key]]));
 const PORTAL = "portal-token-secret-value-32chars-min";
@@ -114,7 +115,19 @@ test("startup exits only for a live production host, and a bad portal secret is 
   assert.equal(cronSecretHttpStatus(), 500);
   process.env.CRON_SECRET = ADMIN;
   assert.equal(cronSecretHttpStatus(), 401);
+  process.env.CRON_SECRET = "wxm-service-secret-value";
+  process.env.WXM_SERVICE_SECRET = "wxm-service-secret-value";
+  assert.equal(readCronSecret(), null);
+  assert.equal(cronSecretHttpStatus(), 401);
+  process.env.WXM_SERVICE_SECRET = "wxm-service-secret-other";
   process.env.CRON_SECRET = "cron-secret-sixteen-chars";
   assert.equal(cronSecretHttpStatus(), null);
   assert.equal(readCronSecret(), "cron-secret-sixteen-chars");
+  assert.equal(cronPresentedSecret("Bearer cron-secret-sixteen-chars", null), "cron-secret-sixteen-chars");
+  assert.equal(cronPresentedSecret("Bearer ignored", "cron-secret-sixteen-chars"), "cron-secret-sixteen-chars");
+  assert.equal(cronAuthorized("cron-secret-sixteen-chars", readCronSecret()), true);
+  assert.equal(cronAuthorized("cron-secret-sixteen-charX", readCronSecret()), false);
+  assert.equal(cronRequestDecision("Bearer cron-secret-sixteen-chars", null), "ok");
+  assert.equal(cronRequestDecision(null, "cron-secret-sixteen-chars"), "ok");
+  assert.equal(cronRequestDecision(null, null), "admin");
 });

@@ -25,7 +25,7 @@ import {
   getLanguage,
 } from "@/lib/reminder-templates";
 import { requireAdmin } from "@/lib/admin-auth";
-import { cronBearerAccepted, cronDeployRejection } from "@/lib/cron-auth";
+import { cronRequestDecision } from "@/lib/cron-request-auth";
 import crypto from "crypto";
 import { ATS_FROM_NAME } from "@/lib/ats-from";
 
@@ -84,9 +84,11 @@ async function ensureFreshTokensForReminder(cand: any): Promise<{ prefilterUrl: 
 }
 
 export async function GET(req: NextRequest) {
-  const rejected = cronDeployRejection(req);
-  if (rejected) return rejected;
-  if (!cronBearerAccepted(req)) {
+  const cronDecision = cronRequestDecision(req.headers.get("authorization"), req.headers.get("x-cron-secret"));
+  if (cronDecision === 401 || cronDecision === 500) {
+    return NextResponse.json({ ok: false }, { status: cronDecision });
+  }
+  if (cronDecision !== "ok") {
     const authError = requireAdmin(req);
     if (authError) return authError;
   }
