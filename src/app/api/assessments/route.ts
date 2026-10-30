@@ -12,7 +12,9 @@ import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
-import { getResend, EMAIL_FROM, EMAIL_BCC } from "@/lib/resend";
+import { getResend, EMAIL_FROM } from "@/lib/resend";
+import { candidateMailBcc } from "@/lib/candidate-bcc";
+import { publicStepBody } from "@/lib/candidate-public-error";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
 import { candidateSignatureHtml, candidateSignatureText } from "@/lib/ats-from";
 
@@ -35,6 +37,9 @@ function generateToken(prefix = "ats"): string {
 
 /* ========== GET /api/assessments ========== */
 export async function GET(req: NextRequest) {
+  const authError = requireAdmin(req);
+  if (authError) return authError;
+
   try {
     const sql = neon(process.env.DATABASE_URL!);
     const { searchParams } = new URL(req.url);
@@ -75,11 +80,8 @@ export async function GET(req: NextRequest) {
       { headers: corsHeaders }
     );
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "unknown_error";
-    return NextResponse.json(
-      { error: "fetch_failed", detail: msg },
-      { status: 500, headers: corsHeaders }
-    );
+    console.error("GET /api/assessments", e);
+    return NextResponse.json(publicStepBody(), { status: 500, headers: corsHeaders });
   }
 }
 
@@ -221,16 +223,15 @@ export async function POST(req: NextRequest) {
     let emailStatus: { sent: boolean; id?: string; error?: string; via?: 'gmail' | 'resend' } = { sent: false };
     if (body.send_email) {
       try {
-        // Pull config dinámica (reply_to, bcc) de recruiter_config
-        let dynamicBcc = EMAIL_BCC;
+        // Kelly: no BCC on candidate mail. Reply-To still comes from config.
+        const dynamicBcc = candidateMailBcc();
         let dynamicReplyTo: string | null = null;
         try {
-          const cfgRows = await sql`SELECT * FROM recruiter_config WHERE id = 1`;
+          const cfgRows = await sql`SELECT email_reply_to FROM recruiter_config WHERE id = 1`;
           if (cfgRows.length > 0) {
-            dynamicBcc = (cfgRows[0].email_bcc as string) || EMAIL_BCC;
             dynamicReplyTo = (cfgRows[0].email_reply_to as string) || null;
           }
-        } catch { /* tabla no existe aún — usa env vars */ }
+        } catch { /* tabla no existe aún — la invitación sale sin Reply-To */ }
 
         const { subject: emailSubject, html } = buildEmailHtml({
           candidate_name: body.candidate_name,
@@ -261,7 +262,7 @@ export async function POST(req: NextRequest) {
           const result = await resend.emails.send({
             from: EMAIL_FROM,
             to: body.candidate_email,
-            bcc: dynamicBcc,
+            ...(dynamicBcc ? { bcc: dynamicBcc } : {}),
             subject: emailSubject,
             html,
             ...(dynamicReplyTo ? { replyTo: dynamicReplyTo } : {}),

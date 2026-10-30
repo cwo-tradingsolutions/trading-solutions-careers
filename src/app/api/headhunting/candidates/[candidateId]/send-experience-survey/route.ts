@@ -12,6 +12,7 @@ import { candidateSignatureHtml } from "@/lib/ats-from";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import crypto from "crypto";
 import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { shouldDropVacancyId, surveySendBody } from "@/lib/candidate-public-error";
 
 export async function POST(
   req: NextRequest,
@@ -76,7 +77,7 @@ export async function POST(
     } else {
       // Crear nuevo token
       token = crypto.randomBytes(20).toString('hex');
-      const { data: created, error: insErr } = await supabaseAdmin
+      const inserted = await supabaseAdmin
         .from("ts_candidate_experience")
         .insert({
           candidate_id: candidateId,
@@ -84,10 +85,26 @@ export async function POST(
           token,
           outcome,
         })
-        .select()
+        .select("id")
         .single();
-      if (insErr) {
-        return NextResponse.json({ error: insErr.message }, { status: 500 });
+      let created = inserted.data;
+      let insErr = inserted.error;
+      if (insErr && shouldDropVacancyId(insErr)) {
+        const retry = await supabaseAdmin
+          .from("ts_candidate_experience")
+          .insert({
+            candidate_id: candidateId,
+            token,
+            outcome,
+          })
+          .select("id")
+          .single();
+        created = retry.data;
+        insErr = retry.error;
+      }
+      if (insErr || !created) {
+        console.error("send-experience-survey insert", insErr);
+        return NextResponse.json(surveySendBody(), { status: 500 });
       }
       surveyId = created.id;
     }
@@ -178,7 +195,8 @@ export async function POST(
           }
         }
       } catch (e: any) {
-        emailResult = { sent: false, error: e?.message || String(e) };
+        console.error("send-experience-survey mail", e);
+        emailResult = { sent: false, error: "No pudimos enviar el correo." };
       }
     }
 
@@ -192,6 +210,6 @@ export async function POST(
     });
   } catch (err: any) {
     console.error("send-experience-survey error:", err);
-    return NextResponse.json({ error: err?.message || "Error" }, { status: 500 });
+    return NextResponse.json(surveySendBody(), { status: 500 });
   }
 }

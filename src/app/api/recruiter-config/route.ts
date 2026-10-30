@@ -12,6 +12,7 @@
 import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
 import { ATS_FROM_EMAIL, ATS_FROM_NAME } from "@/lib/ats-from";
+import { publicStepBody } from "@/lib/candidate-public-error";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -56,7 +57,10 @@ async function ensureTable() {
   `;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authError = requireAdmin(req);
+  if (authError) return authError;
+
   try {
     await ensureTable();
     const sql = neon(process.env.DATABASE_URL!);
@@ -77,10 +81,8 @@ export async function GET() {
       { headers: corsHeaders }
     );
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "unknown" },
-      { status: 500, headers: corsHeaders }
-    );
+    console.error("/api/recruiter-config", e);
+    return NextResponse.json(publicStepBody(), { status: 500, headers: corsHeaders });
   }
 }
 
@@ -109,9 +111,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true }, { headers: corsHeaders });
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "unknown" },
-      { status: 500, headers: corsHeaders }
-    );
+    console.error("/api/recruiter-config", e);
+    return NextResponse.json(publicStepBody(), { status: 500, headers: corsHeaders });
   }
 }

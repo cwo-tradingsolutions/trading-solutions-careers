@@ -8,9 +8,12 @@ import { CANDIDATE_SOURCE_VALUES, validarCanalReclutador } from '@/lib/candidate
  * Returns basic info for a single candidate.
  */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ candidateId: string }> },
 ) {
+  const authError = requireAdmin(req);
+  if (authError) return authError;
+
   try {
     const { candidateId } = await params;
     if (!candidateId) {

@@ -17,10 +17,12 @@
  *   GET    /api/assessment-preview?run_id=X  → leer un run para revisar después
  */
 import { neon } from "@/lib/sql";
+import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { TS_SCENARIOS } from "@/lib/headhunting/scenarios-ts";
 import { TS_BENCHMARK_STATS, TS_DNA_PATTERNS } from "@/lib/headhunting/calibration-data";
 import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
+import { publicStepBody } from "@/lib/candidate-public-error";
 
 export const runtime = "nodejs";
 
@@ -227,14 +229,16 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true }, { headers: corsHeaders });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "unknown_error";
     console.error("assessment-preview POST error:", e);
-    return NextResponse.json({ error: msg }, { status: 500, headers: corsHeaders });
+    return NextResponse.json(publicStepBody(), { status: 500, headers: corsHeaders });
   }
 }
 
 // ─── GET: leer run completo ──────────────────────────────────────────
 export async function GET(req: NextRequest) {
+  const authError = requireAdmin(req);
+  if (authError) return authError;
+
   try {
     if (isPreviewTestMode()) {
       return NextResponse.json({ runs: [], run: null, responses: [] }, { headers: corsHeaders });
@@ -264,8 +268,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ run: runRows[0] ?? null, responses }, { headers: corsHeaders });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "unknown_error";
     console.error("assessment-preview GET error:", e);
-    return NextResponse.json({ error: msg }, { status: 500, headers: corsHeaders });
+    return NextResponse.json(publicStepBody(), { status: 500, headers: corsHeaders });
   }
 }

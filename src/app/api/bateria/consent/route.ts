@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { CONSENT_TEXT_VERSION } from '@/lib/bateria/items';
 import { consentVersionFor, batteryVersionFor, type BatLang } from '@/lib/bateria/i18n';
 import { isPreviewTestMode, previewTestJson } from '@/lib/preview-mode';
+import { publicStepBody } from '@/lib/candidate-public-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,10 @@ export async function POST(req: NextRequest) {
 
     const { data: session, error: eSes } = await supabaseAdmin
       .from('ts_bat_sessions').select('id, status').eq('token', token).single();
-    if (eSes) return NextResponse.json({ error: `[buscar] ${eSes.message}` }, { status: 500 });
+    if (eSes) {
+      console.error('bateria/consent buscar', eSes);
+      return NextResponse.json(publicStepBody(), { status: 500 });
+    }
     if (!session) return NextResponse.json({ error: 'Enlace no válido' }, { status: 404 });
 
     if (isPreviewTestMode()) {
@@ -63,7 +67,10 @@ export async function POST(req: NextRequest) {
       .eq('id', session.id)
       .select('id, consent_data_at, consent_cam_at, status');
 
-    if (error) return NextResponse.json({ error: `[guardar] ${error.message}` }, { status: 500 });
+    if (error) {
+      console.error('bateria/consent guardar', error);
+      return NextResponse.json(publicStepBody(), { status: 500 });
+    }
     if (!filas?.length) {
       return NextResponse.json(
         { error: 'no_persistio', detalle: 'No pudimos registrar su autorización. No inicie la prueba: escríbanos para enviarle un enlace nuevo.' },
@@ -85,6 +92,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error('bateria/consent', err);
-    return NextResponse.json({ error: `[ruta] ${err?.message ?? String(err)}` }, { status: 500 });
+    return NextResponse.json(publicStepBody(), { status: 500 });
   }
 }
