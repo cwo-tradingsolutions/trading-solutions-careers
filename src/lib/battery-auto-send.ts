@@ -1,7 +1,7 @@
 /**
- * Envío automático de la Batería TS.
+ * Envío automático de la Batería TS, y nada más.
  * Apagado salvo BATTERY_AUTO_SEND_ENABLED=1 (también true, yes, on).
- * Vacío o ausente no envía.
+ * Vacío o ausente no envía. Los drafts de etapa usan STAGE_DRAFTS_ENABLED.
  */
 export const NOTA_BATERIA_PENDIENTE = "batería pendiente de envío";
 

@@ -22,6 +22,7 @@ import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { recordStageEvent } from "@/lib/stage-events";
 import { enviarBateriaAuto } from "@/lib/bateria/invitar";
 import { batteryAutoSendEnabled, NOTA_BATERIA_PENDIENTE } from "@/lib/battery-auto-send";
+import { stageDraftsEnabled } from "@/lib/stage-drafts";
 import { ATS_FROM_NAME, candidateSignatureHtml } from "@/lib/ats-from";
 import { validarRechazo, MSG_RECHAZO_SILENCIOSO } from "@/lib/rejection-rules";
 import {
@@ -112,7 +113,7 @@ export async function POST(
 
       try {
         const gmail = await isGmailConnected();
-        if (gmail.connected && batteryAutoSendEnabled()) {
+        if (gmail.connected && stageDraftsEnabled()) {
           // @ts-expect-error supabase relation
           const vacancyTitle = candidate.ht_vacancies?.title || "la vacante";
           const firstName = (candidate.name as string).split(" ")[0] || "candidato";
@@ -240,7 +241,7 @@ export async function POST(
       // Welcome email · primer contacto post-oferta firmada
       try {
         const gmail = await isGmailConnected();
-        if (gmail.connected && candidate.email && batteryAutoSendEnabled()) {
+        if (gmail.connected && candidate.email && stageDraftsEnabled()) {
           const firstName = (candidate.name as string).split(" ")[0] || "";
           // @ts-expect-error supabase relation
           const vacancyTitle = candidate.ht_vacancies?.title || "tu nuevo rol";
