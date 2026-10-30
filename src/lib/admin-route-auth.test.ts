@@ -4,7 +4,8 @@ import { requireAdmin } from "./admin-auth.ts";
 import { signAdminSession } from "./hr-admin-session.ts";
 
 process.env.ADMIN_SECRET = "test-admin-secret-for-401";
-process.env.HR_ADMIN_SESSION_SECRET = "test-admin-secret-for-401";
+process.env.HR_ADMIN_SESSION_SECRET = "test-session-secret-for-401";
+process.env.HR_ADMIN_ALLOWED_EMAILS = "kelly@tradingsolutions.com";
 
 /** Enough of a request for requireAdmin. These tests return before any database call. */
 function request(url: string, cookie?: string) {

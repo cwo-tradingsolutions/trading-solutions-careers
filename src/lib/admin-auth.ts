@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminSessionEmailAllowed } from "./hr-admin-session-policy";
 import { HR_ADMIN_SESSION_COOKIE, readAdminSession } from "./hr-admin-session";
 import { readSessionSecret } from "./hr-admin-secrets";
 
@@ -15,7 +16,7 @@ export function requireAdmin(req: NextRequest): NextResponse | null {
   }
 
   const session = readAdminSession(req.cookies.get(HR_ADMIN_SESSION_COOKIE)?.value, secret);
-  if (session?.email) return null;
+  if (session?.email && adminSessionEmailAllowed(session.email)) return null;
 
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
@@ -26,7 +27,9 @@ export function adminSessionEmail(req: {
 }): string | null {
   const secret = readSessionSecret();
   if (!secret) return null;
-  return readAdminSession(req.cookies.get(HR_ADMIN_SESSION_COOKIE)?.value, secret)?.email ?? null;
+  const email = readAdminSession(req.cookies.get(HR_ADMIN_SESSION_COOKIE)?.value, secret)?.email ?? null;
+  if (!email || !adminSessionEmailAllowed(email)) return null;
+  return email;
 }
 
 /** Actor stored on a write. The client does not get to choose it. */

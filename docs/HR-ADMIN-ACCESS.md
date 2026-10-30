@@ -4,7 +4,7 @@ Draft. Do not merge until Kelly's GO. No deploy and no env change is part of thi
 
 HR Admin signs in with a corporate Google account. The shared password is a vault emergency key. It is off unless `HR_ADMIN_PASSWORD_LOGIN_ENABLED` is on, and Kelly retires it 7 days after Google sign-in is live. It is not a Bearer token, not an `x-admin-secret`, and it does not sign sessions.
 
-The browser session is the `hr_admin_session` cookie `requireAdmin` already checks. It lasts 8 hours, is signed with `HR_ADMIN_SESSION_SECRET`, and must carry an email. Cookies signed with `ADMIN_SECRET`, and cookies with no email, are rejected.
+The browser session is the `hr_admin_session` cookie `requireAdmin` already checks. It lasts 8 hours, is signed with `HR_ADMIN_SESSION_SECRET`, and must carry an email that is still on `HR_ADMIN_ALLOWED_EMAILS`. Removing an address ends that session on the next request. Cookies signed with `ADMIN_SECRET`, and cookies with no email, are rejected. The break-glass email `break-glass@tradingsolutions.com` is not on the allowlist; it works only while the password flag is on.
 
 The OAuth redirect URI comes from `NEXT_PUBLIC_APP_URL`, so Vercel and Cloud Run behind the Google load balancer use the same value. IAP (`x-goog-iap-jwt-assertion`) is accepted only on Cloud Run (`K_SERVICE` set and `VERCEL` / `VERCEL_ENV` unset). On Vercel the header is ignored.
 
@@ -16,28 +16,36 @@ Set the same names on the staging host and on production (Vercel Production and 
 |---|---|---|
 | `GOOGLE_ADMIN_OAUTH_CLIENT_ID` | both, when Google sign-in is turned on | The HR Admin OAuth client. Not the Gmail client (`GOOGLE_CLIENT_ID`). |
 | `GOOGLE_ADMIN_OAUTH_CLIENT_SECRET` | both | Server only, token exchange. |
-| `HR_ADMIN_ALLOWED_EMAILS` | both | Comma-separated `@tradingsolutions.com` emails. Case and surrounding space are ignored. Other domains are ignored. Empty or unset admits nobody through Google or IAP. |
-| `HR_ADMIN_SESSION_SECRET` | both, required | The app only. Signs `hr_admin_session` and the OAuth state cookie. Missing or shorter than 16 characters: no session is issued and admin APIs return 500. |
-| `HR_ADMIN_PASSWORD_LOGIN_ENABLED` | off at cutover | Vault break-glass. On only for `1`, `true`, `yes`, or `on`. Retired 7 days after Google sign-in is live. |
-| `ADMIN_SECRET` | both, rotated | Vault password checked only by `POST /api/hr-admin/login` while the flag is on. Also signs candidate portal links (`src/lib/portal-token.ts`). Not accepted as Bearer, cookie, or `x-admin-secret`. |
-| `ADMIN_SCRIPTS_SECRET` | both, if those jobs still run | One-shot scripts and the battery header. Unset: those calls fail closed. The HR session does not need it. |
-| `IAP_AUDIENCE` | Cloud Run only | Expected `aud` of the IAP JWT. Leave unset on Vercel. Unset on Cloud Run: the header never grants a session. |
+| `HR_ADMIN_ALLOWED_EMAILS` | both | Comma-separated `@tradingsolutions.com` emails. Re-checked on every request. Cloud Run value: `cwo@tradingsolutions.com,jointheteam@tradingsolutions.com`. Empty admits nobody through Google, IAP, or an existing session. |
+| `HR_ADMIN_SESSION_SECRET` | both, required | The app only. Signs `hr_admin_session` and the OAuth state cookie. Missing, shorter than 16 characters, or equal to another auth secret: no session. Startup and `GET /api/health` log `[hr-admin] FATAL` and fail. Cloud Run secret: `prod-careers-hr-admin-session-secret` / `stg-careers-hr-admin-session-secret`. |
+| `HR_ADMIN_PASSWORD_LOGIN_ENABLED` | `0` at cutover | Vault break-glass. On only for `1`, `true`, `yes`, or `on`. The password itself must be at least 16 characters. Retired 7 days after Google sign-in is live. |
+| `ADMIN_SECRET` | both, rotated | Vault password for `POST /api/hr-admin/login` only, and only while the flag is on. Not a session signer, not a script key, and not the portal signer. Must differ from the other three secrets. |
+| `ADMIN_SCRIPTS_SECRET` | both, if those jobs still run | Only the three script routes below. Unset, or equal to another auth secret: those calls fail closed. Cloud Run secret: `prod-careers-admin-scripts-secret` / `stg-careers-admin-scripts-secret`. |
+| `PORTAL_TOKEN_SECRET` | both | Signs new candidate portal links. At least 32 characters. Must differ from the other secrets. Cloud Run secret: `prod-careers-portal-token-secret` / `stg-careers-portal-token-secret`. |
+| `PORTAL_TOKEN_LEGACY_UNTIL` | optional, 7 days | ISO date or timestamp. Until that moment, portal links already sent (signed with `ADMIN_SECRET`) still verify. After it, or if unset, only `PORTAL_TOKEN_SECRET` works. A date-only value includes that UTC day. |
+| `GOOGLE_MAILBOX_ALLOWED_EMAILS` | both | Cloud Run sets `jointheteam@tradingsolutions.com`. The mailbox the careers service may send as. |
+| `IAP_AUDIENCE` | Cloud Run only | Expected `aud` of the IAP JWT. The service YAML ships `REPLACE_WITH_IAP_AUDIENCE` until the load balancer id is filled in. Leave unset on Vercel. |
 | `NEXT_PUBLIC_APP_URL` | already set | Public origin. Redirect URI is `{origin}/api/hr-admin/login/google/callback`. |
 
-`HR_ADMIN_ALLOWED_EMAILS` example (not a prod list): `kelly@tradingsolutions.com, jointheteam@tradingsolutions.com`.
+`HR_ADMIN_SESSION_SECRET`, `ADMIN_SECRET`, `ADMIN_SCRIPTS_SECRET`, and `PORTAL_TOKEN_SECRET` must all be different values. If any two match, the ones that match are refused. On Cloud Run (`K_SERVICE`) and on Vercel production, a missing or reused session secret also throws at startup after the `[hr-admin] FATAL` line. `GET /api/health` returns 503 in that case.
+
+Google OAuth client secrets on both Cloud Run services are `prod-careers-google-admin-oauth-client-id` and `prod-careers-google-admin-oauth-client-secret`.
 
 ### Who calls `ADMIN_SCRIPTS_SECRET`
 
-Send it as `Authorization: Bearer` or `x-admin-secret`. It does not open the rest of HR Admin.
+Send it as `Authorization: Bearer` or `x-admin-secret`. It opens only these three routes. Battery, ranking, candidate files, and evaluate-candidate require an HR session cookie.
 
-| Route | Who | Header they use today |
+| Route | Who | Header |
 |---|---|---|
-| `POST /api/admin/seed-linkedin-apps` and its GET dry-run | Engineering, one-shot LinkedIn Recruiter import | `Authorization: Bearer` |
+| `POST` and `GET /api/admin/seed-linkedin-apps` | Engineering, one-shot LinkedIn Recruiter import | `Authorization: Bearer` |
 | `POST /api/headhunting/sync-from-neon` | Engineering, one-shot copy from Neon talent pool into Supabase | `Authorization: Bearer` |
 | `POST /api/headhunting/reseed-scenarios` | Engineering, reseed Elevare scenarios for the TS model | `x-admin-secret` or Bearer |
-| Batería routes (`/api/bateria/*`) and `POST /api/candidates/[id]/files` | Battery tooling. The HR browser uses the session cookie instead | `x-admin-secret` |
 
-A logged-in HR session can still call the seed and reseed routes. `ADMIN_SECRET` cannot.
+A logged-in HR session can still call those routes. `ADMIN_SECRET` cannot.
+
+### Portal links
+
+New links are `HMAC(id|email, PORTAL_TOKEN_SECRET)` truncated to 16 hex characters. Set `PORTAL_TOKEN_LEGACY_UNTIL` to seven days after the cutover so links already in candidates' inboxes, signed with the old `ADMIN_SECRET`, keep opening until that date. After it, only the new secret verifies. Rotating `ADMIN_SECRET` during those seven days invalidates the legacy links immediately, because the legacy check uses the current `ADMIN_SECRET`.
 
 ## Google ID token
 
@@ -81,9 +89,9 @@ Do this when Google sign-in is switched on. Order matters.
 
 1. Generate three different values. Put the session signer in `HR_ADMIN_SESSION_SECRET` and the script key in `ADMIN_SCRIPTS_SECRET`. Do not copy the current `ADMIN_SECRET` into either.
 2. Deploy the app that requires the email claim and the new signer. Every existing `hr_admin_session` cookie stops working, including ones minted from the old password and ones with no email. People sign in with Google.
-3. Rotate `ADMIN_SECRET` to a new vault value. The old value must stop working. From this deploy it is not accepted as Bearer, as `x-admin-secret`, or as a session signature. It is only the break-glass password, and only while `HR_ADMIN_PASSWORD_LOGIN_ENABLED` is on.
-4. Rotating `ADMIN_SECRET` also invalidates candidate portal links. Those links are `HMAC(id + email, ADMIN_SECRET)`. Send new links after the rotation if anyone still has an old one.
-5. Update any curl or job that called seed-linkedin-apps, sync-from-neon, reseed-scenarios, or battery routes with `ADMIN_SECRET`. Point them at `ADMIN_SCRIPTS_SECRET`. If a job is unused, leave `ADMIN_SCRIPTS_SECRET` unset so the call fails closed.
+3. Rotate `ADMIN_SECRET` to a new vault value of at least 16 characters, different from the session, script, and portal secrets. The old value must stop working. It is only the break-glass password, and only while `HR_ADMIN_PASSWORD_LOGIN_ENABLED` is on.
+4. New portal links use `PORTAL_TOKEN_SECRET`. Set `PORTAL_TOKEN_LEGACY_UNTIL` to seven days out before rotating `ADMIN_SECRET` if candidates still hold old links. After the legacy date, or once `ADMIN_SECRET` changes, those old links stop.
+5. Update any curl that called seed-linkedin-apps, sync-from-neon, or reseed-scenarios with `ADMIN_SECRET`. Point them at `ADMIN_SCRIPTS_SECRET`. Battery, ranking, files, and evaluate-candidate do not take that secret. If a script job is unused, leave `ADMIN_SCRIPTS_SECRET` unset so the call fails closed.
 6. Keep the password flag off. If the vault key is needed in the 7 days after go-live, set `HR_ADMIN_PASSWORD_LOGIN_ENABLED=1` on that host only. The form comes back and `POST /api/hr-admin/login` checks `ADMIN_SECRET`. Each attempt is logged with a warning (`break-glass password login`). The session it creates is signed with `HR_ADMIN_SESSION_SECRET` and the email claim `break-glass@tradingsolutions.com`. Bearer and `x-admin-secret` still do not accept `ADMIN_SECRET`.
 7. On day 7, turn the flag off (unset it) and rotate `ADMIN_SECRET` once more so the retired password is not the value stored in the vault.
 

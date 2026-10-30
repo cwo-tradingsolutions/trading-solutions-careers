@@ -8,6 +8,8 @@ import {
   sessionIssuedAtOk,
   sessionSigningInput,
 } from './lib/hr-admin-session-format';
+import { adminSessionEmailAllowed } from './lib/hr-admin-session-policy';
+import { MIN_AUTH_SECRET_LENGTH, sessionSecretFailure } from './lib/hr-admin-secrets';
 
 /**
  * Middleware combinado:
@@ -16,10 +18,10 @@ import {
  */
 
 // Validación HMAC con Web Crypto (Edge runtime). Mismo formato que readAdminSession.
-async function isValidSession(token: string | undefined, secret: string | undefined): Promise<boolean> {
-  if (!token || !secret) return false;
+async function sessionEmail(token: string | undefined, secret: string | undefined): Promise<string | null> {
+  if (!token || !secret) return null;
   const parsed = sessionSigningInput(token);
-  if (!parsed || !sessionIssuedAtOk(parsed.issuedAt, Date.now())) return false;
+  if (!parsed || !sessionIssuedAtOk(parsed.issuedAt, Date.now())) return null;
 
   try {
     const key = await crypto.subtle.importKey(
@@ -33,16 +35,16 @@ async function isValidSession(token: string | undefined, secret: string | undefi
     const expectedHex = Array.from(new Uint8Array(expected))
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
-    if (expectedHex.length !== parsed.signature.length) return false;
+    if (expectedHex.length !== parsed.signature.length) return null;
     let diff = 0;
     for (let i = 0; i < expectedHex.length; i++) {
       diff |= expectedHex.charCodeAt(i) ^ parsed.signature.charCodeAt(i);
     }
-    if (diff !== 0) return false;
-    if (!parsed.emailToken || !emailFromToken(parsed.emailToken)) return false;
-    return true;
+    if (diff !== 0) return null;
+    if (!parsed.emailToken) return null;
+    return emailFromToken(parsed.emailToken);
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -79,7 +81,9 @@ export async function middleware(request: NextRequest) {
     }
     const token = request.cookies.get(HR_ADMIN_SESSION_COOKIE)?.value;
     const secret = (process.env.HR_ADMIN_SESSION_SECRET ?? '').trim();
-    const ok = secret.length >= 16 && await isValidSession(token, secret);
+    const usable = secret.length >= MIN_AUTH_SECRET_LENGTH && !sessionSecretFailure();
+    const email = usable ? await sessionEmail(token, secret) : null;
+    const ok = Boolean(email && adminSessionEmailAllowed(email));
     if (!ok) {
       const url = request.nextUrl.clone();
       url.pathname = '/hr-admin/login';

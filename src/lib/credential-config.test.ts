@@ -8,9 +8,14 @@ import { isMaskedCredential } from './credential-config';
 const KEYS = ['ADMIN_SECRET', 'CRON_SECRET', 'WXM_SERVICE_SECRET', 'HR_ADMIN_SESSION_SECRET', 'ADMIN_SCRIPTS_SECRET'] as const;
 const originals = Object.fromEntries(KEYS.map(key => [key, process.env[key]]));
 const VALID = 'clave-valida-ficticia-para-pruebas';
+const SESSION = `${VALID}-session`;
+const SCRIPTS = `${VALID}-scripts`;
 
 beforeEach(() => {
   for (const key of KEYS) process.env[key] = VALID;
+  process.env.HR_ADMIN_SESSION_SECRET = SESSION;
+  process.env.ADMIN_SCRIPTS_SECRET = SCRIPTS;
+  process.env.HR_ADMIN_ALLOWED_EMAILS = 'kelly@tradingsolutions.com';
 });
 afterEach(() => {
   for (const key of KEYS) {
@@ -84,7 +89,7 @@ test('el marcador bloquea también las pantallas y API de login antes de sus exc
 });
 
 test('cookie válida con clave real sigue pasando y cookie inválida conserva la redirección', async () => {
-  const allowed = await middleware(request('/hr-admin', { headers: { Cookie: sessionCookie(VALID) } }));
+  const allowed = await middleware(request('/hr-admin', { headers: { Cookie: sessionCookie(SESSION) } }));
   assert.equal(allowed.headers.get('x-middleware-next'), '1');
   const denied = await middleware(request('/hr-admin/prep?tab=uno'));
   assert.equal(denied.status, 307);
@@ -115,8 +120,9 @@ test('no se agrega bloqueo de configuración por credenciales ausentes o cortas'
   const login = await middleware(request('/hr-admin/login'));
   assert.equal(login.headers.get('x-middleware-next'), '1');
   process.env.ADMIN_SECRET = 'x';
-  process.env.HR_ADMIN_SESSION_SECRET = VALID;
-  const short = await middleware(request('/hr-admin', { headers: { Cookie: sessionCookie(VALID) } }));
+  process.env.HR_ADMIN_SESSION_SECRET = SESSION;
+  process.env.HR_ADMIN_ALLOWED_EMAILS = 'kelly@tradingsolutions.com';
+  const short = await middleware(request('/hr-admin', { headers: { Cookie: sessionCookie(SESSION) } }));
   assert.equal(short.headers.get('x-middleware-next'), '1');
 });
 

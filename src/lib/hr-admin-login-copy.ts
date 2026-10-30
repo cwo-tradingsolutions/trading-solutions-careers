@@ -3,6 +3,8 @@ export type LoginLang = "en" | "es";
 export type LoginCopy = {
   kicker: string;
   title: string;
+  heroLead: string;
+  heroRest: string;
   subtitle: string;
   google: string;
   emergency: string;
@@ -24,6 +26,8 @@ export const LOGIN_COPY: Record<LoginLang, LoginCopy> = {
   en: {
     kicker: "HR Admin",
     title: "Welcome.",
+    heroLead: "Talent that",
+    heroRest: "moves the world.",
     subtitle: "Restricted access · Talent Acquisition.",
     google: "Continue with Google",
     emergency: "emergency key",
@@ -42,7 +46,9 @@ export const LOGIN_COPY: Record<LoginLang, LoginCopy> = {
   },
   es: {
     kicker: "HR Admin",
-    title: "Bienvenida.",
+    title: "Te damos la bienvenida.",
+    heroLead: "El talento que",
+    heroRest: "mueve al mundo.",
     subtitle: "Acceso restringido · Equipo de Talent Acquisition.",
     google: "Continuar con Google",
     emergency: "clave de emergencia",

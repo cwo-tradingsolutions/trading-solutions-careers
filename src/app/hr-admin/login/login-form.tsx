@@ -5,9 +5,19 @@ import { Lock, ArrowRight } from "lucide-react";
 import { loginCopy, loginErrorText, type LoginLang } from "@/lib/hr-admin-login-copy";
 
 const HELP_EMAIL = "jointheteam@tradingsolutions.com";
+export const LOGIN_LANG_KEY = "hr-admin-lang";
 
-export function LoginFallback({ googleHref }: { googleHref: string }) {
-  const copy = loginCopy("en");
+export function persistLoginLang(lang: LoginLang) {
+  try {
+    window.localStorage.setItem(LOGIN_LANG_KEY, lang);
+  } catch {
+    /* private mode */
+  }
+  document.cookie = `${LOGIN_LANG_KEY}=${lang}; Path=/; Max-Age=31536000; SameSite=Lax`;
+}
+
+export function LoginFallback({ googleHref, lang = "en" }: { googleHref: string; lang?: LoginLang }) {
+  const copy = loginCopy(lang);
   return (
     <div className="w-full max-w-sm">
       <div className="mb-7">
@@ -29,12 +39,14 @@ export function LoginPanel({
   next,
   googleHref,
   errorCode,
+  initialLang = "en",
 }: {
   next: string;
   googleHref: string;
   errorCode: string | null;
+  initialLang?: LoginLang;
 }) {
-  const [lang, setLang] = useState<LoginLang>("en");
+  const [lang, setLang] = useState<LoginLang>(initialLang);
   const copy = loginCopy(lang);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,6 +56,20 @@ export function LoginPanel({
   useEffect(() => {
     setErr(loginErrorText(lang, errorCode));
   }, [lang, errorCode]);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(LOGIN_LANG_KEY);
+      if (saved === "en" || saved === "es") setLang(saved);
+    } catch {
+      /* private mode */
+    }
+  }, []);
+
+  const chooseLang = (nextLang: LoginLang) => {
+    setLang(nextLang);
+    persistLoginLang(nextLang);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -101,7 +127,7 @@ export function LoginPanel({
       <div className="flex justify-end gap-2 text-xs mb-4">
         <button
           type="button"
-          onClick={() => setLang("en")}
+          onClick={() => chooseLang("en")}
           aria-pressed={lang === "en"}
           className={lang === "en" ? "font-semibold text-ts-ink" : "text-ts-muted"}
         >
@@ -110,7 +136,7 @@ export function LoginPanel({
         <span className="text-ts-muted" aria-hidden>|</span>
         <button
           type="button"
-          onClick={() => setLang("es")}
+          onClick={() => chooseLang("es")}
           aria-pressed={lang === "es"}
           className={lang === "es" ? "font-semibold text-ts-ink" : "text-ts-muted"}
         >

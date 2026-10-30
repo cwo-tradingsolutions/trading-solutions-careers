@@ -58,6 +58,22 @@ spec:
             - { name: GEMINI_RAZONAMIENTO, value: high }
             - name: ADMIN_SECRET
               valueFrom: { secretKeyRef: { name: prd-careers-ADMIN_SECRET, key: latest } }
+            - name: HR_ADMIN_SESSION_SECRET
+              valueFrom: { secretKeyRef: { name: prod-careers-hr-admin-session-secret, key: latest } }
+            - name: ADMIN_SCRIPTS_SECRET
+              valueFrom: { secretKeyRef: { name: prod-careers-admin-scripts-secret, key: latest } }
+            - name: PORTAL_TOKEN_SECRET
+              valueFrom: { secretKeyRef: { name: prod-careers-portal-token-secret, key: latest } }
+            - name: GOOGLE_ADMIN_OAUTH_CLIENT_ID
+              valueFrom: { secretKeyRef: { name: prod-careers-google-admin-oauth-client-id, key: latest } }
+            - name: GOOGLE_ADMIN_OAUTH_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: prod-careers-google-admin-oauth-client-secret, key: latest } }
+            - { name: HR_ADMIN_ALLOWED_EMAILS, value: "cwo@tradingsolutions.com,jointheteam@tradingsolutions.com" }
+            - { name: GOOGLE_MAILBOX_ALLOWED_EMAILS, value: "jointheteam@tradingsolutions.com" }
+            - { name: HR_ADMIN_PASSWORD_LOGIN_ENABLED, value: "0" }
+            # IAP aud of the HTTPS load balancer backend. Replace before IAP login
+            # can succeed: /projects/PROJECT_NUMBER/global/backendServices/BACKEND_SERVICE_ID
+            - { name: IAP_AUDIENCE, value: "REPLACE_WITH_IAP_AUDIENCE" }
             - name: CRON_SECRET
               valueFrom: { secretKeyRef: { name: prd-careers-CRON_SECRET, key: latest } }
             - name: WXM_SERVICE_SECRET

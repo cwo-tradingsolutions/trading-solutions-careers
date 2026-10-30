@@ -29,7 +29,7 @@ import {
   readAdminSession,
   signAdminSession,
 } from "./hr-admin-session.ts";
-import { HR_ADMIN_BREAK_GLASS_EMAIL, iapAvailable } from "./hr-admin-secrets.ts";
+import { HR_ADMIN_BREAK_GLASS_EMAIL, iapAvailable, readPortalSecret, readScriptsSecret, readSessionSecret } from "./hr-admin-secrets.ts";
 
 const KEYS = [
   "ADMIN_SECRET",
@@ -195,6 +195,7 @@ test("expired id token is rejected", () => {
 
 test("session cookie expires at 8 hours and carries the email", () => {
   process.env.HR_ADMIN_SESSION_SECRET = SESSION;
+  process.env.HR_ADMIN_ALLOWED_EMAILS = "kelly@tradingsolutions.com";
   const email = signAdminSession(SESSION, "Kelly@tradingsolutions.com", NOW);
   assert.deepEqual(readAdminSession(email, SESSION, NOW + HR_ADMIN_SESSION_MAX_AGE_MS), {
     issuedAt: NOW,
@@ -216,6 +217,7 @@ test("session cookie expires at 8 hours and carries the email", () => {
 
 test("middleware accepts the email cookie and sends an expired one back to login", async () => {
   process.env.HR_ADMIN_SESSION_SECRET = SESSION;
+  process.env.HR_ADMIN_ALLOWED_EMAILS = "kelly@tradingsolutions.com";
   process.env.CRON_SECRET = "cron-real";
   process.env.WXM_SERVICE_SECRET = "wxm-real";
   const fresh = signAdminSession(SESSION, "kelly@tradingsolutions.com");
@@ -431,7 +433,7 @@ test("ADMIN_SECRET does not authorize admin APIs, cookies, or x-admin-secret", (
     },
     cookies: { get() { return undefined; } },
   };
-  assert.equal(isAdminRequest(scripts), true);
+  assert.equal(isAdminRequest(scripts), false);
   assert.equal(
     scriptsAuthorized({
       headers: {
@@ -557,12 +559,77 @@ test("login copy defaults to English, and rejection uses only the session email"
     "utf8",
   );
   assert.equal(form.includes("error.message"), false);
-  assert.match(form, /useState<LoginLang>\("en"\)/);
-  assert.match(form, /setLang\("es"\)/);
+  assert.match(form, /useState<LoginLang>\(initialLang\)/);
+  assert.match(form, /chooseLang\("es"\)/);
+  assert.match(form, /localStorage/);
+  assert.match(form, /hr-admin-lang/);
+  assert.equal(loginCopy("es").title, "Te damos la bienvenida.");
+  assert.equal(loginCopy("es").heroLead, "El talento que");
+  assert.equal(loginCopy("es").heroRest, "mueve al mundo.");
   assert.match(page, /LoginFallback googleHref=\{googleHref\}/);
   assert.match(page, /googleLoginHref\(next\)/);
   assert.equal(reject.includes("body.rejected_by"), false);
   assert.match(reject, /sessionActor\(adminSessionEmail\(req\)\)/);
+});
+
+test("removing an allowlisted email ends that session on the next request", () => {
+  process.env.HR_ADMIN_SESSION_SECRET = SESSION;
+  process.env.ADMIN_SECRET = SECRET;
+  process.env.HR_ADMIN_ALLOWED_EMAILS = "kelly@tradingsolutions.com,ana@tradingsolutions.com";
+  const token = signAdminSession(SESSION, "kelly@tradingsolutions.com");
+  assert.equal(requireAdmin(request(`hr_admin_session=${token}`) as never), null);
+  assert.equal(isAdminRequest({
+    cookies: { get: () => ({ value: token }) },
+    headers: { get: () => null },
+  }), true);
+  process.env.HR_ADMIN_ALLOWED_EMAILS = "ana@tradingsolutions.com";
+  assert.equal(requireAdmin(request(`hr_admin_session=${token}`) as never)?.status, 401);
+  assert.equal(adminSessionEmail(request(`hr_admin_session=${token}`)), null);
+  assert.equal(isAdminRequest({
+    cookies: { get: () => ({ value: token }) },
+    headers: { get: () => null },
+  }), false);
+});
+
+test("equal auth secrets are refused and the health check logs the failure", async () => {
+  process.env.HR_ADMIN_SESSION_SECRET = SESSION;
+  process.env.ADMIN_SECRET = SESSION;
+  const lines: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    lines.push(args.map(String).join(" "));
+  };
+  try {
+    const { GET } = await import("../app/api/health/route.ts");
+    const res = await GET();
+    assert.equal(res.status, 503);
+    assert.match(lines.join("\n"), /\[hr-admin\] FATAL: HR_ADMIN_SESSION_SECRET must not equal ADMIN_SECRET/);
+    assert.equal(readSessionSecret(), null);
+    const shared = "shared-auth-secret-value-32-characters";
+    process.env.HR_ADMIN_SESSION_SECRET = shared;
+    process.env.ADMIN_SCRIPTS_SECRET = shared;
+    process.env.ADMIN_SECRET = SECRET;
+    process.env.PORTAL_TOKEN_SECRET = shared;
+    assert.equal(readScriptsSecret(), null);
+    assert.equal(readPortalSecret(), null);
+  } finally {
+    console.error = original;
+  }
+});
+
+test("the break-glass password must be at least 16 characters", async () => {
+  process.env.HR_ADMIN_SESSION_SECRET = SESSION;
+  process.env.ADMIN_SECRET = "short-password";
+  process.env.HR_ADMIN_PASSWORD_LOGIN_ENABLED = "1";
+  const res = await POST(
+    new Request("https://careers.tradingsolutions.com/api/hr-admin/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password: "short-password" }),
+    }),
+  );
+  assert.equal(res.status, 500);
+  assert.equal(cookieValue(res, "hr_admin_session"), undefined);
 });
 
 test("headhunting reseed does not accept ADMIN_SECRET", async () => {

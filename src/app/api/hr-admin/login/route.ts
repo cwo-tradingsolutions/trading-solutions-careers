@@ -16,7 +16,7 @@ import {
   setSessionCookie,
 } from "@/lib/hr-admin-cookies";
 import { signAdminSession } from "@/lib/hr-admin-session";
-import { HR_ADMIN_BREAK_GLASS_EMAIL, readSessionSecret } from "@/lib/hr-admin-secrets";
+import { HR_ADMIN_BREAK_GLASS_EMAIL, MIN_AUTH_SECRET_LENGTH, readSessionSecret } from "@/lib/hr-admin-secrets";
 import crypto from "crypto";
 
 export const runtime = "nodejs";
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
 
   const password = (process.env.ADMIN_SECRET ?? "").trim();
   const sessionSecret = readSessionSecret();
-  if (!password || password.length < 6 || !sessionSecret) {
+  if (!password || password.length < MIN_AUTH_SECRET_LENGTH || !sessionSecret) {
     return noStore(
       NextResponse.json(
         { error: "Servidor sin clave de emergencia o sin HR_ADMIN_SESSION_SECRET" },
