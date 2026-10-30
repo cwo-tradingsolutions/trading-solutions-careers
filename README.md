@@ -1,21 +1,16 @@
 # Trading Solutions Careers
 
-Applicant tracking for Trading Solutions. Candidate mail leaves only through the Gmail API as `Talent Acquisition Team <jointheteam@tradingsolutions.com>`.
+Applicant tracking for Trading Solutions. Candidate mail leaves through the Gmail API as `Talent Acquisition Team <jointheteam@tradingsolutions.com>`.
 
 ## Mail recipient guard
 
-Staging databases contain real candidate addresses copied from production. `sendViaGmail` is the only send path (acknowledgements, status mail, assessments, battery invites, the pending replay, and the digest). It checks every To, Cc, and Bcc before it calls Gmail.
+Staging databases contain real candidate addresses copied from production. The same check runs before every Gmail send, every Gmail draft, and every Calendar invite that would notify attendees (`sendUpdates`).
 
-`MAIL_RECIPIENT_ALLOWLIST` is a comma-separated list of exact emails or `@domain` entries. When it is set, a recipient that is not on the list is not sent. The message is stored with status `bloqueado_staging`, and the warning log names only the domain.
+`MAIL_RECIPIENT_ALLOWLIST` is a comma-separated list of exact emails or `@domain` entries. When it is set, a To, Cc, or Bcc outside the list is not sent. A blocked row stores only the recipient domain, a hash of the address, and the template id. It does not store the address or the HTML.
 
-If this process is not production and the allowlist is missing, every send is blocked. Non-production means any of:
+Anything that is not production blocks every send when the allowlist is missing. Production is `VERCEL_ENV=production` with no `K_SERVICE`, or a Cloud Run service whose name starts with `prd-` (`prd-careers` has no `VERCEL_ENV`). Staging and preview are a service starting with `stg-`, `VERCEL_ENV=preview`, or `development`. A local run, any other `K_SERVICE`, and `STAGING_READ_ONLY` set to `1` or `true` stay guarded. The check does not use the Google OAuth environment helper, which treats a missing `VERCEL_ENV` as production.
 
-- `K_SERVICE` starts with `stg-`
-- `STAGING_READ_ONLY=1`
-- `VERCEL_ENV` is `preview` or `development`
-- `NEXT_PUBLIC_APP_URL` is localhost, a staging host, or a non-production `*.vercel.app` host
-
-Production (`VERCEL_ENV=production`, or `K_SERVICE=prd-careers`) sends as usual when the allowlist is unset.
+Each recipient must be exactly one address. Comments, line breaks, extra angle brackets, and extra `@` are rejected. The header is built only from the parsed address.
 
 Staging value:
 

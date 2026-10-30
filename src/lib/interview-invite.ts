@@ -11,6 +11,7 @@ import {
   PREVIEW_GOOGLE_CONNECT_LABEL,
   type GoogleOAuthEnvironment,
 } from "./google-oauth-env";
+import { isProductionRuntime, type MailGuardEnv } from "./mail-recipient-guard";
 
 export const INTERVIEW_FROM_EMAIL = "jointheteam@tradingsolutions.com";
 export const DEFAULT_TZ = "America/Bogota";
@@ -76,6 +77,14 @@ export function interviewFromHeader(fromEmail = INTERVIEW_FROM_EMAIL): string {
 export function invitesFlagOn(flag: string | undefined): boolean {
   const v = (flag || "").trim().toLowerCase();
   return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
+/**
+ * Allowlist mode. Production (VERCEL_ENV=production or K_SERVICE prd-*) is
+ * not guarded. Staging, preview, development, and an unknown env are.
+ */
+export function interviewInviteGuarded(env: MailGuardEnv = {}): boolean {
+  return !isProductionRuntime(env);
 }
 
 /** null = variable ausente. [] = presente pero sin ninguna dirección permitida. */

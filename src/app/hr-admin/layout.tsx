@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { isProductionRuntime } from "@/lib/mail-recipient-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,12 @@ export const metadata: Metadata = {
 };
 
 export default function HRAdminLayout({ children }: { children: React.ReactNode }) {
-  const preview = process.env.VERCEL_ENV === "preview";
+  const preview = !isProductionRuntime({
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    K_SERVICE: process.env.K_SERVICE,
+    STAGING_READ_ONLY: process.env.STAGING_READ_ONLY,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  });
   return (
     <div data-ui="universe" className="min-h-screen bg-ts-canvas text-ts-ink">
       {preview && (

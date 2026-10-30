@@ -16,6 +16,7 @@ type PendingItem = {
 type MailboxState = {
   connected: boolean;
   pending_count: number;
+  blocked_count?: number;
   sends_today: number;
   warn_daily: boolean;
   pending: PendingItem[];
@@ -26,14 +27,29 @@ export function MailboxBanner() {
   const [aiOff, setAiOff] = useState(true);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
+  const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
-    const [mailbox, flag] = await Promise.all([
-      fetch("/api/admin/outbound-mail", { cache: "no-store" }).then((r) => r.json()).catch(() => null),
-      fetch("/api/admin/ai-interview-flag", { cache: "no-store" }).then((r) => r.json()).catch(() => ({ enabled: false })),
-    ]);
-    if (mailbox && typeof mailbox.pending_count === "number") setMail(mailbox as MailboxState);
-    setAiOff(flag?.enabled !== true);
+    try {
+      const [mailboxRes, flagRes] = await Promise.all([
+        fetch("/api/admin/outbound-mail", { cache: "no-store" }),
+        fetch("/api/admin/ai-interview-flag", { cache: "no-store" }),
+      ]);
+      if (!mailboxRes.ok) {
+        setLoadError("No se pudo leer el buzón.");
+        setMail(null);
+      } else {
+        setLoadError("");
+        setMail(await mailboxRes.json());
+      }
+      if (flagRes.ok) {
+        const flag = await flagRes.json();
+        setAiOff(flag?.enabled !== true);
+      }
+    } catch {
+      setLoadError("No se pudo leer el buzón.");
+      setMail(null);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -66,8 +82,16 @@ export function MailboxBanner() {
 
   return (
     <div className="mb-4 space-y-2">
+      {loadError && (
+        <div role="alert" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">{loadError}</div>
+      )}
       {aiOff && (
         <p className="text-xs text-gray-600">{AI_INTERVIEW_OFF_NOTE}</p>
+      )}
+      {(mail?.blocked_count ?? 0) > 0 && (
+        <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          {mail?.blocked_count === 1 ? "1 correo bloqueado" : `${mail?.blocked_count} correos bloqueados`} en este ambiente. No salieron.
+        </div>
       )}
       {showDisconnect && (
         <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">

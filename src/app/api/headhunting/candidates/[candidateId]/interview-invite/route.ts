@@ -5,10 +5,12 @@
  * sendCandidateMail (no draft), From "Talent Acquisition Team", y el evento se
  * crea en el calendario de jointheteam@ con Google Meet.
  *
- * Preview (VERCEL_ENV !== production): solo cwo@ y jointheteam@ pueden
- * recibir correo o quedar como asistentes. Si el correo del candidato no
- * está en esa lista, no se escribe ht_interviews ni se llama a Google:
- * la respuesta trae el correo renderizado y el payload del evento.
+ * Fuera de producción (stg-*, VERCEL_ENV preview o development, o un
+ * entorno desconocido): solo cwo@ y jointheteam@ pueden recibir correo o
+ * quedar como asistentes. Cloud Run prd-* y VERCEL_ENV=production no entran
+ * en ese modo. Si el correo del candidato no está en la lista de prueba,
+ * no se escribe ht_interviews ni se llama a Google: la respuesta trae el
+ * correo renderizado y el payload del evento.
  * Producción: no hace nada salvo que INTERVIEW_INVITES_ENABLED esté activo.
  *
  * La tabla ht_interviews vive solo como archivo de migración. No se aplica
@@ -21,7 +23,7 @@ import { getStoredTokens } from "@/lib/gmail";
 import { sendCandidateMail } from "@/lib/ats-mail-store";
 import { googleOAuthEnvironment } from "@/lib/google-oauth-env";
 import { hasCalendarWriteScope } from "@/lib/google-scopes";
-import { insertInterviewEvent } from "@/lib/google-calendar";
+import { deleteCalendarEvent, insertInterviewEvent } from "@/lib/google-calendar";
 import { recordStageEvent } from "@/lib/stage-events";
 import {
   assertRoundOrder,
@@ -40,6 +42,8 @@ import {
   RECONNECT_CALENDAR_LABEL,
   RECONNECT_CALENDAR_PATH,
   googleReconnectBanner,
+  interviewInviteGuarded,
+  invitesFlagOn,
   PREVIEW_GOOGLE_CONNECT_LABEL,
   resolveInviteLang,
   type PriorInterview,
@@ -50,6 +54,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ALLOWLIST_DOC = "cwo@tradingsolutions.com,jointheteam@tradingsolutions.com";
+
+function inviteIsGuarded(): boolean {
+  return interviewInviteGuarded({
+    K_SERVICE: process.env.K_SERVICE,
+    STAGING_READ_ONLY: process.env.STAGING_READ_ONLY,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+  });
+}
 
 function missingInterviewsTable(message: string | undefined): boolean {
   if (!message) return false;
@@ -128,7 +140,7 @@ export async function GET(req: NextRequest, { params }: { params: { candidateId:
   const google = await googleStatus();
   const { lang, candidateTz } = langOf(candidate);
   const allow = effectiveAllowlist(process.env.INTERVIEW_TEST_RECIPIENTS);
-  const preview = process.env.VERCEL_ENV !== "production";
+  const preview = inviteIsGuarded();
 
   return NextResponse.json({
     candidate: {
@@ -155,9 +167,7 @@ export async function GET(req: NextRequest, { params }: { params: { candidateId:
       allowlist_configured: Boolean(allow && allow.length > 0),
       allowlist_expected: ALLOWLIST_DOC,
     },
-    production_enabled: process.env.VERCEL_ENV === "production"
-      ? ["1", "true", "yes", "on"].includes(String(process.env.INTERVIEW_INVITES_ENABLED || "").trim().toLowerCase())
-      : false,
+    production_enabled: preview ? false : invitesFlagOn(process.env.INTERVIEW_INVITES_ENABLED),
   });
 }
 
@@ -237,7 +247,7 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
         calendar_event_id: null,
         reconnect: null,
       },
-      { status: process.env.VERCEL_ENV === "production" ? 403 : 400 },
+      { status: inviteIsGuarded() ? 400 : 403 },
     );
   }
 
@@ -349,6 +359,19 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
     dedupKey: `interview_invite:${params.candidateId}:${form.value.scheduledAt.toISOString()}`,
   });
   const mailSent = mailed.status === "sent";
+  if (!mailSent && mailed.status !== "pending") {
+    await deleteCalendarEvent(created.event_id);
+    return NextResponse.json({
+      success: false,
+      sent: false,
+      email_status: mailed.status,
+      persisted: false,
+      action: "send",
+      error: mailed.status,
+      calendar_event_id: null,
+      meet_url: null,
+    }, { status: 502 });
+  }
 
   let persisted = false;
   let recordError: string | undefined;
@@ -403,13 +426,13 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
   }
 
   return NextResponse.json({
-    success: mailSent || mailed.status === "pending",
+    success: true,
     sent: mailSent,
     email_status: mailed.status,
     persisted,
     interview_id: interviewId,
     action: "send",
-    error: mailSent || mailed.status === "pending" ? null : mailed.status,
+    error: null,
     record_error: recordError || null,
     suppressed: delivery.suppressed,
     from: interviewFromHeader(google.email || "jointheteam@tradingsolutions.com"),
@@ -422,5 +445,5 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
     calendar_event_id: created.event_id,
     gmail_id: mailSent ? mailed.gmail_id : null,
     reconnect: null,
-  }, { status: mailSent || mailed.status === "pending" ? 200 : 502 });
+  }, { status: 200 });
 }

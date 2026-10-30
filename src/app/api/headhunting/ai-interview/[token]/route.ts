@@ -19,7 +19,7 @@ import {
   conversationMatchesInterview,
   fetchElevenConversation,
 } from "@/lib/ai-interview-finalize";
-import { aiInterviewEnabled } from "@/lib/ai-interview-flag";
+import { aiInterviewEnabled, aiInterviewReady } from "@/lib/ai-interview-flag";
 import { validConversationId } from "@/lib/ai-interview-rescore";
 
 export async function GET(
@@ -27,7 +27,7 @@ export async function GET(
   { params }: { params: { token: string } }
 ) {
   const { token } = params;
-  if (!aiInterviewEnabled()) {
+  if (!aiInterviewReady()) {
     return NextResponse.json({ status: "disabled" }, { status: 503 });
   }
 

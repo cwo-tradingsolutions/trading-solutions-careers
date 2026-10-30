@@ -7,6 +7,7 @@ import { googleOAuthEnvironment } from "./google-oauth-env.ts";
 import {
   blockedSendLogLine,
   decideOutboundRecipients,
+  isProductionRuntime,
   mailEnvironment,
 } from "./mail-recipient-guard.ts";
 
@@ -58,9 +59,35 @@ test("staging without an allowlist blocks every recipient", () => {
   assert.equal(googleOAuthEnvironment(undefined), "production");
   assert.equal(mailEnvironment({ K_SERVICE: "stg-careers-gcp" }), "nonprod");
   assert.equal(mailEnvironment({ STAGING_READ_ONLY: "1" }), "nonprod");
+  assert.equal(mailEnvironment({}), "nonprod");
+  assert.equal(mailEnvironment({ STAGING_READ_ONLY: "true", K_SERVICE: "prd-careers" }), "nonprod");
   assert.equal(mailEnvironment({ K_SERVICE: "prd-careers" }), "prod");
+  assert.equal(isProductionRuntime({ K_SERVICE: "prd-careers", VERCEL_ENV: undefined }), true);
+  assert.equal("VERCEL_ENV" in { K_SERVICE: "prd-careers" }, false);
+  assert.equal(isProductionRuntime({ K_SERVICE: "prd-careers" }), true);
+  assert.equal(isProductionRuntime({ VERCEL_ENV: "development" }), false);
+  assert.equal(isProductionRuntime({ VERCEL_ENV: "preview" }), false);
+  assert.equal(isProductionRuntime({ K_SERVICE: "stg-careers", VERCEL_ENV: "production" }), false);
+  assert.equal(isProductionRuntime({ K_SERVICE: "custom-careers", VERCEL_ENV: "production" }), false);
+  assert.equal(decideOutboundRecipients({ to: "cwo@tradingsolutions.com" }, {}).send, false);
   const guardSrc = readFileSync(join(root, "src/lib/mail-recipient-guard.ts"), "utf8");
   assert.equal(guardSrc.includes("google-oauth-env"), false);
+});
+
+test("malformed recipients never pass, even when the allowlist would match a buried address", () => {
+  const env = { VERCEL_ENV: "production" as const, MAIL_RECIPIENT_ALLOWLIST: STAGING_LIST };
+  const bypasses = [
+    "x@gmail.com (<cwo@tradingsolutions.com>)",
+    "x@gmail.com <cwo@tradingsolutions.com>",
+    "cwo@tradingsolutions.com\r\nBcc: x@gmail.com",
+    "x@gmail.com@tradingsolutions.com",
+  ];
+  for (const sample of bypasses) {
+    const decision = decideOutboundRecipients({ to: sample }, env);
+    assert.equal(decision.send, false, sample);
+    if (!decision.send) assert.equal(decision.reason, "bad_address");
+  }
+  assert.equal(decideOutboundRecipients({ to: "Talent <cwo@tradingsolutions.com>" }, env).send, true);
 });
 
 test("production without an allowlist sends, and with one it still filters", () => {

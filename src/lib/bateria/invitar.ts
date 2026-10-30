@@ -101,7 +101,7 @@ export async function sesionDe(c: CandBateria, perfil: string | null, origin: st
 
 export type ResultadoAuto =
   | { enviado: true; canal: 'gmail'; url: string }
-  | { enviado: false; motivo: string; url?: string; pendiente?: boolean; status?: 'pending' };
+  | { enviado: false; motivo: string; url?: string; pendiente?: boolean; status?: 'pending' | 'bloqueado' };
 
 async function marcarBateriaPendiente(candidatoId: string) {
   const { data } = await supabaseAdmin.from('ht_candidates').select('notes').eq('id', candidatoId).maybeSingle();
@@ -166,7 +166,7 @@ export async function enviarBateriaAuto(candidatoId: string, origin: string): Pr
       sideEffect: { kind: 'battery', candidateId: candidatoId, sessionId: ses.id, channel: 'auto-gmail' },
     });
     if (delivered.status === 'bloqueado_staging') {
-      return { enviado: false, motivo: 'correo bloqueado en este ambiente', url: ses.url, pendiente: true, status: 'pending' };
+      return { enviado: false, motivo: 'correo bloqueado', url: ses.url, status: 'bloqueado' };
     }
     if (delivered.status === 'pending') {
       await marcarBateriaPendiente(candidatoId);

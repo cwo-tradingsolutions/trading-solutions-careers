@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ATS_FROM_NAME } from "./ats-from";
 import { GOOGLE_OAUTH_SCOPES, hasCalendarWriteScope } from "./google-scopes";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   assertRoundOrder,
   buildInviteArtifacts,
@@ -9,6 +12,7 @@ import {
   decideDelivery,
   googleReconnectBanner,
   interviewFromHeader,
+  interviewInviteGuarded,
   PREVIEW_GOOGLE_CONNECT_LABEL,
   renderInterviewEmail,
   validateInviteForm,
@@ -25,6 +29,28 @@ test("HM is blocked until a Wellness interview exists or was held", () => {
   assert.equal(assertRoundOrder("hm", [{ round: "wellness", status: "scheduled", deleted_at: "2026-11-01" }]).ok, false);
   assert.equal(assertRoundOrder("hm", [{ round: "wellness", status: "scheduled", deleted_at: null }]).ok, true);
   assert.equal(assertRoundOrder("hm", [{ round: "wellness", status: "done", deleted_at: null }]).ok, true);
+});
+
+test("Cloud Run prd-careers with no VERCEL_ENV is production, not allowlist mode", () => {
+  assert.equal(interviewInviteGuarded({ K_SERVICE: "prd-careers" }), false);
+  assert.equal(interviewInviteGuarded({ K_SERVICE: "prd-careers", VERCEL_ENV: undefined }), false);
+  assert.equal("VERCEL_ENV" in { K_SERVICE: "prd-careers" }, false);
+  assert.equal(interviewInviteGuarded({ K_SERVICE: "prd-careers-canary" }), false);
+  assert.equal(interviewInviteGuarded({ VERCEL_ENV: "production" }), false);
+  assert.equal(interviewInviteGuarded({ K_SERVICE: "stg-careers" }), true);
+  assert.equal(interviewInviteGuarded({ K_SERVICE: "stg-careers", VERCEL_ENV: "production" }), true);
+  assert.equal(interviewInviteGuarded({ VERCEL_ENV: "preview" }), true);
+  assert.equal(interviewInviteGuarded({ VERCEL_ENV: "development" }), true);
+  assert.equal(interviewInviteGuarded({}), true);
+  assert.equal(interviewInviteGuarded({ K_SERVICE: "custom-careers" }), true);
+
+  const route = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "../app/api/headhunting/candidates/[candidateId]/interview-invite/route.ts"),
+    "utf8",
+  );
+  assert.match(route, /interviewInviteGuarded\(/);
+  assert.equal(route.includes('VERCEL_ENV !== "production"'), false);
+  assert.equal(route.includes('VERCEL_ENV === "production"'), false);
 });
 
 test("allowlist refuses when unset and redirects a real candidate away from coo@", () => {

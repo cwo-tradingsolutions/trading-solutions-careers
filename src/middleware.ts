@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { hasMaskedCredentialConfig } from './lib/credential-config';
 import { previewReadOnlyBlock } from '@/lib/preview-readonly';
+import { isProductionRuntime } from '@/lib/mail-recipient-guard';
 
 /**
  * Middleware combinado:
@@ -61,7 +62,13 @@ export async function middleware(request: NextRequest) {
   }
 
   // Preview de Vercel puede apuntar a la base de producción. Ahí no se escribe.
-  const blocked = previewReadOnlyBlock(process.env.VERCEL_ENV, request.method, pathname);
+  const runtime = isProductionRuntime({
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    K_SERVICE: process.env.K_SERVICE,
+    STAGING_READ_ONLY: process.env.STAGING_READ_ONLY,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  }) ? "production" : "preview";
+  const blocked = previewReadOnlyBlock(runtime, request.method, pathname);
   if (blocked) {
     return NextResponse.json(blocked, { status: 403 });
   }

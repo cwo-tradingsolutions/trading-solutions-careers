@@ -3,10 +3,10 @@
  * Rows are never deleted. Status moves pending → sending → sent, or back to
  * pending when the send did not happen.
  */
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { neon } from "@/lib/sql";
 import { sendViaGmail } from "@/lib/gmail";
-import { recipientDomain } from "@/lib/mail-recipient-guard";
+import { parseAddressList, recipientDomain } from "@/lib/mail-recipient-guard";
 import { applyMailSideEffect } from "@/lib/ats-mail-effects";
 import {
   deliverCandidateMail,
@@ -134,25 +134,36 @@ export async function countRecentQueued(type: string, minutes: number): Promise<
 }
 
 /** A send the staging guard refused. Not claimed by "Reenviar pendientes". */
+/** Blocked staging rows keep a domain, a hash, and the template id. Not the address or the HTML. */
 export async function recordBlockedSend(row: {
-  candidate: string | null;
-  type: string | null;
-  subject: string | null;
-  html: string | null;
-  reply_to: string | null;
-  bcc: string | null;
+  to?: string | null;
+  type?: string | null;
   reason: string;
 }): Promise<{ id: string }> {
-  return insertPending({
-    candidate: row.candidate,
-    type: row.type,
-    subject: row.subject,
-    html: row.html,
-    reply_to: row.reply_to,
-    bcc: row.bcc,
-    error: row.reason,
-    status: "bloqueado_staging",
-  });
+  await ensureOutboundMail();
+  const parsed = parseAddressList(row.to);
+  const address = parsed.ok ? parsed.addresses[0] || "" : "";
+  const domain = address ? recipientDomain(address) : "unknown";
+  const addressHash = address ? createHash("sha256").update(address).digest("hex") : null;
+  const id = randomUUID();
+  await sql()`
+    INSERT INTO ats_outbound_mail (
+      id, candidate, recipient_domain, address_hash, type, subject, html, reply_to, bcc, status, error
+    ) VALUES (
+      ${id},
+      ${null},
+      ${domain},
+      ${addressHash},
+      ${row.type ?? "gmail_send"},
+      ${row.type ?? "gmail_send"},
+      ${null},
+      ${null},
+      ${null},
+      'bloqueado_staging',
+      ${row.reason}
+    )
+  `;
+  return { id };
 }
 
 export async function recordSuccessfulSend(type: string): Promise<number> {
@@ -186,6 +197,22 @@ export type PendingListItem = {
   error: string | null;
   status: string;
 };
+
+export async function listBlocked(): Promise<{ recipient_domain: string | null; type: string | null; created_at: string }[]> {
+  if (!(await ensureOutboundMail())) return [];
+  const rows = await sql()`
+    SELECT recipient_domain, type, created_at
+    FROM ats_outbound_mail
+    WHERE status = 'bloqueado_staging'
+    ORDER BY created_at DESC
+    LIMIT 50
+  `;
+  return rows.map((row) => ({
+    recipient_domain: (row.recipient_domain as string | null) ?? null,
+    type: (row.type as string | null) ?? null,
+    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+  }));
+}
 
 export async function listPending(): Promise<PendingListItem[]> {
   await maintainOutboundMail();

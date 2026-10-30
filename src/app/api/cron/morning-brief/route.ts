@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
 import { requireAdmin } from "@/lib/admin-auth";
+import { secretsEqual } from "@/lib/secret-compare";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -25,10 +26,11 @@ function endOfDay(d: Date): Date { const x = new Date(d); x.setHours(23, 59, 59,
 
 function isVercelCron(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
-  if (!auth) return false;
   const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  return auth === `Bearer ${secret}`;
+  if (!auth || !secret) return false;
+  const bearer = auth.startsWith("Bearer ") ? auth.slice("Bearer ".length) : "";
+  if (!bearer) return false;
+  return secretsEqual(bearer, secret);
 }
 
 export async function GET(req: NextRequest) {
@@ -167,7 +169,10 @@ export async function GET(req: NextRequest) {
     });
 
     if (!r.ok) {
-      return NextResponse.json({ error: "send_failed", detail: r.error }, { status: 500 });
+      if (r.blocked === "bloqueado_staging") {
+        return NextResponse.json({ status: "bloqueado_staging", sent: false });
+      }
+      return NextResponse.json({ error: "send_failed" }, { status: 500 });
     }
 
     return NextResponse.json({

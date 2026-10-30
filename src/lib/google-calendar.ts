@@ -7,6 +7,7 @@
  *   - createMeetEvent(...) · crea evento en Calendar con Google Meet auto-generado
  */
 import { getValidAccessToken } from "@/lib/gmail";
+import { decideOutboundRecipients, isProductionRuntime, parseOneAddress } from "@/lib/mail-recipient-guard";
 
 const FREEBUSY_URL = "https://www.googleapis.com/calendar/v3/freeBusy";
 const EVENTS_URL = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
@@ -221,6 +222,27 @@ export async function createMeetEvent(opts: {
   };
 }
 
+function calendarAudience(attendees: { email: string }[]): {
+  attendees: { email: string }[];
+  sendUpdates: "all" | "none";
+} {
+  const env = {
+    MAIL_RECIPIENT_ALLOWLIST: process.env.MAIL_RECIPIENT_ALLOWLIST,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    K_SERVICE: process.env.K_SERVICE,
+    STAGING_READ_ONLY: process.env.STAGING_READ_ONLY,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+  };
+  if (isProductionRuntime(env)) return { attendees, sendUpdates: "all" };
+  const kept: { email: string }[] = [];
+  for (const attendee of attendees) {
+    const parsed = parseOneAddress(attendee.email || "");
+    if (!parsed.ok) continue;
+    if (decideOutboundRecipients({ to: parsed.address }, env).send) kept.push({ email: parsed.address });
+  }
+  return { attendees: kept, sendUpdates: "none" };
+}
+
 /**
  * events.insert para la invitación a entrevista.
  * `sendUpdates=all` y `conferenceDataVersion=1` van en el query, que es
@@ -245,17 +267,18 @@ export async function insertInterviewEvent(payload: {
     return { ok: false, error: "Google OAuth no conectado" };
   }
 
+  const audience = calendarAudience(payload.attendees);
   const body = {
     summary: payload.summary,
     description: payload.description,
     start: payload.start,
     end: payload.end,
-    attendees: payload.attendees,
+    attendees: audience.attendees,
     conferenceData: payload.conferenceData,
     reminders: { useDefault: true },
   };
 
-  const r = await fetch(`${EVENTS_URL}?conferenceDataVersion=1&sendUpdates=all`, {
+  const r = await fetch(`${EVENTS_URL}?conferenceDataVersion=1&sendUpdates=${audience.sendUpdates}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${valid.access_token}`,
@@ -276,4 +299,14 @@ export async function insertInterviewEvent(payload: {
     || "";
 
   return { ok: true, event_id: data.id, meet_url: meet, html_link: data.htmlLink || "" };
+}
+
+export async function deleteCalendarEvent(eventId: string): Promise<void> {
+  if (!eventId) return;
+  const valid = await getValidAccessToken();
+  if (!valid) return;
+  await fetch(`${EVENTS_URL}/${encodeURIComponent(eventId)}?sendUpdates=none`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${valid.access_token}` },
+  });
 }

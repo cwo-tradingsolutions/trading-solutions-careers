@@ -27,14 +27,9 @@ export type MailGuardDecision =
   | {
       send: false;
       status: typeof BLOCKED_STAGING_STATUS;
-      reason: "not_on_allowlist" | "staging_allowlist_unset";
+      reason: "not_on_allowlist" | "staging_allowlist_unset" | "bad_address";
       domains: string[];
     };
-
-const PROD_HOSTS = new Set([
-  "careers.tradingsolutions.com",
-  "trading-solutions-careers.vercel.app",
-]);
 
 export function parseMailAllowlist(raw?: string | null): { emails: Set<string>; domains: Set<string> } | null {
   if (raw == null) return null;
@@ -51,7 +46,8 @@ export function parseMailAllowlist(raw?: string | null): { emails: Set<string>; 
       if (domain) domains.add(domain);
       continue;
     }
-    emails.add(extractAddress(entry));
+    const parsed = parseOneAddress(entry);
+    if (parsed.ok) emails.add(parsed.address);
   }
   if (emails.size === 0 && domains.size === 0) return null;
   return { emails, domains };
@@ -83,30 +79,67 @@ export function splitRecipients(value?: string | null): string[] {
 }
 
 /**
- * prod: Vercel production, or Cloud Run `prd-careers` (and any `prd-` service).
- * nonprod: staging service, STAGING_READ_ONLY, preview/development, or a URL
- * that is not the production host.
- * unspecified: nothing says which environment this is (local without a URL).
+ * Production is VERCEL_ENV=production, or a Cloud Run service whose name
+ * starts with prd- (prd-careers has no VERCEL_ENV). Staging and preview are
+ * a service starting with stg-, VERCEL_ENV=preview, or development. Any
+ * other name, a missing env, and STAGING_READ_ONLY of 1 or true stay
+ * non-production so sends stay guarded. A stg- service wins over
+ * VERCEL_ENV=production. This does not use the OAuth helper: that one
+ * treats a missing VERCEL_ENV as production, which is wrong on Cloud Run.
  */
-export function mailEnvironment(env: MailGuardEnv): "prod" | "nonprod" | "unspecified" {
-  const service = (env.K_SERVICE || "").trim();
-  const stagingFlag = env.STAGING_READ_ONLY === "1";
-  if (service.startsWith("stg-") || stagingFlag) return "nonprod";
-  if (service === "prd-careers" || service.startsWith("prd-")) return "prod";
-  if (env.VERCEL_ENV === "production") return "prod";
-  if (env.VERCEL_ENV === "preview" || env.VERCEL_ENV === "development") return "nonprod";
+export function isProductionRuntime(env: MailGuardEnv = {}): boolean {
+  const staging = String(env.STAGING_READ_ONLY ?? "").trim().toLowerCase();
+  if (staging === "1" || staging === "true") return false;
+  const service = (env.K_SERVICE || "").trim().toLowerCase();
+  if (service.startsWith("stg-")) return false;
+  if (service.startsWith("prd-")) return true;
+  if (service) return false;
+  const vercel = (env.VERCEL_ENV || "").trim().toLowerCase();
+  if (vercel === "preview" || vercel === "development") return false;
+  return vercel === "production";
+}
 
-  const rawUrl = (env.NEXT_PUBLIC_APP_URL || "").trim();
-  if (!rawUrl) return "unspecified";
-  try {
-    const host = new URL(rawUrl).hostname.toLowerCase();
-    if (host === "localhost" || host === "127.0.0.1" || host.endsWith(".local")) return "nonprod";
-    if (host.includes("staging") || host.startsWith("stg.") || host.includes("stg-")) return "nonprod";
-    if (host.endsWith(".vercel.app") && !PROD_HOSTS.has(host)) return "nonprod";
-    return "unspecified";
-  } catch {
-    return "nonprod";
+export function mailEnvironment(env: MailGuardEnv = {}): "prod" | "nonprod" {
+  return isProductionRuntime(env) ? "prod" : "nonprod";
+}
+
+export type ParsedAddress = { ok: true; address: string } | { ok: false };
+
+/** Exactly one addr-spec. Comments, breaks, extra brackets, and extra @ fail. */
+export function parseOneAddress(raw: string): ParsedAddress {
+  if (typeof raw !== "string") return { ok: false };
+  if (/[\u0000\r\n]/.test(raw)) return { ok: false };
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.includes("(") || trimmed.includes(")")) return { ok: false };
+  const opens = trimmed.match(/</g)?.length ?? 0;
+  const closes = trimmed.match(/>/g)?.length ?? 0;
+  if (opens > 1 || closes > 1 || opens !== closes) return { ok: false };
+  let address = trimmed;
+  if (opens === 1) {
+    const match = trimmed.match(/^([^<]*)<([^<>]+)>$/);
+    if (!match) return { ok: false };
+    const display = match[1].trim();
+    if (display.includes("@") || display.includes("<") || display.includes(">")) return { ok: false };
+    address = match[2].trim();
   }
+  if ((address.match(/@/g) || []).length !== 1) return { ok: false };
+  if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(address)) return { ok: false };
+  return { ok: true, address: address.toLowerCase() };
+}
+
+/** Comma-separated header. Every piece must be one address. The result is only those addresses. */
+export function parseAddressList(raw?: string | null): { ok: true; addresses: string[] } | { ok: false } {
+  if (raw == null || raw.trim() === "") return { ok: true, addresses: [] };
+  if (/[\u0000\r\n]/.test(raw)) return { ok: false };
+  const parts = raw.split(/[,;]/).map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 0) return { ok: false };
+  const addresses: string[] = [];
+  for (const part of parts) {
+    const parsed = parseOneAddress(part);
+    if (!parsed.ok) return { ok: false };
+    addresses.push(parsed.address);
+  }
+  return { ok: true, addresses };
 }
 
 function uniqueDomains(addresses: string[]): string[] {
@@ -114,11 +147,11 @@ function uniqueDomains(addresses: string[]): string[] {
 }
 
 export function decideOutboundRecipients(fields: RecipientFields, env: MailGuardEnv = {}): MailGuardDecision {
-  const addresses = [
-    ...splitRecipients(fields.to),
-    ...splitRecipients(fields.cc),
-    ...splitRecipients(fields.bcc),
-  ];
+  const lists = [parseAddressList(fields.to), parseAddressList(fields.cc), parseAddressList(fields.bcc)];
+  if (lists.some((list) => !list.ok)) {
+    return { send: false, status: BLOCKED_STAGING_STATUS, reason: "bad_address", domains: [] };
+  }
+  const addresses = lists.flatMap((list) => (list.ok ? list.addresses : []));
   const allow = parseMailAllowlist(env.MAIL_RECIPIENT_ALLOWLIST);
   if (!allow) {
     if (mailEnvironment(env) === "nonprod") {

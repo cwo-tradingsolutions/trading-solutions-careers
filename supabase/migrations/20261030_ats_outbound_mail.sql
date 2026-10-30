@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS ats_outbound_mail (
 );
 
 ALTER TABLE ats_outbound_mail ADD COLUMN IF NOT EXISTS recipient_domain TEXT;
+ALTER TABLE ats_outbound_mail ADD COLUMN IF NOT EXISTS address_hash TEXT;
 ALTER TABLE ats_outbound_mail ADD COLUMN IF NOT EXISTS dedup_key TEXT;
 ALTER TABLE ats_outbound_mail ADD COLUMN IF NOT EXISTS side_effect JSONB;
 ALTER TABLE ats_outbound_mail ADD COLUMN IF NOT EXISTS side_effect_applied_at TIMESTAMPTZ;

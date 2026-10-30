@@ -29,3 +29,12 @@ export function aiInterviewEnabled(flagOrEnv?: string | null | AiInterviewEnv): 
   }
   return flagOn(process.env.AI_INTERVIEW_ENABLED) && Boolean((process.env.ELEVENLABS_API_KEY ?? "").trim());
 }
+
+/** Candidate GET and finalize. A string flag is not enough; the key has to be present too. */
+export function aiInterviewReady(input?: { flag?: string | null; apiKey?: string | null } | null): boolean {
+  if (input == null) {
+    return aiInterviewEnabled() && String(process.env.ELEVENLABS_API_KEY ?? "").trim().length > 0;
+  }
+  if (!aiInterviewEnabled(input.flag)) return false;
+  return String(input.apiKey ?? "").trim().length > 0;
+}

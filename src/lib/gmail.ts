@@ -15,7 +15,7 @@
  */
 import { neon } from "@/lib/sql";
 import { ATS_FROM_EMAIL, atsFromHeader } from "@/lib/ats-from";
-import { blockedSendLogLine, decideOutboundRecipients } from "@/lib/mail-recipient-guard";
+import { blockedSendLogLine, decideOutboundRecipients, parseAddressList } from "@/lib/mail-recipient-guard";
 import { buildAlternativeBody, encodeSubject, stripHeaderBreaks } from "@/lib/gmail-mime";
 import { googleOAuthEnvironment, PREVIEW_GOOGLE_CONNECT_LABEL } from "@/lib/google-oauth-env";
 import {
@@ -164,6 +164,13 @@ export async function isGmailConnected(): Promise<GmailConnection> {
 }
 
 // Codifica un correo en formato RFC 822 → base64url para Gmail API
+function addressHeader(raw?: string): string {
+  if (!raw) return "";
+  const parsed = parseAddressList(raw);
+  if (!parsed.ok) return "";
+  return parsed.addresses.join(", ");
+}
+
 function buildRfc822(opts: {
   from: string;
   to: string;
@@ -174,10 +181,10 @@ function buildRfc822(opts: {
   bcc?: string;
 }): string {
   const from = stripHeaderBreaks(opts.from);
-  const to = stripHeaderBreaks(opts.to);
-  const cc = opts.cc ? stripHeaderBreaks(opts.cc) : "";
-  const replyTo = opts.replyTo ? stripHeaderBreaks(opts.replyTo) : "";
-  const bcc = opts.bcc ? stripHeaderBreaks(opts.bcc) : "";
+  const to = addressHeader(opts.to);
+  const cc = addressHeader(opts.cc);
+  const replyTo = addressHeader(opts.replyTo);
+  const bcc = addressHeader(opts.bcc);
   const { boundary, body } = buildAlternativeBody(opts.html);
   const lines: string[] = [];
   lines.push(`From: ${from}`);
@@ -197,6 +204,42 @@ function buildRfc822(opts: {
  * Crea un draft en Gmail (no envía). Útil para que HR revise y envíe manual.
  * Devuelve el draft_id; el usuario lo verá en su carpeta Drafts.
  */
+async function blockedDraft(opts: {
+  to?: string | null;
+  cc?: string;
+  bcc?: string;
+  replyTo?: string;
+  subject: string;
+  mailType?: string;
+}): Promise<{ ok: false; error: string } | null> {
+  const decision = decideOutboundRecipients(
+    { to: opts.to, cc: opts.cc, bcc: opts.bcc },
+    {
+      MAIL_RECIPIENT_ALLOWLIST: process.env.MAIL_RECIPIENT_ALLOWLIST,
+      NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+      K_SERVICE: process.env.K_SERVICE,
+      STAGING_READ_ONLY: process.env.STAGING_READ_ONLY,
+      VERCEL_ENV: process.env.VERCEL_ENV,
+    },
+  );
+  const reply = opts.replyTo ? parseAddressList(opts.replyTo) : { ok: true as const, addresses: [] as string[] };
+  if (!decision.send || !reply.ok) {
+    console.warn(blockedSendLogLine(decision.send ? { send: false, status: "bloqueado_staging", reason: "bad_address", domains: [] } : decision));
+    try {
+      const { recordBlockedSend } = await import("@/lib/ats-mail-store");
+      await recordBlockedSend({
+        to: opts.to || "",
+        type: opts.mailType ?? "gmail_draft",
+        reason: decision.send ? "bad_address" : decision.reason,
+      });
+    } catch {
+      console.warn("[ats-mail] bloqueado_staging no se pudo guardar");
+    }
+    return { ok: false, error: "bloqueado_staging" };
+  }
+  return null;
+}
+
 export async function createDraftViaGmail(opts: {
   to: string;
   subject: string;
@@ -205,6 +248,8 @@ export async function createDraftViaGmail(opts: {
   bcc?: string;
   fromName?: string;
 }): Promise<{ ok: true; draft_id: string; gmail_email: string } | { ok: false; error: string }> {
+  const blocked = await blockedDraft(opts);
+  if (blocked) return blocked;
   const valid = await getValidAccessToken();
   if (!valid) {
     return { ok: false, error: "Gmail no conectado. Pide a Kelly que vaya a Settings → Conectar Gmail." };
@@ -277,12 +322,8 @@ export async function sendViaGmail(opts: {
       try {
         const { recordBlockedSend } = await import("@/lib/ats-mail-store");
         const saved = await recordBlockedSend({
-          candidate: safe.to,
+          to: safe.to,
           type: opts.mailType ?? "gmail_send",
-          subject: safe.subject,
-          html: opts.html,
-          reply_to: safe.replyTo ?? null,
-          bcc: safe.bcc ?? null,
           reason: decision.reason,
         });
         blockedId = saved.id;
@@ -522,6 +563,8 @@ export async function createDraftWithAttachmentsViaGmail(opts: {
   replyTo?: string;
   attachments: { filename: string; mimeType: string; data: Buffer }[];
 }): Promise<{ ok: true; draft_id: string; message_id: string; gmail_email: string } | { ok: false; error: string }> {
+  const blocked = await blockedDraft({ to: opts.to, replyTo: opts.replyTo, subject: opts.subject, mailType: "gmail_draft_attachment" });
+  if (blocked) return blocked;
   const valid = await getValidAccessToken();
   if (!valid) return { ok: false, error: "Gmail no está conectado o el permiso expiró." };
 
@@ -532,9 +575,11 @@ export async function createDraftWithAttachmentsViaGmail(opts: {
 
   const l: string[] = [];
   l.push(`From: ${formatFrom(opts.fromName, valid.email)}`);
-  if (opts.to) l.push(`To: ${opts.to}`);
-  if (opts.replyTo) l.push(`Reply-To: ${opts.replyTo}`);
-  l.push(`Subject: ${enc(opts.subject)}`);
+  const attachmentTo = addressHeader(opts.to || "");
+  const attachmentReply = addressHeader(opts.replyTo);
+  if (attachmentTo) l.push(`To: ${attachmentTo}`);
+  if (attachmentReply) l.push(`Reply-To: ${attachmentReply}`);
+  l.push(`Subject: ${encodeSubject(opts.subject)}`);
   l.push("MIME-Version: 1.0");
   l.push(`Content-Type: multipart/mixed; boundary="${limite}"`);
   l.push("");

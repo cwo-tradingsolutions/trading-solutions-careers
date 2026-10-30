@@ -177,18 +177,20 @@ export async function POST(req: NextRequest) {
 
     const ok = resultado.filter((r) => r.url && !r.error && r.email_status !== 'pending' && r.email_status !== 'bloqueado_staging').length;
     const pendientes = resultado.filter((r) => r.email_status === 'pending').length;
+    const bloqueados = resultado.filter((r) => r.email_status === 'bloqueado_staging').length;
     return NextResponse.json(
       {
         modo,
         ok,
         pendientes,
+        bloqueados,
         fallaron: resultado.filter((r) => r.error).length,
         cuenta: gmail.email ?? null,
         resultado,
         nota:
           modo === 'borrador'
             ? `Quedaron ${ok} borradores en la bandeja de ${gmail.email ?? 'Gmail'}. Revísalos y dales Enviar. Ya quedaron en la etapa Batería.`
-            : `Salieron ${ok} correos por Gmail${pendientes ? ` y ${pendientes} quedaron pendientes` : ''}. Las respuestas llegan a ${RESPONDER_A}.`,
+            : `Salieron ${ok} correos por Gmail${pendientes ? ` y ${pendientes} quedaron pendientes` : ''}${bloqueados ? ` y ${bloqueados} quedaron bloqueados` : ''}. Las respuestas llegan a ${RESPONDER_A}.`,
       },
       { headers: { 'Cache-Control': 'no-store' } }
     );
