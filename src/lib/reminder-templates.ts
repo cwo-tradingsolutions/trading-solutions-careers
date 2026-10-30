@@ -37,6 +37,21 @@ export async function getActiveReminderRules(): Promise<ReminderRule[]> {
   return (data || []) as ReminderRule[];
 }
 
+const TEAM_VOICE: [string, string][] = [
+  ["Kelly Castañeda · Trading Solutions", "Talent Acquisition Team · Trading Solutions"],
+  ["Soy Kelly de Trading Solutions", "Te escribimos del Talent Acquisition Team de Trading Solutions"],
+  ["soy Kelly de Trading Solutions", "te escribimos del Talent Acquisition Team de Trading Solutions"],
+  ["This is Kelly from Trading Solutions", "This is the Talent Acquisition Team at Trading Solutions"],
+  ["this is Kelly from Trading Solutions", "this is the Talent Acquisition Team at Trading Solutions"],
+  ["soy Kelly.", "te escribimos del Talent Acquisition Team."],
+  ["this is Kelly.", "this is the Talent Acquisition Team."],
+];
+
+/** Firma y saludo del equipo, aunque la fila en la base todavía diga Kelly. */
+export function teamReminderVoice(text: string): string {
+  return TEAM_VOICE.reduce((out, [from, to]) => out.split(from).join(to), text);
+}
+
 /** Renderiza un template con variables del candidato/vacante */
 export function renderTemplate(
   template: RenderedTemplate,
@@ -44,10 +59,11 @@ export function renderTemplate(
 ): RenderedTemplate {
   const replace = (s: string | undefined): string | undefined => {
     if (!s) return s;
-    return s.replace(/\{(\w+)\}/g, (_, key) => {
+    const filled = s.replace(/\{(\w+)\}/g, (_, key) => {
       const v = vars[key];
       return v !== undefined && v !== null ? String(v) : `{${key}}`;
     });
+    return teamReminderVoice(filled);
   };
   return {
     email_subject: replace(template.email_subject),
