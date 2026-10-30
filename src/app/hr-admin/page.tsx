@@ -279,14 +279,6 @@ export default function HRAdminPage() {
               <span>Pendientes HM</span>
             </button>
             <button
-              onClick={() => setScheduleOpen(true)}
-              className="flex items-center gap-1.5 bg-ts-accent hover:bg-[var(--ts-accent-hover)] text-white text-[12px] font-medium px-3.5 py-1.5 rounded-ts-sm transition-colors"
-              title="Agendar entrevista"
-            >
-              <Calendar className="w-3.5 h-3.5" />
-              <span>Agendar</span>
-            </button>
-            <button
               onClick={() => openSettings("metas")}
               className="text-white/70 hover:text-white p-1.5"
               title="Settings · metas y recordatorios"
