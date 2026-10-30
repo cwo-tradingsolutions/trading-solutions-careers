@@ -4,6 +4,8 @@ import { TS_SCENARIOS } from '@/lib/headhunting/scenarios-ts';
 import { recordStageEvent } from '@/lib/stage-events';
 import { isPreviewTestMode } from '@/lib/preview-mode';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const token = req.nextUrl.searchParams.get('token');
