@@ -4,6 +4,7 @@ import test from "node:test";
 
 process.env.ADMIN_SECRET = "test-admin-secret-for-401";
 process.env.HR_ADMIN_SESSION_SECRET = "test-session-secret-0123456789";
+process.env.HR_ADMIN_ALLOWED_EMAILS = "qa@tradingsolutions.com";
 process.env.WXM_SERVICE_SECRET = "test-wxm-secret";
 
 function request(url: string, opts?: { cookie?: string; authorization?: string; body?: unknown }) {

@@ -30,7 +30,18 @@ create table if not exists ht_recruitment_sources (
 );
 
 alter table ht_recruitment_sources enable row level security;
-revoke all on table ht_recruitment_sources from anon, authenticated;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    execute 'revoke all on table ht_recruitment_sources from anon';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    execute 'revoke all on table ht_recruitment_sources from authenticated';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    execute 'grant all on table ht_recruitment_sources to service_role';
+  end if;
+end $$;
 
 insert into ht_recruitment_sources (key, label, active, sort_order) values
   ('careers',   'Careers',   true, 10),

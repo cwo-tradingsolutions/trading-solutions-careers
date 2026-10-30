@@ -42,13 +42,19 @@ export async function cargarFuentes(): Promise<{ fuentes: FuenteLista[]; desde: 
 
 const PAGINA = 1000;
 
-/** PostgREST corta en 1000 filas. Se pide de a páginas hasta que una venga corta. */
-async function leerCandidatosPorPagina(): Promise<{ vacancy_id: string; arrival_source: string | null }[] | null> {
+const TOPE = 50_000;
+
+/** PostgREST corta en 1000 filas. Se pide de a páginas, ordenadas por id, hasta que una venga corta. */
+async function leerCandidatosPorPagina(): Promise<{
+  rows: { vacancy_id: string; arrival_source: string | null }[];
+  truncated: boolean;
+} | null> {
   const todos: { vacancy_id: string; arrival_source: string | null }[] = [];
-  for (let desde = 0; desde < 50_000; desde += PAGINA) {
+  for (let desde = 0; desde < TOPE; desde += PAGINA) {
     const { data, error } = await supabaseAdmin
       .from("ht_candidates")
       .select("vacancy_id, arrival_source")
+      .order("id", { ascending: true })
       .range(desde, desde + PAGINA - 1);
     if (error) {
       console.error("[vacancy-sources] llegada:", error.message);
@@ -56,9 +62,10 @@ async function leerCandidatosPorPagina(): Promise<{ vacancy_id: string; arrival_
     }
     const lote = (data || []) as { vacancy_id: string; arrival_source: string | null }[];
     todos.push(...lote);
-    if (lote.length < PAGINA) return todos;
+    if (lote.length < PAGINA) return { rows: todos, truncated: false };
   }
-  return todos;
+  console.error("[vacancy-sources] llegada truncada en", TOPE, "filas");
+  return { rows: todos, truncated: true };
 }
 
 export async function clavesFuenteActivas(): Promise<string[]> {
@@ -70,13 +77,14 @@ export async function cargarTableroFuentes(): Promise<{
   fuentes: FuenteLista[];
   desde: "tabla" | "fallback";
   vacantes: VacanteFuentes[];
+  llegada_truncada: boolean;
 }> {
   const { fuentes, desde } = await cargarFuentes();
   try {
     const { data: vacs, error: vacErr } = await supabaseAdmin
       .from("ht_vacancies")
       .select("id, title, status, requisition_id");
-    if (vacErr) return { fuentes, desde, vacantes: [] };
+    if (vacErr) return { fuentes, desde, vacantes: [], llegada_truncada: false };
 
     const { data: reqs } = await supabaseAdmin
       .from("ht_requisitions")
@@ -100,9 +108,11 @@ export async function cargarTableroFuentes(): Promise<{
     }
 
     let llegadaPorVacante = new Map<string, LlegadaFila[]>();
+    let llegadaTruncada = false;
     const cands = await leerCandidatosPorPagina();
     if (cands) {
-      llegadaPorVacante = agruparLlegada(cands.filter((c) => c.vacancy_id));
+      llegadaTruncada = cands.truncated;
+      llegadaPorVacante = agruparLlegada(cands.rows.filter((c) => c.vacancy_id));
     }
 
     const vacantes: VacanteFuentes[] = ((vacs || []) as {
@@ -120,8 +130,8 @@ export async function cargarTableroFuentes(): Promise<{
       llegada: llegadaPorVacante.get(v.id) ?? [],
     }));
 
-    return { fuentes, desde, vacantes };
+    return { fuentes, desde, vacantes, llegada_truncada: llegadaTruncada };
   } catch {
-    return { fuentes, desde, vacantes: [] };
+    return { fuentes, desde, vacantes: [], llegada_truncada: false };
   }
 }

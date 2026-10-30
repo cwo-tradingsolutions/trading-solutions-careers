@@ -163,12 +163,11 @@ export function quiereIncludeHidden(valor: string | null): boolean {
   return valor === "1";
 }
 
-/** Una oculta no entra al circuito. Aprobarla crearía una vacante de una fila escondida. */
+/** Una oculta no se edita ni se mueve. Guardar sin acción también queda afuera. */
 export function transicionBloqueadaPorOculta(
   row: { hidden_at?: string | null },
-  accion: string,
+  _accion?: string,
 ): string | null {
-  if (!String(accion || "").trim()) return null;
   if (!estaOculta(row)) return null;
-  return "Esta requisición está oculta. No se aprueba ni se mueve de estado.";
+  return "Esta requisición está oculta. No se guarda ni se mueve de estado.";
 }

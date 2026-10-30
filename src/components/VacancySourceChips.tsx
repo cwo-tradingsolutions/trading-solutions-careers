@@ -1,6 +1,5 @@
 "use client";
 
-import { POR_CONSTRUIR } from "@/lib/requisition-board";
 import { etiquetaLlegada, type FuenteLista, type LlegadaFila } from "@/lib/recruitment-sources";
 
 export function SourceChips({
@@ -13,9 +12,7 @@ export function SourceChips({
   onAlternar?: (key: string, publicada: boolean) => void;
 }) {
   const visibles = fuentes.filter((f) => f.active || activas.includes(f.key));
-  if (visibles.length === 0) {
-    return <p className="text-[12px] text-[var(--ts-muted)]">{POR_CONSTRUIR}</p>;
-  }
+  if (visibles.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-1.5">
       {visibles.map((f) => {
@@ -68,14 +65,12 @@ export function ArrivalCross({
     .filter(Boolean);
   return (
     <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[12px]">
-      <div>
-        <p className="text-[var(--ts-muted)] mb-1">Publicada en</p>
-        {publicadas.length === 0 ? (
-          <p className="text-[var(--ts-ink)]">{POR_CONSTRUIR}</p>
-        ) : (
+      {publicadas.length > 0 && (
+        <div>
+          <p className="text-[var(--ts-muted)] mb-1">Publicada en</p>
           <p className="text-[var(--ts-ink)]">{publicadas.join(" · ")}</p>
-        )}
-      </div>
+        </div>
+      )}
       <div>
         <p className="text-[var(--ts-muted)] mb-1">Llegaron por</p>
         {llegada.length === 0 ? (

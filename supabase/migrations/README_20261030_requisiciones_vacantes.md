@@ -100,4 +100,4 @@ select
 
 Esperado después: 11, 9, 1, 1, 2, 30, `rechazada`, `duplicada`, `pedida`, `fuera_del_ats`, `publicada`, `true`.
 
-Si la base ya no es esa línea base (entró otra requisición entre el 30-oct y el GO), `coincide` sale en falso. Los dos `UPDATE` igual solo tocan esos uuid y no les cambian el status. Hay que leer el resultado antes de dar por buena la corrida.
+Si la base ya no es esa línea base (entró otra requisición entre el 30-oct y el GO), `coincide` sale en falso. La migración lanza `coincide=false` y no llega al `commit`: la transacción se revierte. No hay `delete` ni cambio de `status`.

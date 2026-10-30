@@ -76,7 +76,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const estadoActual = actual.status as RequisitionStatus;
     const bloqueo = transicionBloqueadaPorOculta(actual, accion);
-    if (bloqueo) return NextResponse.json({ error: bloqueo }, { status: 400 });
+    if (bloqueo) return NextResponse.json({ error: bloqueo }, { status: 409 });
 
     // Los campos del perfil se guardan aunque la acción no sea "armar_perfil":
     // Wellness puede ir completando y guardar sin mandar todavía al CWO.

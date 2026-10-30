@@ -26,6 +26,7 @@ export function useVacantesBoard() {
   const [filtro, setFiltro] = useState<ConteoClave | null>(null);
   const [fuenteFiltro, setFuenteFiltro] = useState("");
   const [admin, setAdmin] = useState(false);
+  const [avisoChip, setAvisoChip] = useState<string | null>(null);
 
   const recargar = useCallback(async () => {
     const [boardRes, reqRes] = await Promise.all([
@@ -76,14 +77,32 @@ export function useVacantesBoard() {
       : [];
 
   async function alternar(vacancyId: string, key: string, publicada: boolean) {
-    const r = publicada
-      ? await fetch(`/api/vacancies/${vacancyId}/postings?source=${encodeURIComponent(key)}`, { method: "DELETE" })
-      : await fetch(`/api/vacancies/${vacancyId}/postings`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ source: key }),
-        });
-    if (r.ok) await recargar();
+    setAvisoChip(null);
+    const previas = vacantes;
+    setVacantes((curr) => curr.map((v) => {
+      if (v.vacancy_id !== vacancyId) return v;
+      const sources = publicada ? v.sources.filter((s) => s !== key) : [...v.sources, key];
+      return { ...v, sources };
+    }));
+    try {
+      const r = publicada
+        ? await fetch(`/api/vacancies/${vacancyId}/postings?source=${encodeURIComponent(key)}`, { method: "DELETE" })
+        : await fetch(`/api/vacancies/${vacancyId}/postings`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ source: key }),
+          });
+      if (!r.ok) {
+        setVacantes(previas);
+        const j = await r.json().catch(() => ({}));
+        setAvisoChip(j.error || "No se pudo actualizar la fuente");
+        return;
+      }
+      await recargar();
+    } catch {
+      setVacantes(previas);
+      setAvisoChip("No se pudo actualizar la fuente");
+    }
   }
 
   async function guardarFuente(accion: "alta" | "cambio", cuerpo: Record<string, unknown>): Promise<string | null> {
@@ -110,6 +129,7 @@ export function useVacantesBoard() {
     porWeb,
     pasa,
     filasSinVacante,
+    avisoChip,
     alternar,
     guardarFuente,
   };

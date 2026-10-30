@@ -9,15 +9,13 @@ describe("isPreviewAllowed", () => {
     assert.equal(isPreviewAllowed({ K_SERVICE: "stg-careers", NODE_ENV: "production" }), true);
     assert.equal(isPreviewAllowed({ K_SERVICE: "stg-", NODE_ENV: "production" }), true);
     assert.equal(isPreviewAllowed({ NODE_ENV: "development" }), true);
-    assert.equal(
-      isPreviewAllowed({ VERCEL_ENV: "production", NODE_ENV: "development" }),
-      true,
-    );
   });
 
   it("niega producción de Vercel, prd-* de Cloud Run, y un entorno desconocido", () => {
     assert.equal(isPreviewAllowed({ VERCEL_ENV: "production", NODE_ENV: "production" }), false);
+    assert.equal(isPreviewAllowed({ VERCEL_ENV: "production", NODE_ENV: "development" }), false);
     assert.equal(isPreviewAllowed({ K_SERVICE: "prd-careers", NODE_ENV: "production" }), false);
+    assert.equal(isPreviewAllowed({ K_SERVICE: "prd-careers", NODE_ENV: "development" }), false);
     assert.equal(isPreviewAllowed({ K_SERVICE: "prd-careers" }), false);
     assert.equal(isPreviewAllowed({}), false);
     assert.equal(isPreviewAllowed({ NODE_ENV: "production" }), false);

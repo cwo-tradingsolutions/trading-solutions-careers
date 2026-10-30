@@ -69,7 +69,18 @@ where r.id in (
 on conflict (requisition_id) do nothing;
 
 alter table ht_requisitions_backup_20261030 enable row level security;
-revoke all on table ht_requisitions_backup_20261030 from anon, authenticated;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    execute 'revoke all on table ht_requisitions_backup_20261030 from anon';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    execute 'revoke all on table ht_requisitions_backup_20261030 from authenticated';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    execute 'grant all on table ht_requisitions_backup_20261030 to service_role';
+  end if;
+end $$;
 
 -- ─── 3) Conteos ANTES, una sola vez ─────────────────────────────────────────
 -- Esperado en la línea base del 30-oct-2026 ~12:25 Bogotá:
@@ -85,7 +96,18 @@ create table if not exists ht_migration_verify_20261030 (
 );
 
 alter table ht_migration_verify_20261030 enable row level security;
-revoke all on table ht_migration_verify_20261030 from anon, authenticated;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    execute 'revoke all on table ht_migration_verify_20261030 from anon';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    execute 'revoke all on table ht_migration_verify_20261030 from authenticated';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    execute 'grant all on table ht_migration_verify_20261030 to service_role';
+  end if;
+end $$;
 
 insert into ht_migration_verify_20261030 (phase, metric, n)
 select 'before', x.metric, x.n
@@ -192,8 +214,6 @@ end $$;
 --   ht_requisitions 11 (publicada 9, pedida 1, rechazada 1) — igual que antes
 --   hidden 2
 --   ht_requisition_events 30
-delete from ht_migration_verify_20261030 where phase = 'after';
-
 insert into ht_migration_verify_20261030 (phase, metric, n)
 select 'after', x.metric, x.n
 from (
@@ -208,7 +228,10 @@ from (
   select 'hidden', count(*)::int from ht_requisitions where hidden_at is not null
   union all
   select 'events', count(*)::int from ht_requisition_events
-) x;
+) x
+on conflict (phase, metric) do update
+  set n = excluded.n,
+      captured_at = now();
 
 -- ─── 7) Verificación (también está en el README, para correrla sola) ───────
 select
@@ -233,5 +256,28 @@ select
   end as coincide
 from ht_migration_verify_20261030 v
 order by v.phase, v.metric;
+
+-- Si algún conteo no coincide con la línea base, se aborta. El commit de
+-- abajo no corre y la transacción queda revertida (rollback, no commit).
+do $$
+declare
+  malas int;
+begin
+  select count(*) into malas
+  from ht_migration_verify_20261030 v
+  where v.n is distinct from (
+    case v.metric
+      when 'ht_requisitions' then 11
+      when 'publicada' then 9
+      when 'pedida' then 1
+      when 'rechazada' then 1
+      when 'hidden' then case v.phase when 'before' then 0 when 'after' then 2 end
+      when 'events' then case v.phase when 'before' then 28 when 'after' then 30 end
+    end
+  );
+  if malas > 0 then
+    raise exception 'coincide=false: la linea base no cuadra; rollback, no commit';
+  end if;
+end $$;
 
 commit;

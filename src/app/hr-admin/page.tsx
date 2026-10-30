@@ -3289,6 +3289,12 @@ function Vacantes() {
         </div>
       )}
 
+      {board.avisoChip && (
+        <p className="mb-3 text-[13px] text-[var(--ts-ink)] border border-[color:var(--ts-line)] rounded-xl px-3 py-2">
+          {board.avisoChip}
+        </p>
+      )}
+
       {muestraRequisiciones && (
         <div className="space-y-3 mb-4">
           {board.filasSinVacante.length === 0 ? (

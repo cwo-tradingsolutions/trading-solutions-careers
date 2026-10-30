@@ -350,14 +350,16 @@ export default function RequisitionsInbox({
             Fuentes
           </button>
           <button
+            type="button"
             onClick={() => setNueva(true)}
-            className="text-sm px-4 py-2 rounded-full bg-black text-white hover:bg-gray-800 font-medium"
+            className="min-h-11 inline-flex items-center text-sm px-4 rounded-full bg-black text-white hover:bg-gray-800 font-medium"
           >
             + Nueva requisición
           </button>
           <button
+            type="button"
             onClick={() => cargar()}
-            className="text-sm text-gray-500 hover:text-gray-900 underline"
+            className="min-h-11 inline-flex items-center text-sm text-[var(--ts-ink)] underline"
           >
             Actualizar
           </button>
@@ -427,12 +429,14 @@ export default function RequisitionsInbox({
         if (g.filas.length === 0) return null;
         return (
           <section key={g.titulo} className="mt-8">
-            <div className="flex items-baseline gap-3 mb-3">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--ts-muted)]">
-                {g.titulo}
-              </h3>
-              <span className="text-sm text-[var(--ts-muted)]">{g.filas.length}</span>
-              {g.nota && <span className="text-xs text-[var(--ts-muted)] ml-auto">{g.nota}</span>}
+            <div className="mb-3">
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--ts-muted)] whitespace-nowrap">
+                  {g.titulo}
+                </h3>
+                <span className="text-sm text-[var(--ts-muted)]">{g.filas.length}</span>
+              </div>
+              {g.nota && <p className="text-xs text-[var(--ts-muted)] mt-1">{g.nota}</p>}
             </div>
             <div className="space-y-3">
               {g.filas.map((r) => {

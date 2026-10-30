@@ -40,7 +40,7 @@ export default function FuentesAdmin({
     <div className="mb-4 bg-white rounded-2xl border border-[color:var(--ts-line)] p-4">
       <div className="flex items-baseline gap-3 mb-3">
         <h3 className="text-[15px] font-medium text-[var(--ts-ink)]">Fuentes</h3>
-        <button type="button" onClick={onCerrar} className="ml-auto text-[12px] text-[var(--ts-muted)] underline">
+        <button type="button" onClick={onCerrar} className="ml-auto min-h-11 inline-flex items-center text-[12px] text-[var(--ts-muted)] underline">
           Cerrar
         </button>
       </div>

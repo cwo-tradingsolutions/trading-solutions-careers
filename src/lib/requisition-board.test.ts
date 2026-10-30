@@ -64,10 +64,13 @@ describe("ocultar", () => {
   it("una oculta no se aprueba", () => {
     assert.equal(
       transicionBloqueadaPorOculta({ hidden_at: "2026-10-30" }, "aprobar"),
-      "Esta requisición está oculta. No se aprueba ni se mueve de estado.",
+      "Esta requisición está oculta. No se guarda ni se mueve de estado.",
     );
     assert.equal(transicionBloqueadaPorOculta({ hidden_at: null }, "aprobar"), null);
-    assert.equal(transicionBloqueadaPorOculta({ hidden_at: "2026-10-30" }, ""), null);
+    assert.equal(
+      transicionBloqueadaPorOculta({ hidden_at: "2026-10-30" }, ""),
+      "Esta requisición está oculta. No se guarda ni se mueve de estado.",
+    );
   });
 
   it("flota oculta dice Fuera del ATS y sigue clasificada como oculta", () => {
@@ -230,7 +233,11 @@ describe("migraciones", () => {
     assert.match(oculta, /^begin;/m);
     assert.match(oculta, /^commit;/m);
     assert.match(oculta, /enable row level security/);
-    assert.match(oculta, /revoke all on table ht_requisitions_backup_20261030 from anon, authenticated/);
+    assert.match(oculta, /revoke all on table ht_requisitions_backup_20261030 from authenticated/);
+    assert.match(oculta, /rolname = 'authenticated'/);
+    assert.match(oculta, /grant all on table ht_requisitions_backup_20261030 to service_role/);
+    assert.match(oculta, /coincide=false/);
+    assert.equal(/\bdelete\s+from\b/i.test(oculta), false);
     assert.equal(/delete\s+from\s+ht_requisitions\b/i.test(oculta), false);
     assert.equal(/delete\s+from\s+ht_requisition_events\b/i.test(oculta), false);
 
@@ -250,7 +257,10 @@ describe("migraciones", () => {
     assert.match(fuentes, /^begin;/m);
     assert.match(fuentes, /^commit;/m);
     assert.match(fuentes, /enable row level security/);
-    assert.match(fuentes, /revoke all on table ht_recruitment_sources from anon, authenticated/);
+    assert.match(fuentes, /revoke all on table ht_recruitment_sources from authenticated/);
+    assert.match(fuentes, /rolname = 'authenticated'/);
+    assert.match(fuentes, /grant all on table ht_recruitment_sources to service_role/);
+    assert.equal(/\bdelete\s+from\b/i.test(fuentes), false);
     for (const key of ["careers", "linkedin", "turpial", "magneto", "referidos", "otro"]) {
       assert.match(fuentes, new RegExp(`'${key}'`));
     }
