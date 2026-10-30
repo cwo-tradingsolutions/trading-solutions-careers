@@ -18,6 +18,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { fetchAllRows } from "@/lib/fetch-all-rows";
 import { supabaseAdmin } from "@/lib/supabase";
 import {
   STAGES,
@@ -87,12 +88,14 @@ export async function GET(req: NextRequest) {
     }
 
     // ── Candidatos vivos ─────────────────────────────────────────
-    let candQuery = supabaseAdmin
-      .from("ht_candidates")
-      .select("id, name, vacancy_id, stage, status, updated_at, created_at")
-      .not("email", "ilike", "%@tradingsolutions.com");
-    if (byVacancy) candQuery = candQuery.eq("vacancy_id", vacancyFilter);
-    const { data: cands } = await candQuery;
+    const cands = await fetchAllRows(() => {
+      let candQuery = supabaseAdmin
+        .from("ht_candidates")
+        .select("id, name, vacancy_id, stage, status, updated_at, created_at")
+        .not("email", "ilike", "%@tradingsolutions.com");
+      if (byVacancy) candQuery = candQuery.eq("vacancy_id", vacancyFilter);
+      return candQuery;
+    });
 
     const live = (cands || []).filter(
       (c: any) =>
@@ -109,11 +112,19 @@ export async function GET(req: NextRequest) {
       // Índice por id: buscar con .find() dentro del loop era O(candidatos ×
       // eventos), y la siembra deja varios eventos por candidato.
       const byId = new Map<string, any>(live.map((c: any) => [c.id, c]));
-      const { data: events } = await supabaseAdmin
-        .from("ht_candidate_stage_events")
-        .select("candidate_id, to_stage, changed_at, source")
-        .in("candidate_id", Array.from(byId.keys()))
-        .order("changed_at", { ascending: false });
+      // changed_at desc: el primero de cada candidato es el más reciente.
+      // Esta tabla no tiene created_at; id desempata timestamps iguales.
+      const events = await fetchAllRows(() =>
+        supabaseAdmin
+          .from("ht_candidate_stage_events")
+          .select("candidate_id, to_stage, changed_at, source")
+          .in("candidate_id", Array.from(byId.keys())),
+        1000,
+        [
+          { column: "changed_at", ascending: false },
+          { column: "id", ascending: true },
+        ],
+      );
 
       for (const ev of (events || []) as any[]) {
         const cand = byId.get(ev.candidate_id);
@@ -129,11 +140,13 @@ export async function GET(req: NextRequest) {
     // ── Sub-pruebas pendientes ───────────────────────────────────
     const testsByCandidate = new Map<string, any[]>();
     if (live.length > 0) {
-      const { data: tests } = await supabaseAdmin
-        .from("ht_candidate_tests")
-        .select("candidate_id, test_id, status, sent_at, completed_at")
-        .in("candidate_id", live.map((c: any) => c.id))
-        .in("status", ["pendiente", "enviada"]);
+      const tests = await fetchAllRows(() =>
+        supabaseAdmin
+          .from("ht_candidate_tests")
+          .select("candidate_id, test_id, status, sent_at, completed_at")
+          .in("candidate_id", live.map((c: any) => c.id))
+          .in("status", ["pendiente", "enviada"]),
+      );
       for (const t of tests || []) {
         const arr = testsByCandidate.get((t as any).candidate_id) || [];
         arr.push(t);

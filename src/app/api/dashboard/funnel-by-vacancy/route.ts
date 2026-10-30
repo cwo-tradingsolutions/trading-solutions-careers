@@ -12,6 +12,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { fetchAllRows } from "@/lib/fetch-all-rows";
 import { supabaseAdmin } from "@/lib/supabase";
 // El orden y las etiquetas del funnel salen de la fuente única de verdad.
 // Antes había una copia acá que se quedó en los codes pre-v4: el funnel de
@@ -52,12 +53,14 @@ export async function GET(req: NextRequest) {
     const milestoneByVac: Record<string, any> = {};
     (milestones || []).forEach((m: any) => { milestoneByVac[m.vacancy_id] = m; });
 
-    let candQuery = supabaseAdmin
-      .from("ht_candidates")
-      .select("id, vacancy_id, stage, status, created_at, updated_at")
-      .not("email", "ilike", "%@tradingsolutions.com");
-    if (filterByVacancy) candQuery = candQuery.eq("vacancy_id", vacancyId);
-    const { data: cands } = await candQuery;
+    const cands = await fetchAllRows(() => {
+      let candQuery = supabaseAdmin
+        .from("ht_candidates")
+        .select("id, vacancy_id, stage, status, created_at, updated_at")
+        .not("email", "ilike", "%@tradingsolutions.com");
+      if (filterByVacancy) candQuery = candQuery.eq("vacancy_id", vacancyId);
+      return candQuery;
+    });
 
     const candsByVac: Record<string, any[]> = {};
     (cands || []).forEach((c: any) => {

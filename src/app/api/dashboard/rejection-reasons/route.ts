@@ -9,6 +9,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { fetchAllRows } from "@/lib/fetch-all-rows";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -35,18 +36,21 @@ export async function GET(req: NextRequest) {
   const range = req.nextUrl.searchParams.get("range") || "quarter";
   const since = rangeStart(range).toISOString();
 
-  const [{ data: rejected }, { data: catalog }] = await Promise.all([
-    supabaseAdmin
-      .from("ht_candidates")
-      .select("id, rejection_category, rejection_sub_detail, rejection_save_for_future, rejected_at")
-      .eq("client_id", TS_CLIENT_ID)
-      .eq("stage", "rechazado")
-      .gte("rejected_at", since),
+  const [rejected, catalogRes] = await Promise.all([
+    fetchAllRows(() =>
+      supabaseAdmin
+        .from("ht_candidates")
+        .select("id, rejection_category, rejection_sub_detail, rejection_save_for_future, rejected_at")
+        .eq("client_id", TS_CLIENT_ID)
+        .eq("stage", "rechazado")
+        .gte("rejected_at", since),
+    ),
     supabaseAdmin
       .from("ts_rejection_categories")
       .select("category_key, category_label, sub_details")
       .eq("active", true),
   ]);
+  const catalog = catalogRes.data;
 
   const total = (rejected || []).length;
   const savedForFuture = (rejected || []).filter((r: any) => r.rejection_save_for_future).length;
