@@ -120,7 +120,7 @@ export const translations = {
       submit: "Enviar postulación",
       cancel: "Cancelar",
       successTitle: "Postulación enviada",
-      successMsg: "",
+      successMsg: "Gracias por tu interés en Trading Solutions. Nuestro equipo revisará tu perfil y te contactará pronto.",
       backToJobsBtn: "Volver a vacantes"
     },
     deptNames: {

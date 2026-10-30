@@ -115,7 +115,7 @@ export const ptBR = {
     submit: "Enviar candidatura",
     cancel: "Cancelar",
     successTitle: "Candidatura enviada",
-    successMsg: "",
+    successMsg: "Obrigado pelo seu interesse na Trading Solutions. Nossa equipe vai revisar seu perfil e entrar em contato em breve.",
     backToJobsBtn: "Voltar às vagas"
   },
   deptNames: {
