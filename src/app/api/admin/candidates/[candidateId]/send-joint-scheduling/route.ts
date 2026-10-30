@@ -63,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
     <p>Avanzamos a la siguiente etapa del proceso para <strong>${vacancyTitle}</strong>. La próxima conversación es con <strong>${interviewerLabel}</strong> · va a durar alrededor de ${durationMinutes} minutos por video.</p>
     <p>Elige el horario que mejor te funcione · solo vas a ver opciones donde todos estén disponibles al mismo tiempo. Una vez confirmes, se genera la videollamada de Google Meet automáticamente.</p>
     <p style="text-align:center"><a href="${jointLink}" class="cta">Elegir horario</a></p>
-    <p>Si ninguno de los horarios disponibles te funciona, regálame una respuesta a este correo y buscamos juntos.</p>
+    <p>Si ninguno de los horarios disponibles te funciona, regálanos una respuesta a este correo y buscamos juntos.</p>
     ${candidateSignatureHtml("es")}
     <div class="footer">El enlace queda activo 7 días. La videollamada de Google Meet se genera automáticamente al confirmar el horario.</div>
   </div>

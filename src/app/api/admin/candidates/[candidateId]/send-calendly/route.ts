@@ -97,7 +97,7 @@ function buildEmailHtml(firstName: string, vacancyTitle: string, calendlyUrl: st
     <p>${slotText}</p>
     <p style="text-align:center"><a href="${calendlyUrl}" class="cta">Elegir horario</a></p>
     <p style="font-size:13px;color:#737373"><em>Nota: los festivos colombianos no son hábiles · si ves alguno disponible (ej. lunes 18 de mayo · Día de la Ascensión), por favor escoge otro día.</em></p>
-    <p>Si ninguno de los horarios disponibles te funciona, regálame una respuesta a este correo y buscamos juntos.</p>
+    <p>Si ninguno de los horarios disponibles te funciona, regálanos una respuesta a este correo y buscamos juntos.</p>
     ${candidateSignatureHtml("es")}
     <div class="footer">La dirección y los detalles quedan también en la invitación de Calendly al confirmar tu horario.</div>
   </div>

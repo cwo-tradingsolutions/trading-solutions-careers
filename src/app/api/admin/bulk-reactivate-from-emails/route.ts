@@ -34,10 +34,10 @@ function buildReplyHtml(firstName: string, vacancyTitle: string, freshUrl: strin
 </style></head><body>
   <div class="container">
     <p>Hola <strong>${firstName}</strong>,</p>
-    <p>Gracias por avisarme y disculpa la fricción. Aquí te dejo un nuevo enlace para completar ${stepLabel} de <strong>${vacancyTitle}</strong> · queda activo 7 días:</p>
+    <p>Gracias por avisarnos y disculpa la fricción. Aquí te dejamos un nuevo enlace para completar ${stepLabel} de <strong>${vacancyTitle}</strong> · queda activo 7 días:</p>
     <p style="text-align:center"><a href="${freshUrl}" class="cta">Continuar</a></p>
     <p style="font-size:12px;color:#737373;word-break:break-all">O cópialo: ${freshUrl}</p>
-    <p>Cualquier cosa que necesites para avanzar, regálame una respuesta a este correo.</p>
+    <p>Cualquier cosa que necesites para avanzar, regálanos una respuesta a este correo.</p>
     ${candidateSignatureHtml("es")}
   </div>
 </body></html>`;

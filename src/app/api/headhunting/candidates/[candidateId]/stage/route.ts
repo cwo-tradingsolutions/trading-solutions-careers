@@ -128,18 +128,18 @@ export async function POST(
 </style></head><body>
   <div class="container">
     <p>Hola <strong>${firstName}</strong>,</p>
-    <p>Pasaste a la siguiente etapa del proceso para <strong>${vacancyTitle}</strong>. El próximo paso es un Assessment virtual que nos ayuda a conocerte mejor · cómo pensás, cómo decidís, qué te mueve.</p>
+    <p>Pasaste a la siguiente etapa del proceso para <strong>${vacancyTitle}</strong>. El próximo paso es un Assessment virtual que nos ayuda a conocerte mejor · cómo piensas, cómo decides, qué te mueve.</p>
     <p>No es un examen · no hay respuestas correctas. Es solo entender tu forma de ver las cosas.</p>
     <p style="text-align:center"><a href="${elevareUrl}" class="cta">Iniciar Assessment</a></p>
     <p>Algunos detalles para que estés cómoda/o:</p>
     <ul>
-      <li>Toma alrededor de 55 minutos · podés guardarlo y retomar</li>
-      <li>Necesitás computador con internet estable y cámara web (la usamos solo para validar identidad)</li>
-      <li>Buscá un espacio tranquilo, sin interrupciones</li>
+      <li>Toma alrededor de 55 minutos · puedes guardarlo y retomar</li>
+      <li>Necesitas computador con internet estable y cámara web (la usamos solo para validar identidad)</li>
+      <li>Busca un espacio tranquilo, sin interrupciones</li>
       <li>El enlace queda activo 72 horas</li>
       <li>Tus respuestas se guardan automáticamente</li>
     </ul>
-    <p>Si te queda alguna duda, contestame este correo.</p>
+    <p>Si te queda alguna duda, contéstanos este correo.</p>
     ${candidateSignatureHtml("es")}
   </div>
 </body></html>`;
@@ -258,7 +258,7 @@ export async function POST(
   <div class="container">
     <div class="eyebrow">Bienvenida/o a Trading Solutions</div>
     <h1>${firstName}, qué bueno tenerte con nosotros.</h1>
-    <p>Cerramos el proceso para <strong>${vacancyTitle}</strong> y ya estás dentro. Antes de tu primer día queremos hacerte el camino corto · te paso lo que viene.</p>
+    <p>Cerramos el proceso para <strong>${vacancyTitle}</strong> y ya estás dentro. Antes de tu primer día queremos hacerte el camino corto · te pasamos lo que viene.</p>
     <p><strong>En los próximos días te vamos a enviar:</strong></p>
     <ul>
       <li>Tu carta oferta firmada y los documentos para HR</li>
@@ -266,7 +266,7 @@ export async function POST(
       <li>Tu plan de los primeros 30/60/90 días con el equipo</li>
       <li>Quién será tu buddy para tus primeras semanas</li>
     </ul>
-    <p>Si tenés alguna duda mientras tanto · sobre tu fecha de inicio, lo logístico, lo que sea · contestame este correo y resolvemos.</p>
+    <p>Si tienes alguna duda mientras tanto · sobre tu fecha de inicio, lo logístico, lo que sea · contéstanos este correo y resolvemos.</p>
     <p>Nos vemos muy pronto.</p>
     ${candidateSignatureHtml("es")}
   </div>

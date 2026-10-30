@@ -112,17 +112,17 @@ export async function POST(
   <div class="container">
     <p>Hola <strong>${firstName}</strong>,</p>
     <p>Llegaste a la siguiente etapa del proceso para <strong>${vacancyTitle}</strong>. El próximo paso es una conversación con nuestra recruiter virtual · es por voz, en tiempo real, y termina con una sección corta en inglés.</p>
-    <p>No es un examen · te va a preguntar sobre tu experiencia y querés contarle naturalmente, como una llamada cualquiera.</p>
+    <p>No es un examen · te va a preguntar sobre tu experiencia y quieres contarle naturalmente, como una llamada cualquiera.</p>
     <p style="text-align:center"><a href="${interviewUrl}" class="cta">Iniciar entrevista</a></p>
     <p>Algunos detalles para que estés cómoda/o:</p>
     <ul>
       <li>Dura entre 15 y 20 minutos</li>
-      <li>Necesitás computador con micrófono, internet estable y un espacio tranquilo</li>
-      <li>Hablá con naturalidad · ella te escucha y responde</li>
+      <li>Necesitas computador con micrófono, internet estable y un espacio tranquilo</li>
+      <li>Habla con naturalidad · ella te escucha y responde</li>
       <li>El enlace queda activo 72 horas</li>
-      <li>Mejor hacela de corrido, sin pausas largas</li>
+      <li>Mejor hazla de corrido, sin pausas largas</li>
     </ul>
-    <p>Después de la entrevista nos contactamos contigo para los siguientes pasos. Si te queda alguna duda, contestame este correo.</p>
+    <p>Después de la entrevista nos contactamos contigo para los siguientes pasos. Si te queda alguna duda, contéstanos este correo.</p>
     ${candidateSignatureHtml("es")}
   </div>
 </body></html>`;

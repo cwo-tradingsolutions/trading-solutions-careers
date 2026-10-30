@@ -1604,6 +1604,7 @@ function BulkActionBar({
   // Los hooks van antes de cualquier return: si no, React se desincroniza
   // al pasar de "hay seleccion" a "no hay seleccion".
   const [batMsg, setBatMsg] = useState<string | null>(null);
+  const [batIsError, setBatIsError] = useState(false);
   const [citando, setCitando] = useState(false);
   /** Rechazo masivo: pasa por el mismo modal con motivo que el individual. */
   const [rechazando, setRechazando] = useState(false);
@@ -1658,6 +1659,7 @@ function BulkActionBar({
       : "";
     if (!confirm(`Se van a crear ${n} borradores de la batería en tu Gmail.${aviso}\n\nNo se envía nada todavía: quedan en Borradores para que los revises.`)) return;
     setRunning(true);
+    setBatIsError(false);
     setBatMsg(null);
     try {
       const r = await fetch("/api/bateria/enviar", {
@@ -1688,6 +1690,7 @@ function BulkActionBar({
     if (running) return;
     if (!confirm(`Se van a crear ${n} borradores de recordatorio del prefiltro en tu Gmail.\n\nA quien tenga el enlace vigente se le manda EL MISMO, para no borrarle lo que ya llevaba respondido.\n\nNo se envía nada todavía.`)) return;
     setRunning(true);
+    setBatIsError(false);
     setBatMsg(null);
     try {
       const r = await fetch("/api/headhunting/candidates/recordatorio-prefiltro", {
@@ -1734,7 +1737,7 @@ function BulkActionBar({
   async function pedirCita(modo: "previsualizar" | "borrador") {
     if (running) return;
     if (modo === "borrador" && !confirm(`Se van a crear ${n} borradores de citación en tu Gmail.\n\nNo se envía nada todavía.`)) return;
-    setRunning(true); setBatMsg(null);
+    setRunning(true); setBatIsError(false); setBatMsg(null);
     try {
       const r = await fetch("/api/headhunting/candidates/citar-assessment", {
         method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
@@ -1803,7 +1806,12 @@ function BulkActionBar({
       setProgress({ done: i + 1, total: n, ok, fail });
     }
 
-    if (errors.length) setBatMsg(errors.join(" · "));
+    if (errors.length) {
+      setBatIsError(true);
+      setBatMsg(errors.join(" · "));
+    } else {
+      setBatIsError(false);
+    }
     setRunning(false);
     setTimeout(() => {
       setProgress(null);
@@ -1904,7 +1912,7 @@ function BulkActionBar({
       </div>
 
       {batMsg && (
-        <div className="text-[11px] px-3 py-1 bg-white/10 rounded-full max-w-xs leading-snug">{batMsg}</div>
+        <div className={`text-[11px] px-3 py-1 rounded-full max-w-xs leading-snug ${batIsError ? "bg-red-100 text-red-800" : "bg-white/10"}`}>{batMsg}</div>
       )}
 
       {progress && (

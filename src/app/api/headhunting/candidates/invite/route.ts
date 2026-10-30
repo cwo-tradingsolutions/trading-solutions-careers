@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     <div class="header"><h1>${clientName}</h1></div>
     <div class="body">
       <p>Hola <strong>${candidate.name}</strong>,</p>
-      <p>Espero que estés muy bien. Te escribo para invitarte a la siguiente etapa de nuestro proceso de selección para la posición de <strong>${vacancyTitle}</strong> en ${clientName}.</p>
+      <p>Esperamos que estés muy bien. Te escribimos para invitarte a la siguiente etapa de nuestro proceso de selección para la posición de <strong>${vacancyTitle}</strong> en ${clientName}.</p>
       <p>El siguiente paso es una evaluación que nos ayuda a entender mejor cómo piensas y decides en situaciones reales del trabajo. No hay respuestas correctas o incorrectas — solo queremos conocer tu forma de ser.</p>
       <p style="text-align:center"><a href="${assessmentUrl}" class="cta">Iniciar Evaluación</a></p>
       <div class="info-box"><p style="margin:0"><strong>Detalles importantes:</strong></p>

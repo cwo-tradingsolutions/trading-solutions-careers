@@ -99,7 +99,7 @@ export default function RecomendarHojaDeVidaPage() {
               <strong>{candidateName}</strong>. El equipo de Talent Acquisition la revisará y, si hay match con alguna vacante actual o futura, nos pondremos en contacto directamente con la persona.
             </p>
             <p className="text-xs text-gray-500 mt-4">
-              Si querés recomendar a otra persona, podés volver a abrir esta página.
+              Si quieres recomendar a otra persona, puedes volver a abrir esta página.
             </p>
           </div>
         </div>

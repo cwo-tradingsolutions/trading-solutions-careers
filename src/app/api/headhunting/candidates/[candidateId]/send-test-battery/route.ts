@@ -86,16 +86,16 @@ export async function POST(
   <div class="container">
     <p>Hola <strong>${firstName}</strong>,</p>
 
-    <p>Llegaste a la siguiente etapa para la posición de <strong>${vacancyTitle}</strong>. Antes de la entrevista final queremos conocer un poco más cómo pensás y trabajás · estos cuestionarios nos ayudan a tener esa lectura.</p>
+    <p>Llegaste a la siguiente etapa para la posición de <strong>${vacancyTitle}</strong>. Antes de la entrevista final queremos conocer un poco más cómo piensas y trabajas · estos cuestionarios nos ayudan a tener esa lectura.</p>
 
     <ol>
       <li>
         <strong>16 Personalities (MBTI):</strong> <a href="https://www.16personalities.com/es/test-de-personalidad">16personalities.com</a><br>
-        <span class="nota">Al terminar, compartime los dos links que aparecen al darle al ícono de compartir.</span>
+        <span class="nota">Al terminar, compártenos los dos links que aparecen al darle al ícono de compartir.</span>
       </li>
       <li>
         <strong>DISC:</strong> <a href="https://miperfildisc.com/">miperfildisc.com</a><br>
-        <span class="nota">Vas a recibir el resultado por correo · reenvialo a esta misma dirección.</span>
+        <span class="nota">Vas a recibir el resultado por correo · reenvíalo a esta misma dirección.</span>
       </li>
       <li>
         <strong>Test de motivación:</strong> <a href="https://motivation-test-production.up.railway.app/">motivation-test-production.up.railway.app</a>
@@ -110,9 +110,9 @@ export async function POST(
       </li>
     </ol>
 
-    <p>Tomate tu tiempo · son alrededor de 2 horas en total y podés repartirlas en varias sesiones. No hay respuestas correctas, solo tu forma de ver las cosas.</p>
+    <p>Tómate tu tiempo · son alrededor de 2 horas en total y puedes repartirlas en varias sesiones. No hay respuestas correctas, solo tu forma de ver las cosas.</p>
 
-    <p>Cuando termines, contame por este mismo correo. Si surge cualquier duda en el camino, escribime.</p>
+    <p>Cuando termines, cuéntanos por este mismo correo. Si surge cualquier duda en el camino, escríbenos.</p>
 
     ${candidateSignatureHtml("es")}
 
