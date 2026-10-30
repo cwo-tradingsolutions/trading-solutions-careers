@@ -12,7 +12,7 @@ export const siteLinks = {
   customs: `${SITE}/customs`,
   contact: `${SITE}/contact`,
   legal: `${SITE}/legal`,
-  linkedinJobs: "https://www.linkedin.com/company/trading-solutions/jobs",
+  linkedinJobs: "https://www.linkedin.com/company/trading-sol/jobs",
   linkedin: "https://www.linkedin.com/company/trading-sol/",
   instagram: "https://www.instagram.com/tradingsolutions/",
 };
