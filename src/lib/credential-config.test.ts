@@ -5,7 +5,7 @@ import { NextRequest } from 'next/server';
 import { middleware } from '../middleware';
 import { isMaskedCredential } from './credential-config';
 
-const KEYS = ['ADMIN_SECRET', 'CRON_SECRET', 'WXM_SERVICE_SECRET'] as const;
+const KEYS = ['ADMIN_SECRET', 'CRON_SECRET', 'WXM_SERVICE_SECRET', 'HR_ADMIN_SESSION_SECRET', 'ADMIN_SCRIPTS_SECRET'] as const;
 const originals = Object.fromEntries(KEYS.map(key => [key, process.env[key]]));
 const VALID = 'clave-valida-ficticia-para-pruebas';
 
@@ -21,8 +21,10 @@ afterEach(() => {
 
 function sessionCookie(secret: string): string {
   const timestamp = Date.now().toString();
-  const signature = createHmac('sha256', secret).update(timestamp).digest('hex');
-  return `hr_admin_session=${timestamp}.${signature}`;
+  const email = Buffer.from('kelly@tradingsolutions.com', 'utf8').toString('base64url');
+  const payload = `${timestamp}.${email}`;
+  const signature = createHmac('sha256', secret).update(payload).digest('hex');
+  return `hr_admin_session=${payload}.${signature}`;
 }
 
 function request(path: string, init?: ConstructorParameters<typeof NextRequest>[1]): NextRequest {
@@ -113,7 +115,8 @@ test('no se agrega bloqueo de configuración por credenciales ausentes o cortas'
   const login = await middleware(request('/hr-admin/login'));
   assert.equal(login.headers.get('x-middleware-next'), '1');
   process.env.ADMIN_SECRET = 'x';
-  const short = await middleware(request('/hr-admin', { headers: { Cookie: sessionCookie('x') } }));
+  process.env.HR_ADMIN_SESSION_SECRET = VALID;
+  const short = await middleware(request('/hr-admin', { headers: { Cookie: sessionCookie(VALID) } }));
   assert.equal(short.headers.get('x-middleware-next'), '1');
 });
 

@@ -11,12 +11,12 @@
  *
  * Llamar UNA VEZ después de configurar SUPABASE_SERVICE_ROLE_KEY:
  *   curl -X POST https://trading-solutions-careers.vercel.app/api/headhunting/sync-from-neon \
- *        -H "Authorization: Bearer $ADMIN_SECRET"
+ *        -H "Authorization: Bearer $ADMIN_SCRIPTS_SECRET"
  */
 import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@/lib/sql";
 import { supabaseAdmin } from "@/lib/supabase";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdminOrScripts } from "@/lib/admin-scripts-auth";
 
 // IDs de Supabase verificados via /api/headhunting/vacancies el 2026-04-30
 // Si Supabase cambia, re-correr ese endpoint para revalidar.
@@ -69,7 +69,7 @@ function detectVacancySlug(c: NeonCandidate): string | null {
 }
 
 export async function POST(req: NextRequest) {
-  const authError = requireAdmin(req);
+  const authError = requireAdminOrScripts(req);
   if (authError) return authError;
 
   const sql = neon(process.env.DATABASE_URL!);

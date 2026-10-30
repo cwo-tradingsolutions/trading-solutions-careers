@@ -6,7 +6,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { parseAllowlist, safeAdminNext } from "@/lib/hr-admin-access";
-import { clearOAuthCookie, noStore, setSessionCookie } from "@/lib/hr-admin-cookies";
+import { clearOAuthCookie, cookieIsSecure, noStore, setSessionCookie } from "@/lib/hr-admin-cookies";
 import {
   adminPublicOrigin,
   decideGoogleAdmin,
@@ -18,6 +18,7 @@ import {
   adminOAuthRedirectUri,
 } from "@/lib/hr-admin-oauth";
 import { signAdminSession } from "@/lib/hr-admin-session";
+import { readSessionSecret } from "@/lib/hr-admin-secrets";
 import crypto from "crypto";
 
 export const runtime = "nodejs";
@@ -42,15 +43,16 @@ function finish(req: NextRequest, error: string | null, nextPath: string, sessio
     dest.searchParams.set("error", error);
     if (safeNext !== "/hr-admin") dest.searchParams.set("next", safeNext);
   }
+  const secure = cookieIsSecure(req);
   const res = NextResponse.redirect(dest);
-  clearOAuthCookie(res);
-  if (session) setSessionCookie(res, session);
+  clearOAuthCookie(res, secure);
+  if (session) setSessionCookie(res, session, secure);
   return noStore(res);
 }
 
 export async function GET(req: NextRequest) {
-  const secret = (process.env.ADMIN_SECRET ?? "").trim();
-  if (!secret || secret.length < 6) return finish(req, "config", "/hr-admin", null);
+  const secret = readSessionSecret();
+  if (!secret) return finish(req, "config", "/hr-admin", null);
 
   if (req.nextUrl.searchParams.get("error")) return finish(req, "google", "/hr-admin", null);
 

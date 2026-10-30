@@ -6,7 +6,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { safeAdminNext } from "@/lib/hr-admin-access";
-import { noStore, setOAuthCookie } from "@/lib/hr-admin-cookies";
+import { cookieIsSecure, noStore, setOAuthCookie } from "@/lib/hr-admin-cookies";
 import {
   adminOAuthRedirectUri,
   adminPublicOrigin,
@@ -17,6 +17,7 @@ import {
   readConfiguredAppUrl,
   signOAuthTransaction,
 } from "@/lib/hr-admin-oauth";
+import { readSessionSecret } from "@/lib/hr-admin-secrets";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,11 +30,11 @@ function loginUrl(req: NextRequest, error: string): URL {
 }
 
 export async function GET(req: NextRequest) {
-  const secret = (process.env.ADMIN_SECRET ?? "").trim();
+  const secret = readSessionSecret();
   const clientId = (process.env.GOOGLE_ADMIN_OAUTH_CLIENT_ID ?? "").trim();
   const clientSecret = (process.env.GOOGLE_ADMIN_OAUTH_CLIENT_SECRET ?? "").trim();
   const redirectUri = adminOAuthRedirectUri(readConfiguredAppUrl());
-  if (!secret || secret.length < 6 || !clientId || !clientSecret || !redirectUri) {
+  if (!secret || !clientId || !clientSecret || !redirectUri) {
     return noStore(NextResponse.redirect(loginUrl(req, "config")));
   }
 
@@ -57,6 +58,6 @@ export async function GET(req: NextRequest) {
     codeChallenge: pkceChallenge(verifier),
   });
   const res = NextResponse.redirect(destination);
-  setOAuthCookie(res, tx);
+  setOAuthCookie(res, tx, cookieIsSecure(req));
   return noStore(res);
 }

@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import crypto from "node:crypto";
 import test from "node:test";
 import { requireAdmin } from "./admin-auth.ts";
+import { signAdminSession } from "./hr-admin-session.ts";
 
 process.env.ADMIN_SECRET = "test-admin-secret-for-401";
+process.env.HR_ADMIN_SESSION_SECRET = "test-admin-secret-for-401";
 
 /** Enough of a request for requireAdmin. These tests return before any database call. */
 function request(url: string, cookie?: string) {
@@ -81,10 +82,9 @@ const routes: { spec: string; url: string; load: () => Promise<GetHandler>; ctx?
 ];
 
 test("hr_admin_session is the same cookie requireAdmin already accepts", () => {
-  const secret = process.env.ADMIN_SECRET as string;
-  const ts = Date.now().toString();
-  const sig = crypto.createHmac("sha256", secret).update(ts).digest("hex");
-  const req = request("http://localhost/api/applications", `hr_admin_session=${ts}.${sig}`);
+  const secret = process.env.HR_ADMIN_SESSION_SECRET as string;
+  const token = signAdminSession(secret, "kelly@tradingsolutions.com");
+  const req = request("http://localhost/api/applications", `hr_admin_session=${token}`);
   assert.equal(requireAdmin(req as never), null);
 });
 

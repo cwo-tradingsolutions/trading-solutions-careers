@@ -28,11 +28,11 @@ function signatureMatches(expected: string, actual: string): boolean {
   return crypto.timingSafeEqual(left, right);
 }
 
-/** Password sessions omit the email. Google and IAP sessions store it, lowercased. */
-export function signAdminSession(secret: string, email: string | null, now = Date.now()): string {
-  const ts = String(now);
-  if (!email) return `${ts}.${hmacHex(secret, ts)}`;
+/** Every session carries an email. A cookie without one is not signed here. */
+export function signAdminSession(secret: string, email: string, now = Date.now()): string {
   const emailToken = emailToToken(email);
+  if (!emailToken) throw new Error("hr admin session requires an email");
+  const ts = String(now);
   const payload = `${ts}.${emailToken}`;
   return `${payload}.${hmacHex(secret, payload)}`;
 }
@@ -46,7 +46,7 @@ export function readAdminSession(
   const parsed = sessionSigningInput(token);
   if (!parsed || !sessionIssuedAtOk(parsed.issuedAt, now)) return null;
   if (!signatureMatches(hmacHex(secret, parsed.payload), parsed.signature)) return null;
-  if (!parsed.emailToken) return { issuedAt: parsed.issuedAt, email: null };
+  if (!parsed.emailToken) return null;
   const email = emailFromToken(parsed.emailToken);
   if (!email) return null;
   return { issuedAt: parsed.issuedAt, email };

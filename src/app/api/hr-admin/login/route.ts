@@ -1,15 +1,22 @@
 /**
  * GET  /api/hr-admin/login          → whether the password form and Google are available
- * POST /api/hr-admin/login          → shared password, only if HR_ADMIN_PASSWORD_LOGIN_ENABLED
+ * POST /api/hr-admin/login          → vault password, only if HR_ADMIN_PASSWORD_LOGIN_ENABLED
  * DELETE /api/hr-admin/login        → logout
  *
- * The session cookie is hr_admin_session, HMAC-signed with ADMIN_SECRET, for 8 hours.
- * Google and IAP set the same cookie and include the user's email.
+ * The session cookie is signed with HR_ADMIN_SESSION_SECRET, not ADMIN_SECRET.
+ * Break-glass sessions still carry an email claim so old email-less cookies die.
  */
 import { NextResponse } from "next/server";
 import { isPasswordLoginEnabled } from "@/lib/hr-admin-access";
-import { clearOAuthCookie, clearSessionCookie, noStore, setSessionCookie } from "@/lib/hr-admin-cookies";
+import {
+  clearOAuthCookie,
+  clearSessionCookie,
+  cookieIsSecure,
+  noStore,
+  setSessionCookie,
+} from "@/lib/hr-admin-cookies";
 import { signAdminSession } from "@/lib/hr-admin-session";
+import { HR_ADMIN_BREAK_GLASS_EMAIL, readSessionSecret } from "@/lib/hr-admin-secrets";
 import crypto from "crypto";
 
 export const runtime = "nodejs";
@@ -40,9 +47,15 @@ export async function POST(req: Request) {
     );
   }
 
-  const secret = (process.env.ADMIN_SECRET ?? "").trim();
-  if (!secret || secret.length < 6) {
-    return noStore(NextResponse.json({ error: "Servidor sin ADMIN_SECRET configurado" }, { status: 500 }));
+  const password = (process.env.ADMIN_SECRET ?? "").trim();
+  const sessionSecret = readSessionSecret();
+  if (!password || password.length < 6 || !sessionSecret) {
+    return noStore(
+      NextResponse.json(
+        { error: "Servidor sin clave de emergencia o sin HR_ADMIN_SESSION_SECRET" },
+        { status: 500 },
+      ),
+    );
   }
 
   let body: { password?: string };
@@ -57,7 +70,7 @@ export async function POST(req: Request) {
     return noStore(NextResponse.json({ error: "Clave requerida" }, { status: 400 }));
   }
 
-  if (!timingSafeEqualStr(pass, secret)) {
+  if (!timingSafeEqualStr(pass, password)) {
     console.warn("[hr-admin] break-glass password login failed");
     await new Promise((resolve) => setTimeout(resolve, 500));
     return noStore(NextResponse.json({ error: "Clave incorrecta" }, { status: 401 }));
@@ -65,13 +78,18 @@ export async function POST(req: Request) {
 
   console.warn("[hr-admin] break-glass password login succeeded");
   const res = NextResponse.json({ ok: true });
-  setSessionCookie(res, signAdminSession(secret, null));
+  setSessionCookie(
+    res,
+    signAdminSession(sessionSecret, HR_ADMIN_BREAK_GLASS_EMAIL),
+    cookieIsSecure(req),
+  );
   return noStore(res);
 }
 
-export async function DELETE() {
+export async function DELETE(req: Request) {
+  const secure = cookieIsSecure(req);
   const res = NextResponse.json({ ok: true });
-  clearSessionCookie(res);
-  clearOAuthCookie(res);
+  clearSessionCookie(res, secure);
+  clearOAuthCookie(res, secure);
   return noStore(res);
 }

@@ -39,7 +39,7 @@ async function isValidSession(token: string | undefined, secret: string | undefi
       diff |= expectedHex.charCodeAt(i) ^ parsed.signature.charCodeAt(i);
     }
     if (diff !== 0) return false;
-    if (parsed.emailToken && !emailFromToken(parsed.emailToken)) return false;
+    if (!parsed.emailToken || !emailFromToken(parsed.emailToken)) return false;
     return true;
   } catch {
     return false;
@@ -56,6 +56,8 @@ export async function middleware(request: NextRequest) {
         ADMIN_SECRET: process.env.ADMIN_SECRET,
         CRON_SECRET: process.env.CRON_SECRET,
         WXM_SERVICE_SECRET: process.env.WXM_SERVICE_SECRET,
+        HR_ADMIN_SESSION_SECRET: process.env.HR_ADMIN_SESSION_SECRET,
+        ADMIN_SCRIPTS_SECRET: process.env.ADMIN_SCRIPTS_SECRET,
       })) {
     return NextResponse.json(
       { error: 'Servicio temporalmente no disponible.' },
@@ -76,8 +78,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next();
     }
     const token = request.cookies.get(HR_ADMIN_SESSION_COOKIE)?.value;
-    const secret = (process.env.ADMIN_SECRET ?? '').trim();
-    const ok = await isValidSession(token, secret);
+    const secret = (process.env.HR_ADMIN_SESSION_SECRET ?? '').trim();
+    const ok = secret.length >= 16 && await isValidSession(token, secret);
     if (!ok) {
       const url = request.nextUrl.clone();
       url.pathname = '/hr-admin/login';

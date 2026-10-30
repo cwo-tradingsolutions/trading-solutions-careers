@@ -64,7 +64,7 @@ export function assertGoogleIdClaims(
 
 /**
  * IAP assertions are signed by Google and may omit email_verified.
- * An explicit false still fails. hd and the allowlist are required.
+ * When the claim is present it must be true. hd and the allowlist are required.
  */
 export function assertIapClaims(
   claims: IdentityClaims,
@@ -72,7 +72,9 @@ export function assertIapClaims(
 ): IdentityDecision {
   const base = assertCorporateIdentity(claims, opts, [IAP_ISSUER]);
   if (!base.ok) return base;
-  if (claims.email_verified === false) return { ok: false, reason: "unverified" };
+  if (claims.email_verified !== undefined && claims.email_verified !== true) {
+    return { ok: false, reason: "unverified" };
+  }
   return allowlisted(base.email, opts.allowlist);
 }
 
@@ -81,7 +83,7 @@ export function safeAdminNext(value: string | null | undefined): string {
   const fallback = "/hr-admin";
   if (!value) return fallback;
   const next = value.trim();
-  if (!isHrAdminPath(next)) return fallback;
+  if (!isHrAdminPath(next) || hasTraversal(next)) return fallback;
   if (next.includes("\\") || next.includes("://") || next.includes("\0") || /[\r\n]/.test(next)) {
     return fallback;
   }
@@ -91,9 +93,13 @@ export function safeAdminNext(value: string | null | undefined): string {
   } catch {
     return fallback;
   }
-  if (decoded !== next && !isHrAdminPath(decoded)) return fallback;
+  if (decoded !== next && (!isHrAdminPath(decoded) || hasTraversal(decoded))) return fallback;
   if (decoded.includes("\\") || decoded.includes("://")) return fallback;
   return next;
+}
+
+export function googleLoginHref(nextPath: string | null | undefined): string {
+  return `/api/hr-admin/login/google?next=${encodeURIComponent(safeAdminNext(nextPath))}`;
 }
 
 function assertCorporateIdentity(
@@ -138,4 +144,21 @@ function emailDomain(email: string): string {
 
 function isHrAdminPath(path: string): boolean {
   return path === "/hr-admin" || path.startsWith("/hr-admin/") || path.startsWith("/hr-admin?");
+}
+
+/** `..` plus percent-encoded and double-encoded forms. */
+function hasTraversal(value: string): boolean {
+  let current = value;
+  for (let i = 0; i < 3; i++) {
+    if (current.includes("..")) return true;
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(current);
+    } catch {
+      return true;
+    }
+    if (decoded === current) return false;
+    current = decoded;
+  }
+  return current.includes("..");
 }
