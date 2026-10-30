@@ -25,6 +25,7 @@ import {
   getLanguage,
 } from "@/lib/reminder-templates";
 import { requireAdmin } from "@/lib/admin-auth";
+import { readCronSecret } from "@/lib/hr-admin-secrets";
 import crypto from "crypto";
 import { ATS_FROM_NAME } from "@/lib/ats-from";
 
@@ -85,7 +86,7 @@ async function ensureFreshTokensForReminder(cand: any): Promise<{ prefilterUrl: 
 function isVercelCron(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
   if (!auth) return false;
-  const secret = process.env.CRON_SECRET;
+  const secret = readCronSecret();
   if (!secret) return false;
   return auth === `Bearer ${secret}`;
 }

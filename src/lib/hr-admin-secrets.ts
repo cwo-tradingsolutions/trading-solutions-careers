@@ -18,6 +18,9 @@ export const AUTH_SECRET_NAMES = [
   "ADMIN_SECRET",
   "ADMIN_SCRIPTS_SECRET",
   "PORTAL_TOKEN_SECRET",
+  // Optional. Unset does not fail startup. When set it must be 16+ characters
+  // and different from the other names, or readCronSecret() refuses it.
+  "CRON_SECRET",
 ] as const;
 
 export type AuthSecretName = (typeof AUTH_SECRET_NAMES)[number];
@@ -65,9 +68,45 @@ export function portalSecretFailure(env: NodeJS.ProcessEnv = process.env): strin
   return null;
 }
 
-/** Session signer and portal signer. Either one blocks a candidate-facing host. */
+/**
+ * Fixed cutover midnight. The legacy date cap is 14 days after this, not
+ * "now", so a date past the cap never becomes valid on a later request.
+ * The stored day ends at 23:59:59.999Z, so the last date that fits is 13
+ * days after the reference (2026-11-12).
+ */
+export const PORTAL_LEGACY_REFERENCE_UTC = "2026-10-30";
+export const PORTAL_LEGACY_MAX_DAYS = 14;
+const PORTAL_LEGACY_CAP_MS =
+  Date.parse(`${PORTAL_LEGACY_REFERENCE_UTC}T00:00:00.000Z`) + PORTAL_LEGACY_MAX_DAYS * 24 * 60 * 60 * 1000;
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+export function legacyPortalUntilMs(raw: string | undefined | null): number | null {
+  const value = (raw ?? "").trim();
+  const match = ISO_DATE.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const end = Date.UTC(year, month - 1, day, 23, 59, 59, 999);
+  const check = new Date(end);
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) {
+    return null;
+  }
+  if (end > PORTAL_LEGACY_CAP_MS) return null;
+  return end;
+}
+
+/** A real calendar date past the cap. Placeholders and empty values are not fatal. */
+export function legacyPortalDateFailure(env: NodeJS.ProcessEnv = process.env): string | null {
+  const value = (env.PORTAL_TOKEN_LEGACY_UNTIL ?? "").trim();
+  if (!ISO_DATE.test(value)) return null;
+  if (legacyPortalUntilMs(value) !== null) return null;
+  return `PORTAL_TOKEN_LEGACY_UNTIL is more than 14 days after ${PORTAL_LEGACY_REFERENCE_UTC}`;
+}
+
+/** Session signer, portal signer, or a legacy date past the cap. Unset cron does not. */
 export function startupSecretFailure(env: NodeJS.ProcessEnv = process.env): string | null {
-  return sessionSecretFailure(env) || portalSecretFailure(env);
+  return sessionSecretFailure(env) || portalSecretFailure(env) || legacyPortalDateFailure(env);
 }
 
 export function logStartupSecretFailure(env: NodeJS.ProcessEnv = process.env): string | null {
@@ -100,6 +139,14 @@ export function readPortalSecret(env: NodeJS.ProcessEnv = process.env): string |
   const value = (env.PORTAL_TOKEN_SECRET ?? "").trim();
   if (value.length < MIN_PORTAL_SECRET_LENGTH) return null;
   if (!secretIsDistinct("PORTAL_TOKEN_SECRET", env)) return null;
+  return value;
+}
+
+/** Null when unset, shorter than 16 characters, or equal to another auth secret. */
+export function readCronSecret(env: NodeJS.ProcessEnv = process.env): string | null {
+  const value = (env.CRON_SECRET ?? "").trim();
+  if (value.length < MIN_AUTH_SECRET_LENGTH) return null;
+  if (!secretIsDistinct("CRON_SECRET", env)) return null;
   return value;
 }
 

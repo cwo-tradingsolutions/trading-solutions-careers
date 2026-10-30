@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
 import { requireAdmin } from "@/lib/admin-auth";
+import { readCronSecret } from "@/lib/hr-admin-secrets";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -23,7 +24,8 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://trading-solutions-ca
 function isVercelCron(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
   if (!auth) return false;
-  return auth === `Bearer ${process.env.CRON_SECRET || ""}`;
+  const secret = readCronSecret();
+  return Boolean(secret) && auth === `Bearer ${secret}`;
 }
 
 export async function GET(req: NextRequest) {

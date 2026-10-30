@@ -566,7 +566,7 @@ test("login copy defaults to English, and rejection uses only the session email"
   assert.equal(loginCopy("es").title, "Te damos la bienvenida.");
   assert.equal(loginCopy("es").heroLead, "El talento que");
   assert.equal(loginCopy("es").heroRest, "mueve al mundo.");
-  assert.equal(loginCopy("es").toolLine, "Adquisición de talento · Herramienta interna");
+  assert.equal(loginCopy("es").toolLine, "Talent Acquisition Team");
   assert.equal(loginCopy("es").tagline, "Donde la visión se encuentra con la ejecución.");
   assert.match(form, /<Hero lang=\{lang\} \/>/);
   assert.match(page, /LoginFallback googleHref=\{googleHref\}/);

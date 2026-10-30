@@ -51,7 +51,7 @@ export const LOGIN_COPY: Record<LoginLang, LoginCopy> = {
   es: {
     kicker: "HR Admin",
     title: "Te damos la bienvenida.",
-    toolLine: "Adquisición de talento · Herramienta interna",
+    toolLine: "Talent Acquisition Team",
     tagline: "Donde la visión se encuentra con la ejecución.",
     heroLead: "El talento que",
     heroRest: "mueve al mundo.",

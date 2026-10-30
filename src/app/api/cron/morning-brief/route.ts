@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
 import { requireAdmin } from "@/lib/admin-auth";
+import { readCronSecret } from "@/lib/hr-admin-secrets";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -26,7 +27,7 @@ function endOfDay(d: Date): Date { const x = new Date(d); x.setHours(23, 59, 59,
 function isVercelCron(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
   if (!auth) return false;
-  const secret = process.env.CRON_SECRET;
+  const secret = readCronSecret();
   if (!secret) return false;
   return auth === `Bearer ${secret}`;
 }

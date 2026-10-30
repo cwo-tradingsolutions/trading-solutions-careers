@@ -10,6 +10,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { readCronSecret } from "@/lib/hr-admin-secrets";
 import { sincronizarLote } from "@/lib/contactos";
 
 export const runtime = "nodejs";
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 function esCron(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
+  const secret = readCronSecret();
   return Boolean(secret) && req.headers.get("authorization") === `Bearer ${secret}`;
 }
 

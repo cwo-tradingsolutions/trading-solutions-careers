@@ -7,7 +7,7 @@ import {
   legacyPortalSecret,
   legacyPortalUntilMs,
 } from "./portal-token.ts";
-import { shouldExitOnStartupFailure, startupSecretFailure } from "./hr-admin-secrets.ts";
+import { readCronSecret, shouldExitOnStartupFailure, startupSecretFailure } from "./hr-admin-secrets.ts";
 
 const KEYS = ["PORTAL_TOKEN_SECRET", "ADMIN_SECRET", "HR_ADMIN_SESSION_SECRET", "ADMIN_SCRIPTS_SECRET", "PORTAL_TOKEN_LEGACY_UNTIL", "K_SERVICE", "VERCEL_ENV", "NEXT_PHASE", "npm_lifecycle_event"] as const;
 const originals = Object.fromEntries(KEYS.map((key) => [key, process.env[key]]));
@@ -50,8 +50,10 @@ test("legacy portal links accept only a YYYY-MM-DD within 14 days and a 16 chara
   assert.notEqual(legacyPortalSecret(), null);
   assert.equal(isValidSignatureFor(7, "ada@example.com", old), true);
 
-  process.env.PORTAL_TOKEN_LEGACY_UNTIL = dayOffset(20);
-  assert.equal(legacyPortalUntilMs(process.env.PORTAL_TOKEN_LEGACY_UNTIL), null);
+  assert.notEqual(legacyPortalUntilMs("2026-11-12"), null);
+  assert.equal(legacyPortalUntilMs("2026-11-13"), null);
+  assert.equal(legacyPortalUntilMs("2099-12-31"), null);
+  process.env.PORTAL_TOKEN_LEGACY_UNTIL = "2026-11-13";
   assert.equal(isValidSignatureFor(7, "ada@example.com", old), false);
 
   for (const bad of ["2099-12-31", "Nov 6 2026", "2099-01-02T00:00:00.000Z", "99999", ""]) {
@@ -90,4 +92,18 @@ test("startup exits only for a live production host, and a bad portal secret is 
   assert.equal(shouldExitOnStartupFailure(), false);
   process.env.VERCEL_ENV = "production";
   assert.equal(shouldExitOnStartupFailure(), true);
+  delete process.env.K_SERVICE;
+  delete process.env.VERCEL_ENV;
+  process.env.HR_ADMIN_SESSION_SECRET = SESSION;
+  process.env.PORTAL_TOKEN_SECRET = PORTAL;
+  process.env.ADMIN_SECRET = ADMIN;
+  delete process.env.CRON_SECRET;
+  assert.equal(startupSecretFailure(), null);
+  assert.equal(readCronSecret(), null);
+  process.env.CRON_SECRET = "short-cron";
+  assert.equal(readCronSecret(), null);
+  assert.equal(startupSecretFailure(), null);
+  process.env.CRON_SECRET = SESSION;
+  assert.equal(readCronSecret(), null);
+  assert.match(startupSecretFailure() ?? "", /HR_ADMIN_SESSION_SECRET/);
 });
