@@ -126,18 +126,31 @@ html[lang="zh-CN"] .ts-x h1,
     overflow: hidden;
   }
   .ts-x .nav-logo img {
-    display: block;
     width: auto;
     max-width: 100%;
-    height: 20px;
+    height: 18px;
   }
+  /* Keep the light/dark logo swap. display:block on every img showed both. */
+  .ts-x .nav-logo img.logo-dark { display: none; }
+  .ts-x .nav.over .nav-logo img.logo-light { display: none; }
+  .ts-x .nav.over .nav-logo img.logo-dark { display: block; }
+  .ts-x .nav.open.over .nav-logo img.logo-light { display: block; }
+  .ts-x .nav.open.over .nav-logo img.logo-dark { display: none; }
   .ts-x .nav-right {
     flex: none;
     margin-left: auto;
     gap: 6px;
   }
   .ts-x .nav-right .btn-dark {
-    display: none !important;
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 8px;
+    font-size: 11px;
+    line-height: 1;
+    letter-spacing: 0;
+    white-space: nowrap;
+    flex: none;
   }
   .ts-x .burger {
     flex: none;
@@ -147,6 +160,16 @@ html[lang="zh-CN"] .ts-x h1,
     right: 0;
     width: 100%;
     box-sizing: border-box;
+  }
+}
+@media (max-width: 390px) {
+  .ts-x .nav-logo img { height: 16px; }
+  .ts-x .nav-in { gap: 4px; }
+  .ts-x .nav-right { gap: 4px; }
+  .ts-x .nav-right .btn-dark {
+    height: 30px;
+    padding: 0 6px;
+    font-size: 10px;
   }
 }
 
