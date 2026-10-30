@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { TS_SCENARIOS } from '@/lib/headhunting/scenarios-ts';
 import { recordStageEvent } from '@/lib/stage-events';
+import { isPreviewTestMode } from '@/lib/preview-mode';
 
 export async function GET(req: NextRequest) {
   try {
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
     // Razón: drafts de Gmail pueden sentarse días antes de enviar · si el link
     // expira en el camino, candidato recibe link muerto sin culpa. Cada click
     // del candidato vivo re-activa el reloj.
-    if (candidate.token_expires_at) {
+    if (!isPreviewTestMode() && candidate.token_expires_at) {
       const expires = new Date(candidate.token_expires_at);
       const now = new Date();
       if (expires < now || (expires.getTime() - now.getTime()) < 3 * 24 * 60 * 60 * 1000) {
@@ -41,10 +42,12 @@ export async function GET(req: NextRequest) {
     // Check candidate status — pero permitir reactivar si status quedó 'expired'
     // por un check antiguo · ya no expiramos, así que volvemos a 'invited'.
     if (candidate.status === 'expired') {
-      await supabaseAdmin
-        .from('ht_candidates')
-        .update({ status: 'invited' })
-        .eq('id', candidate.id);
+      if (!isPreviewTestMode()) {
+        await supabaseAdmin
+          .from('ht_candidates')
+          .update({ status: 'invited' })
+          .eq('id', candidate.id);
+      }
       candidate.status = 'invited';
     }
     if (!['invited', 'in_progress'].includes(candidate.status)) {
@@ -83,7 +86,7 @@ export async function GET(req: NextRequest) {
       .eq('candidate_id', candidate.id);
 
     // If status is 'invited', transition to 'in_progress'
-    if (candidate.status === 'invited') {
+    if (candidate.status === 'invited' && !isPreviewTestMode()) {
       const { error: updateErr } = await supabaseAdmin
         .from('ht_candidates')
         .update({

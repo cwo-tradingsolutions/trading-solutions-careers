@@ -23,6 +23,7 @@ const ROUTES = [
   "src/app/api/headhunting/assessment/save/route.ts",
   "src/app/api/headhunting/assessment/complete/route.ts",
   "src/app/api/headhunting/assessment/snapshot/route.ts",
+  "src/app/api/headhunting/assessment/validate/route.ts",
   "src/app/api/headhunting/ai-interview/[token]/route.ts",
   "src/app/api/headhunting/ai-interview/[token]/finalize/route.ts",
   "src/app/api/decision/[token]/route.ts",
