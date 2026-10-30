@@ -5,7 +5,7 @@ import { generatePortalToken } from "@/lib/portal-token";
 import { getResend, EMAIL_FROM } from "@/lib/resend";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
 import { candidateSignatureHtml } from "@/lib/ats-from";
-import { batteryAutoSendEnabled } from "@/lib/battery-auto-send";
+import { applicationStatusEmailsEnabled } from "@/lib/application-status-email";
 import { buildRejectionHtml, REJECTION_REPLY_TO, rejectionEmailsEnabled, rejectionSubject } from "@/lib/rejection-email";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 
@@ -171,11 +171,15 @@ export async function PATCH(
       RETURNING id, status, updated_at
     `;
 
-    // Status mail is automatic. Rejection uses its own flag. The other
-    // transitions use the battery auto-send flag so they stay off by default.
+    // Rejection has its own flag. Interview, offer and hired use
+    // APPLICATION_STATUS_EMAILS_ENABLED, which stays off until it is set.
     const wantsEmail = !skipEmail && prev.status !== status;
+    const statusMail =
+      status === "interview" || status === "offer" || status === "hired";
     const emailTriggered = wantsEmail && (
-      status === "rejected" ? rejectionEmailsEnabled() : batteryAutoSendEnabled()
+      status === "rejected"
+        ? rejectionEmailsEnabled()
+        : statusMail && applicationStatusEmailsEnabled()
     );
     if (emailTriggered) {
       await sendStatusTransitionEmail(prev, status);
