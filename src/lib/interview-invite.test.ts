@@ -27,7 +27,7 @@ test("HM is blocked until a Wellness interview exists or was held", () => {
   assert.equal(assertRoundOrder("hm", [{ round: "wellness", status: "done", deleted_at: null }]).ok, true);
 });
 
-test("preview allowlist refuses when unset and strips coo@", () => {
+test("allowlist refuses when unset and redirects a real candidate away from coo@", () => {
   const unset = decideDelivery({
     vercelEnv: "preview",
     invitesEnabledFlag: undefined,
@@ -38,20 +38,22 @@ test("preview allowlist refuses when unset and strips coo@", () => {
   assert.equal(unset.action, "refuse");
   if (unset.action === "refuse") assert.match(unset.error, /INTERVIEW_TEST_RECIPIENTS/);
 
-  const dry = decideDelivery({
+  const redirected = decideDelivery({
     vercelEnv: "preview",
     invitesEnabledFlag: undefined,
     allowlistRaw: ALLOWLIST,
     candidateEmail: "ana.real@gmail.com",
     interviewerEmail: "coo@tradingsolutions.com",
   });
-  assert.equal(dry.action, "dry_run");
-  if (dry.action === "dry_run") {
-    assert.deepEqual(dry.emailTo, []);
-    assert.deepEqual(dry.calendarAttendees, []);
-    assert.equal(dry.persist, false);
-    assert.ok(dry.suppressed.some((s) => s.email === "coo@tradingsolutions.com" && s.role === "interviewer"));
-    assert.ok(dry.suppressed.some((s) => s.email === "ana.real@gmail.com"));
+  assert.equal(redirected.action, "send");
+  if (redirected.action === "send") {
+    assert.deepEqual(redirected.emailTo, ["cwo@tradingsolutions.com", "jointheteam@tradingsolutions.com"]);
+    assert.deepEqual(redirected.calendarAttendees, redirected.emailTo);
+    assert.equal(redirected.persist, false);
+    assert.ok(!redirected.emailTo.includes("ana.real@gmail.com"));
+    assert.ok(!redirected.emailTo.includes("coo@tradingsolutions.com"));
+    assert.ok(redirected.suppressed.some((s) => s.email === "coo@tradingsolutions.com" && s.role === "interviewer"));
+    assert.ok(redirected.suppressed.some((s) => s.email === "ana.real@gmail.com"));
   }
 });
 
@@ -85,28 +87,54 @@ test("coo@ is suppressed in preview even when the candidate mailbox is allowlist
   assert.ok(!JSON.stringify(event).includes("coo@"));
 });
 
-test("production stays off unless INTERVIEW_INVITES_ENABLED is set", () => {
-  const off = decideDelivery({
-    vercelEnv: "production",
-    invitesEnabledFlag: undefined,
-    allowlistRaw: ALLOWLIST,
-    candidateEmail: "ana@example.com",
-    interviewerEmail: "coo@tradingsolutions.com",
-  });
-  assert.equal(off.action, "refuse");
-  if (off.action === "refuse") assert.match(off.error, /INTERVIEW_INVITES_ENABLED/);
-
-  const on = decideDelivery({
+test("production allowlist fails closed and only an explicit flag lifts it", () => {
+  const missing = decideDelivery({
     vercelEnv: "production",
     invitesEnabledFlag: "true",
     allowlistRaw: undefined,
     candidateEmail: "ana@example.com",
     interviewerEmail: "coo@tradingsolutions.com",
   });
-  assert.equal(on.action, "send");
-  if (on.action === "send") {
-    assert.deepEqual(on.calendarAttendees, ["ana@example.com", "coo@tradingsolutions.com"]);
-    assert.equal(on.persist, true);
+  assert.equal(missing.action, "refuse");
+  if (missing.action === "refuse") assert.match(missing.error, /INTERVIEW_TEST_RECIPIENTS/);
+
+  const empty = decideDelivery({
+    vercelEnv: "production",
+    invitesEnabledFlag: "true",
+    allowlistRaw: "   ",
+    candidateEmail: "ana@example.com",
+    interviewerEmail: "coo@tradingsolutions.com",
+  });
+  assert.equal(empty.action, "refuse");
+
+  const limited = decideDelivery({
+    vercelEnv: "production",
+    invitesEnabledFlag: "true",
+    allowlistRaw: ALLOWLIST,
+    candidateEmail: "ana@example.com",
+    interviewerEmail: "coo@tradingsolutions.com",
+  });
+  assert.equal(limited.action, "send");
+  if (limited.action === "send") {
+    assert.deepEqual(limited.emailTo, ["cwo@tradingsolutions.com", "jointheteam@tradingsolutions.com"]);
+    assert.ok(!limited.emailTo.includes("ana@example.com"));
+    assert.ok(!limited.calendarAttendees.includes("coo@tradingsolutions.com"));
+    assert.equal(limited.persist, false);
+  }
+
+  const lifted = decideDelivery({
+    vercelEnv: "production",
+    invitesEnabledFlag: undefined,
+    unrestrictedFlag: "1",
+    allowlistRaw: undefined,
+    candidateEmail: "ana@example.com",
+    interviewerEmail: "coo@tradingsolutions.com",
+  });
+  assert.equal(lifted.action, "send");
+  if (lifted.action === "send") {
+    assert.deepEqual(lifted.emailTo, ["ana@example.com"]);
+    assert.deepEqual(lifted.calendarAttendees, ["ana@example.com", "coo@tradingsolutions.com"]);
+    assert.equal(lifted.persist, true);
   }
 });
 

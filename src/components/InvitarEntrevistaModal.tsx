@@ -213,9 +213,10 @@ export function InvitarEntrevistaModal({
           </a>
         )}
 
-        {load?.preview.active && !load.preview.allowlist_configured && (
+        {load && !load.preview.allowlist_configured && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-950">
-            Este preview no envía hasta definir <code>INTERVIEW_TEST_RECIPIENTS={load.preview.allowlist_expected}</code>.
+            No se envía a candidatos reales hasta definir <code>INTERVIEW_TEST_RECIPIENTS={load.preview.allowlist_expected}</code>.
+            Con la lista, el correo sale solo a esas direcciones, también en producción.
           </div>
         )}
 

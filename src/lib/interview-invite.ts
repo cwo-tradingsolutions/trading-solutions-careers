@@ -105,22 +105,16 @@ export type Delivery =
 export function decideDelivery(input: {
   vercelEnv: string | undefined;
   invitesEnabledFlag: string | undefined;
+  /** INTERVIEW_INVITES_UNRESTRICTED=1 is the only way to mail real candidates. */
+  unrestrictedFlag?: string | undefined;
   allowlistRaw: string | undefined;
   candidateEmail: string;
   interviewerEmail: string;
 }): Delivery {
   const candidate = normalizeEmail(input.candidateEmail);
   const interviewer = normalizeEmail(input.interviewerEmail);
-  const production = input.vercelEnv === "production";
 
-  if (production) {
-    if (!invitesFlagOn(input.invitesEnabledFlag)) {
-      return {
-        action: "refuse",
-        error:
-          "Las invitaciones a entrevista están apagadas en producción. INTERVIEW_INVITES_ENABLED no está activo.",
-      };
-    }
+  if (invitesFlagOn(input.unrestrictedFlag)) {
     return {
       action: "send",
       emailTo: candidate ? [candidate] : [],
@@ -131,18 +125,11 @@ export function decideDelivery(input: {
   }
 
   const allow = effectiveAllowlist(input.allowlistRaw);
-  if (allow == null) {
+  if (allow == null || allow.length === 0) {
     return {
       action: "refuse",
       error:
-        "INTERVIEW_TEST_RECIPIENTS no está configurado. En preview no se envía nada. Definilo como cwo@tradingsolutions.com,jointheteam@tradingsolutions.com",
-    };
-  }
-  if (allow.length === 0) {
-    return {
-      action: "refuse",
-      error:
-        "INTERVIEW_TEST_RECIPIENTS no incluye ningún correo de la lista de prueba (solo cwo@tradingsolutions.com y jointheteam@tradingsolutions.com).",
+        "INTERVIEW_TEST_RECIPIENTS no está configurado o está vacío. No se envía a candidatos reales. Definilo como cwo@tradingsolutions.com,jointheteam@tradingsolutions.com",
     };
   }
 
@@ -153,11 +140,14 @@ export function decideDelivery(input: {
     suppressed.push({ email: interviewer, role: "interviewer" });
   }
 
-  const calendarAttendees = unique([candidate, interviewer].filter((e) => allowSet.has(e)));
+  const onList = unique([candidate, interviewer].filter((e) => allowSet.has(e)));
   const persist = Boolean(candidate) && allowSet.has(candidate);
+  // Someone on the list receives the mail. A real candidate is redirected to the allowlist.
+  const emailTo = onList.length > 0 ? onList : allow;
+  const calendarAttendees = onList.length > 0 ? onList : allow;
   return {
-    action: persist ? "send" : "dry_run",
-    emailTo: persist ? [candidate] : [],
+    action: "send",
+    emailTo,
     calendarAttendees,
     suppressed,
     persist,

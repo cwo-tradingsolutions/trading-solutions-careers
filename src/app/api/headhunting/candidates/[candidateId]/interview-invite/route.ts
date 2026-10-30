@@ -151,7 +151,7 @@ export async function GET(req: NextRequest, { params }: { params: { candidateId:
     google,
     preview: {
       active: preview,
-      allowlist_configured: preview ? Boolean(allow && allow.length > 0) : true,
+      allowlist_configured: Boolean(allow && allow.length > 0),
       allowlist_expected: ALLOWLIST_DOC,
     },
     production_enabled: process.env.VERCEL_ENV === "production"
@@ -192,6 +192,7 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
   const delivery = decideDelivery({
     vercelEnv: process.env.VERCEL_ENV,
     invitesEnabledFlag: process.env.INTERVIEW_INVITES_ENABLED,
+    unrestrictedFlag: process.env.INTERVIEW_INVITES_UNRESTRICTED,
     allowlistRaw: process.env.INTERVIEW_TEST_RECIPIENTS,
     candidateEmail: candidate.email,
     interviewerEmail: form.value.interviewerEmail,
