@@ -14,4 +14,4 @@ export function getResend(): Resend {
 }
 
 export const EMAIL_FROM = process.env.EMAIL_FROM || `${ATS_FROM_NAME} <${ATS_FROM_EMAIL}>`;
-export const EMAIL_BCC = process.env.EMAIL_BCC || 'hello@elevarecareer.com';
+export const EMAIL_BCC = process.env.EMAIL_BCC || '';
