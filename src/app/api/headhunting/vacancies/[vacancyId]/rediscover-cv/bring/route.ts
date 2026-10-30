@@ -15,7 +15,7 @@
  *   y el destino son la misma etapa, recordStageEvent no escribe.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-auth";
+import { adminSessionEmail, requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { recordStageEvent } from "@/lib/stage-events";
 import { POST as postStage } from "@/app/api/headhunting/candidates/[candidateId]/stage/route";
@@ -27,12 +27,13 @@ async function markReviewed(
   vacancyId: string,
   sourceCandidateId: string,
   decision: "contact" | "already_processed",
+  actor: string,
 ) {
   await supabaseAdmin
     .from("ts_cv_bank_matches")
     .update({
       reviewed_decision: decision,
-      reviewed_by: "hr-admin",
+      reviewed_by: actor,
       reviewed_at: new Date().toISOString(),
     })
     .eq("vacancy_id", vacancyId)
@@ -45,6 +46,7 @@ export async function POST(
 ) {
   const authError = requireAdmin(req);
   if (authError) return authError;
+  const actor = adminSessionEmail(req) || "hr-admin";
 
   try {
     const { vacancyId } = params;
@@ -83,7 +85,7 @@ export async function POST(
     );
 
     if (same && !CLOSED.has(String(same.stage || ""))) {
-      await markReviewed(vacancyId, sourceId, "already_processed");
+      await markReviewed(vacancyId, sourceId, "already_processed", actor);
       return NextResponse.json(
         {
           error: "already_active",
@@ -125,7 +127,7 @@ export async function POST(
           { status: stageRes.status },
         );
       }
-      await markReviewed(vacancyId, sourceId, "contact");
+      await markReviewed(vacancyId, sourceId, "contact", actor);
       return NextResponse.json({
         success: true,
         reopened: true,
@@ -174,9 +176,10 @@ export async function POST(
       toStage: "aplico",
       vacancyId,
       source: "ui",
+      changedBy: actor,
       note: "cv_proceso_anterior · rediscovery",
     });
-    await markReviewed(vacancyId, sourceId, "contact");
+    await markReviewed(vacancyId, sourceId, "contact", actor);
 
     return NextResponse.json({
       success: true,

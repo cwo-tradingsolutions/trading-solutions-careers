@@ -9,7 +9,7 @@
  *   - Crea draft de descarte automático en Gmail
  */
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-auth";
+import { adminSessionEmail, requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
 import { defaultOnboardingTasks } from "@/lib/onboarding-tasks";
@@ -216,6 +216,7 @@ export async function POST(
       toStage: targetStage,
       vacancyId: candidate.vacancy_id ?? null,
       source: "ui",
+      changedBy: adminSessionEmail(req),
       note: batteryPending ? NOTA_BATERIA_PENDIENTE : undefined,
     });
 

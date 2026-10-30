@@ -18,7 +18,7 @@
  *   - opcionalmente: draft de Gmail con copy editado
  */
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-auth";
+import { adminSessionEmail, requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected } from "@/lib/gmail";
 import { recordStageEvent } from "@/lib/stage-events";
@@ -53,7 +53,8 @@ export async function POST(
     const notePublic: string | null = body.note_public?.trim() || null;
     const saveForFuture: boolean = body.save_for_future !== false; // default true
     const createDraft: boolean = body.create_rejection_draft !== false;
-    const rejectedBy: string = String(body.rejected_by || "kelly").trim();
+    const rejectedBy: string =
+      adminSessionEmail(req) || String(body.rejected_by || "kelly").trim() || "kelly";
 
     const rechazo = validarRechazo({
       category_key: categoryKey,

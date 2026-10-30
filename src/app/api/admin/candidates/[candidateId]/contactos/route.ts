@@ -12,7 +12,7 @@
  *              source?: 'manual' | 'whatsapp_boton' }
  */
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-auth";
+import { adminSessionEmail, requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { guardarContactos, huella, sincronizarGmailCandidato, type Canal, type Direccion } from "@/lib/contactos";
 
@@ -131,7 +131,7 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
       external_id: source === "whatsapp_boton" ? huella(cand.id, occurred.toISOString(), summary) : null,
       // Abrir WhatsApp no prueba que se envió: lo confirma el chat importado.
       status: source === "whatsapp_boton" ? "intento" : "confirmado",
-      created_by: "hr-admin",
+      created_by: adminSessionEmail(req) || "hr-admin",
     },
   ]);
   if (r.error) return NextResponse.json({ error: r.error }, { status: 500 });
