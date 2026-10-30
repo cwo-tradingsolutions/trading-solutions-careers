@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { CheckCircle2, XCircle, ArrowRight, HelpCircle, AlertTriangle } from "lucide-react";
 import { stageLabel } from "@/lib/stage-labels";
 import { REJECTION_CATEGORIES } from "@/lib/rejection-rules";
-import { invalidLinkBoth } from "@/lib/candidate-invalid-link";
+import { invalidLinkBoth, loadRetryBoth } from "@/lib/candidate-invalid-link";
 import { CANDIDATE_MAIL } from "@/lib/candidate-public-error";
 
 const TS_HERO = "https://cdn.prod.website-files.com/68fb7b9474bf8f90808cd50f/691645b652c1e9091b25f59c_FotosWeb_TradingSolutions-14_4_11zon.webp";
@@ -31,7 +31,7 @@ export default function DecisionPage() {
   const presetDecision = searchParams?.get('d');
 
   const [state, setState] = useState<DecisionState | null>(null);
-  const [phase, setPhase] = useState<'loading' | 'choose' | 'confirm' | 'submitting' | 'done' | 'error'>('loading');
+  const [phase, setPhase] = useState<'loading' | 'choose' | 'confirm' | 'submitting' | 'done' | 'saved' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
 
   // Form state
@@ -47,7 +47,7 @@ export default function DecisionPage() {
       .then(async r => {
         const j = await r.json();
         if (!r.ok) {
-          setError(invalidLinkBoth());
+          setError(r.status >= 500 ? loadRetryBoth() : invalidLinkBoth());
           setPhase('error');
         } else {
           setState(j);
@@ -59,7 +59,7 @@ export default function DecisionPage() {
           }
         }
       })
-      .catch(() => { setError(invalidLinkBoth()); setPhase('error'); });
+      .catch(() => { setError(loadRetryBoth()); setPhase('error'); });
   }, [token]);
 
   const submit = async () => {
@@ -78,8 +78,7 @@ export default function DecisionPage() {
         }),
       });
       if (r.status === 409) {
-        setError("Ya registramos tu respuesta. / We already saved your answer.");
-        setPhase('choose');
+        setPhase('saved');
       } else if (!r.ok) {
         setError(`No pudimos registrar la decisión. Escríbenos a ${CANDIDATE_MAIL}. / We couldn't save this decision. Write to us at ${CANDIDATE_MAIL}.`);
         setPhase('choose');
@@ -94,6 +93,17 @@ export default function DecisionPage() {
 
   if (phase === 'loading') {
     return <div className="min-h-screen flex items-center justify-center text-sm text-gray-400">Cargando…</div>;
+  }
+
+  if (phase === 'saved') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
+        <div className="bg-white border border-gray-200 rounded-xl p-8 max-w-md text-center">
+          <h2 className="text-xl font-bold mb-2">Ya registramos tu respuesta</h2>
+          <p className="text-sm text-gray-600">We already saved your answer.</p>
+        </div>
+      </div>
+    );
   }
 
   if (phase === 'error') {

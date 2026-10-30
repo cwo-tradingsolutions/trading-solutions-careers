@@ -99,6 +99,16 @@ Repetir para los otros tres cambiando nombre, `--schedule` y `--uri`.
 
 **Importante:** no crear los jobs hasta que Cloud Run esté sirviendo y verificado. Si quedan activos en los dos lados al mismo tiempo, el digest y el morning-brief salen duplicados al correo.
 
+### AI interview rescore (do not create yet)
+
+The AI interview stays disabled on GCP. None of the four jobs above scores it. When it is turned on, add this Cloud Scheduler job by hand. This hotfix does not create it.
+
+`POST /api/cron/rescore-ai-interviews` with `Authorization: Bearer CRON_SECRET` scores interviews still `in_progress` whose ElevenLabs conversation is `done`. The candidate page also polls finalize for about two minutes; this job catches the ones that finish later.
+
+```bash
+gcloud scheduler jobs create http careers-rescore-ai-interviews --location us-west1 --schedule "*/10 * * * *" --time-zone "America/Bogota" --uri "https://CAREERS_URL/api/cron/rescore-ai-interviews" --http-method POST --update-headers "Authorization=Bearer EL_CRON_SECRET"
+```
+
 ## 4. Verificación antes de cortar
 
 1. El portal público de vacantes carga y se puede aplicar.

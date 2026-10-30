@@ -4,12 +4,17 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  FINALIZE_LOOKUP_MAX,
+  FINALIZE_LOOKUP_WINDOW_MS,
+  allowFinalizeLookup,
   conversationMatchesInterview,
+  finalizeLookupHas,
   publicFinalizeBody,
   runCandidateFinalize,
   type ConversationDetail,
   type InterviewBind,
 } from "./ai-interview-finalize.ts";
+import { rescoreAction } from "./ai-interview-rescore.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -71,6 +76,13 @@ test("a client transcript is ignored when the conversation is bound on the serve
     body: { transcript: clientTranscript, conversation_id: "conv_attacker", score: 100 },
     fetchConversation: async (id) => {
       fetched = id;
+      if (id !== "conv_server") {
+        return detail({
+          conversation_id: id,
+          dynamic_variables: { interview_token: "someone-else" },
+          transcript: [{ role: "user", message: "OTHER" }],
+        });
+      }
       return server;
     },
     markManualReview: async () => {
@@ -191,22 +203,68 @@ test("interview_id alone does not bind a conversation", () => {
   assert.equal(conversationMatchesInterview(byToken, interview), true);
 });
 
-test("unbound finalize does not scan a page of conversations and is rate limited", async () => {
+test("finalize lookups expire and the bound path is limited too", async () => {
+  const staleAt = 1_000;
+  assert.equal(allowFinalizeLookup("tok-stale-key", staleAt), true);
+  assert.equal(finalizeLookupHas("tok-stale-key"), true);
+  assert.equal(allowFinalizeLookup("tok-fresh-key", staleAt + FINALIZE_LOOKUP_WINDOW_MS + 1), true);
+  assert.equal(finalizeLookupHas("tok-stale-key"), false);
+
   let fetches = 0;
-  const calls = async () =>
+  const bound = { ...interview, token: "tok-bound-limit", conversation_id: "conv_bound" };
+  const calls = () =>
     runCandidateFinalize({
-      interview: { ...interview, token: "tok-rate", conversation_id: null },
+      interview: bound,
       body: {},
       fetchConversation: async () => {
         fetches += 1;
-        return null;
+        return detail({ status: "in-progress", conversation_id: "conv_bound" });
       },
       markManualReview: async () => {},
       scoreServerTranscript: async () => true,
     });
-  for (let i = 0; i < 8; i++) await calls();
+  for (let i = 0; i < FINALIZE_LOOKUP_MAX; i++) await calls();
   const blocked = await calls();
-  assert.equal(fetches, 0);
+  assert.equal(fetches, FINALIZE_LOOKUP_MAX);
   assert.equal(blocked.status, 429);
-  assert.deepEqual(blocked.body, { status: "in_progress" });
+});
+
+test("a verified hint replaces the conversation stored from an earlier page load", async () => {
+  let remembered: string | null = null;
+  let scoredId: string | null = null;
+  const live = detail({
+    conversation_id: "conv_live",
+    dynamic_variables: { interview_token: "tok-reload" },
+    transcript: [{ role: "user", message: "LIVE" }],
+  });
+  const result = await runCandidateFinalize({
+    interview: { ...interview, token: "tok-reload", conversation_id: "conv_abandoned" },
+    body: { conversation_id: "conv_live" },
+    fetchConversation: async (id) => (id === "conv_live" ? live : detail({
+      conversation_id: id,
+      dynamic_variables: { interview_token: "tok-reload" },
+      transcript: [{ role: "user", message: "OLD" }],
+    })),
+    rememberConversation: async (id) => {
+      remembered = id;
+    },
+    markManualReview: async () => {
+      throw new Error("review");
+    },
+    scoreServerTranscript: async (id) => {
+      scoredId = id;
+      return true;
+    },
+  });
+  assert.equal(remembered, "conv_live");
+  assert.equal(scoredId, "conv_live");
+  assert.deepEqual(result.body, { status: "completed" });
+});
+
+test("rescore scores an in-progress interview only after ElevenLabs is done", () => {
+  const row = { status: "in_progress", conversation_id: "conv_1", ai_score: null };
+  assert.equal(rescoreAction(row, "done"), "score");
+  assert.equal(rescoreAction(row, "in-progress"), "wait");
+  assert.equal(rescoreAction({ ...row, status: "completed" }, "done"), "skip");
+  assert.equal(rescoreAction({ ...row, ai_score: 80 }, "done"), "skip");
 });

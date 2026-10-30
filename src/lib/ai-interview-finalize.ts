@@ -67,20 +67,30 @@ export function transcriptHasContent(transcript: unknown): boolean {
   return false;
 }
 
-const LOOKUP_WINDOW_MS = 60_000;
-const LOOKUP_MAX = 8;
+export const FINALIZE_LOOKUP_WINDOW_MS = 2 * 60 * 1000;
+export const FINALIZE_LOOKUP_MAX = 40;
 const lookupHits = new Map<string, number[]>();
 
-/** Caps unbound ElevenLabs reads from the public finalize POST. */
-export function allowFinalizeLookup(token: string, now = Date.now()): boolean {
-  const recent = (lookupHits.get(token) ?? []).filter((at) => now - at < LOOKUP_WINDOW_MS);
-  if (recent.length >= LOOKUP_MAX) {
-    lookupHits.set(token, recent);
-    return false;
+function sweepFinalizeLookups(now: number) {
+  for (const [token, hits] of lookupHits) {
+    const recent = hits.filter((at) => now - at < FINALIZE_LOOKUP_WINDOW_MS);
+    if (recent.length === 0) lookupHits.delete(token);
+    else lookupHits.set(token, recent);
   }
+}
+
+/** Caps ElevenLabs reads from public finalize and bind calls, including a stored conversation. */
+export function allowFinalizeLookup(token: string, now = Date.now()): boolean {
+  sweepFinalizeLookups(now);
+  const recent = lookupHits.get(token) ?? [];
+  if (recent.length >= FINALIZE_LOOKUP_MAX) return false;
   recent.push(now);
   lookupHits.set(token, recent);
   return true;
+}
+
+export function finalizeLookupHas(token: string): boolean {
+  return lookupHits.has(token);
 }
 
 export function normalizeElevenConversation(raw: unknown): ConversationDetail | null {
@@ -119,18 +129,6 @@ function hintedConversationId(body: unknown): string | null {
   return typeof id === "string" && id.trim() ? id.trim() : null;
 }
 
-async function resolveUnboundConversation(
-  interview: InterviewBind,
-  body: unknown,
-  fetchConversation: (id: string) => Promise<ConversationDetail | null>,
-): Promise<ConversationDetail | null> {
-  const hinted = hintedConversationId(body);
-  if (!hinted) return null;
-  const detail = await fetchConversation(hinted);
-  if (detail && conversationMatchesInterview(detail, interview)) return detail;
-  return null;
-}
-
 function readyToScore(detail: ConversationDetail | null): detail is ConversationDetail {
   return Boolean(detail && detail.status === "done" && transcriptHasContent(detail.transcript));
 }
@@ -139,6 +137,7 @@ export async function runCandidateFinalize(input: {
   interview: InterviewBind;
   body: unknown;
   fetchConversation: (id: string) => Promise<ConversationDetail | null>;
+  rememberConversation?: (conversationId: string) => Promise<void>;
   markManualReview: () => Promise<void>;
   scoreServerTranscript: (conversationId: string, transcript: unknown) => Promise<boolean>;
 }): Promise<{ status: number; body: { status: PublicFinalizeStatus } }> {
@@ -146,17 +145,26 @@ export async function runCandidateFinalize(input: {
     return { status: 200, body: publicFinalizeBody("completed") };
   }
 
+  if (!allowFinalizeLookup(input.interview.token)) {
+    return { status: 429, body: publicFinalizeBody("in_progress") };
+  }
+
   let detail: ConversationDetail | null = null;
-  if (input.interview.conversation_id) {
+  const hinted = hintedConversationId(input.body);
+  if (hinted) {
+    const hintedDetail = await input.fetchConversation(hinted);
+    if (hintedDetail && conversationMatchesInterview(hintedDetail, input.interview)) {
+      detail = hintedDetail;
+      if (hinted !== input.interview.conversation_id) {
+        await input.rememberConversation?.(hinted);
+      }
+    }
+  }
+  if (!detail && input.interview.conversation_id) {
     detail = await input.fetchConversation(input.interview.conversation_id);
     if (detail?.agent_id && input.interview.agent_id && detail.agent_id !== input.interview.agent_id) {
       detail = null;
     }
-  } else {
-    if (!allowFinalizeLookup(input.interview.token)) {
-      return { status: 429, body: publicFinalizeBody("in_progress") };
-    }
-    detail = await resolveUnboundConversation(input.interview, input.body, input.fetchConversation);
   }
 
   if (!detail) {

@@ -106,7 +106,7 @@ export default function EncuestaPage() {
             </>
           ) : error === "expired" ? (
             <>
-              <p className="text-sm text-gray-600">Esta encuesta expiró. Escríbenos a jointheteam@tradingsolutions.com</p>
+              <p className="text-sm text-gray-600">Esta encuesta venció. Escríbenos a jointheteam@tradingsolutions.com y te ayudamos.</p>
               <p className="mt-2 text-sm text-gray-600">This survey has expired. Write to us at jointheteam@tradingsolutions.com and we&apos;ll help.</p>
             </>
           ) : (
@@ -208,9 +208,9 @@ export default function EncuestaPage() {
               {error === "nps" ? (
                 "Por favor, responde el NPS antes de enviar"
               ) : error === "already" ? (
-                "Esta encuesta ya fue respondida. / You've already answered this survey."
+                "Ya respondiste esta encuesta. / You've already answered this survey."
               ) : error === "expired" ? (
-                "Esta encuesta expiró. Escríbenos a jointheteam@tradingsolutions.com / This survey has expired. Write to us at jointheteam@tradingsolutions.com and we'll help."
+                "Esta encuesta venció. Escríbenos a jointheteam@tradingsolutions.com y te ayudamos. / This survey has expired. Write to us at jointheteam@tradingsolutions.com and we'll help."
               ) : (
                 <SurveySendCopy />
               )}

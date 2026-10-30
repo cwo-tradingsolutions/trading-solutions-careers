@@ -24,3 +24,10 @@ export function expiredLinkBoth(): string {
 export function loadFailBoth(): string {
   return `${LOAD_FAIL_ES} / ${LOAD_FAIL_EN}`;
 }
+
+export const LOAD_RETRY_ES = "No pudimos cargar. Intenta de nuevo.";
+export const LOAD_RETRY_EN = "We couldn't load this. Try again.";
+
+export function loadRetryBoth(): string {
+  return `${LOAD_RETRY_ES} / ${LOAD_RETRY_EN}`;
+}

@@ -259,6 +259,13 @@ export async function POST(
       },
       body,
       fetchConversation: (id) => (apiKey ? fetchElevenConversation(id, apiKey) : Promise.resolve(null)),
+      rememberConversation: async (conversationId) => {
+        await supabaseAdmin
+          .from("ht_ai_interviews")
+          .update({ conversation_id: conversationId })
+          .eq("id", interview.id)
+          .neq("status", "completed");
+      },
       markManualReview: async () => {
         await supabaseAdmin
           .from("ht_ai_interviews")

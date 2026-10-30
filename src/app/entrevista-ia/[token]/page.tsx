@@ -18,10 +18,10 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Script from "next/script";
-import { invalidLinkBoth } from "@/lib/candidate-invalid-link";
+import { invalidLinkBoth, loadRetryBoth } from "@/lib/candidate-invalid-link";
 import { CANDIDATE_MAIL } from "@/lib/candidate-public-error";
 
-type Phase = "loading" | "welcome" | "consent" | "live" | "ended" | "error";
+type Phase = "loading" | "welcome" | "consent" | "live" | "processing" | "ended" | "error";
 
 type Config = {
   interview_id: string;
@@ -68,7 +68,9 @@ export default function AiInterviewPage() {
           const j = await r.json().catch(() => ({}));
           if (!cancelled) {
             setError(
-              j.error === "already_completed"
+              r.status >= 500
+                ? loadRetryBoth()
+                : j.error === "already_completed"
                 ? `Ya completaste esta entrevista. Si necesitas ayuda, escríbenos a ${CANDIDATE_MAIL}. You already completed this interview. If you need help, write to us at ${CANDIDATE_MAIL}.`
                 : invalidLinkBoth()
             );
@@ -88,7 +90,7 @@ export default function AiInterviewPage() {
         }
       } catch (e) {
         if (!cancelled) {
-          setError(invalidLinkBoth());
+          setError(loadRetryBoth());
           setPhase("error");
         }
       }
@@ -105,6 +107,8 @@ export default function AiInterviewPage() {
   //   · custom event 'elevenlabs-convai:call' con .detail.conversation_id
   // Capturamos en TODOS los lugares y guardamos en ref para usarlo al finalize.
   const conversationIdRef = React.useRef<string | null>(null);
+  const mountedRef = React.useRef(true);
+  React.useEffect(() => () => { mountedRef.current = false; }, []);
 
   // Helper para extraer conversation_id de cualquier objeto recursivamente
   function extractConversationId(obj: any, depth = 0): string | null {
@@ -130,9 +134,13 @@ export default function AiInterviewPage() {
   useEffect(() => {
     function captureId(payload: any) {
       const id = extractConversationId(payload);
-      if (id && !conversationIdRef.current) {
+      if (id && id !== conversationIdRef.current) {
         conversationIdRef.current = id;
-        console.log('[ai-interview] captured conversation_id:', id);
+        fetch(`/api/headhunting/ai-interview/${token}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversation_id: id }),
+        }).catch(() => {});
       }
     }
 
@@ -176,8 +184,7 @@ export default function AiInterviewPage() {
   }, []);
 
   async function finalizeInterview(conversationId: string | null) {
-    setPhase("ended");
-    // Última oportunidad de capturar — chequear el atributo del widget directamente
+    setPhase("processing");
     let finalId = conversationId || conversationIdRef.current;
     if (!finalId) {
       const widget: any = document.querySelector('elevenlabs-convai');
@@ -188,15 +195,37 @@ export default function AiInterviewPage() {
                   null;
       }
     }
-    try {
-      await fetch(`/api/headhunting/ai-interview/${token}/finalize`, {
+    if (finalId && finalId !== conversationIdRef.current) {
+      conversationIdRef.current = finalId;
+      fetch(`/api/headhunting/ai-interview/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversation_id: finalId }),
-      });
-    } catch (e) {
-      console.error("finalize failed:", e);
+      }).catch(() => {});
     }
+    const started = Date.now();
+    const budgetMs = 2 * 60 * 1000;
+    let waitMs = 0;
+    while (Date.now() - started <= budgetMs) {
+      if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+      waitMs = 5000;
+      try {
+        const r = await fetch(`/api/headhunting/ai-interview/${token}/finalize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversation_id: finalId }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!mountedRef.current) return;
+        if (j.status === "completed" || j.status === "needs_review") {
+          setPhase("ended");
+          return;
+        }
+      } catch (e) {
+        console.error("finalize failed:", e);
+      }
+    }
+    if (mountedRef.current) setPhase("ended");
   }
 
   // ─── Render ────────────────────────────────────────────────────
@@ -216,6 +245,19 @@ export default function AiInterviewPage() {
         <div style={card}>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#dc2626" }}>No se puede continuar</h1>
           <p style={{ marginTop: 12, color: "#374151" }}>{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "processing") {
+    return (
+      <div style={shell}>
+        <div style={card}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>Estamos procesando tu entrevista</h1>
+          <p style={{ color: "#374151", lineHeight: 1.6 }}>
+            Puedes dejar esta ventana abierta. We're processing your interview.
+          </p>
         </div>
       </div>
     );

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { invalidLinkBoth } from "@/lib/candidate-invalid-link";
+import { invalidLinkBoth, loadRetryBoth } from "@/lib/candidate-invalid-link";
 import { CANDIDATE_MAIL } from "@/lib/candidate-public-error";
 import "./submit.css";
 
@@ -225,7 +225,9 @@ export default function PrefiltroForm() {
         if (!r.ok) {
           const j = await r.json();
           setErrorMsg(
-            j.error === "already_completed"
+            r.status >= 500
+              ? loadRetryBoth()
+              : j.error === "already_completed"
               ? `Ya enviaste este cuestionario. Si necesitas ayuda, escríbenos a ${CANDIDATE_MAIL}. You already sent this questionnaire. If you need help, write to us at ${CANDIDATE_MAIL}.`
               : invalidLinkBoth()
           );
@@ -237,7 +239,7 @@ export default function PrefiltroForm() {
         setPhase("habeas");
       })
       .catch(() => {
-        setErrorMsg(invalidLinkBoth());
+        setErrorMsg(loadRetryBoth());
         setPhase("error");
       });
   }, [token]);

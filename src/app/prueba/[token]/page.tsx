@@ -192,7 +192,7 @@ const T: Record<Lang, Dict> = {
     errorTitle: "We could not open the assessment",
     errorHelp: `Write to us at ${CANDIDATE_MAIL} and we'll help.`,
     errOpen: "We could not open the assessment.",
-    errNetwork: `We could not connect. Write to us at ${CANDIDATE_MAIL} if this link doesn't open.`,
+    errNetwork: `We couldn't connect. Write to us at ${CANDIDATE_MAIL} if this link doesn't open.`,
     errInvalidLink: INVALID_LINK_EN,
     errAlreadyTaken: "This assessment has already been taken",
     errConsentSave: "We could not record your consent. Write to us and we will send you a new link.",

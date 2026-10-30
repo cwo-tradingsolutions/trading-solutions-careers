@@ -17,7 +17,7 @@ import {
   type AssessmentMeta,
   type AssessmentId,
 } from "@/data/assessments";
-import { expiredLinkBoth, invalidLinkBoth } from "@/lib/candidate-invalid-link";
+import { expiredLinkBoth, invalidLinkBoth, loadRetryBoth } from "@/lib/candidate-invalid-link";
 
 type TokenData = {
   token: string;
@@ -53,7 +53,9 @@ export default function AssessmentLanding() {
         const j = await r.json();
         if (cancelled) return;
         if (!r.ok) {
-          setLoadErr(j.error ?? "not_found");
+          if (r.status >= 500) setLoadErr("load");
+          else if (j.error === "expired" || r.status === 410) setLoadErr("expired");
+          else setLoadErr("not_found");
         } else {
           setToken(j.data as TokenData);
           setLang((j.data?.language as "es" | "en") ?? "es");
@@ -67,7 +69,7 @@ export default function AssessmentLanding() {
           }
         }
       } catch (e) {
-        if (!cancelled) setLoadErr(e instanceof Error ? e.message : "error");
+        if (!cancelled) setLoadErr("load");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -107,10 +109,10 @@ export default function AssessmentLanding() {
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center max-w-md p-8">
           <h1 className="text-2xl font-bold mb-3">
-            {loadErr === "expired" ? "Enlace vencido" : "No pudimos abrir tu evaluación"}
+            {loadErr === "expired" ? "Enlace vencido" : loadErr === "load" ? "No pudimos cargar" : "No pudimos abrir tu evaluación"}
           </h1>
           <p className="text-gray-500">
-            {loadErr === "expired" ? expiredLinkBoth() : invalidLinkBoth()}
+            {loadErr === "expired" ? expiredLinkBoth() : loadErr === "load" ? loadRetryBoth() : invalidLinkBoth()}
           </p>
         </div>
       </div>

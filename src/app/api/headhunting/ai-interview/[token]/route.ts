@@ -14,6 +14,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { isPreviewTestMode } from "@/lib/preview-mode";
+import {
+  allowFinalizeLookup,
+  conversationMatchesInterview,
+  fetchElevenConversation,
+} from "@/lib/ai-interview-finalize";
 
 export async function GET(
   _req: NextRequest,
@@ -74,27 +79,15 @@ export async function GET(
         interview_token: token,
       };
 
-      // Request signed URL from ElevenLabs. include_conversation_id stores the
-      // id on this interview before the candidate can send one.
-      const url = `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${encodeURIComponent(interview.agent_id)}&include_conversation_id=true`;
+      // A new signed URL can belong to a new call. The conversation id is stored
+      // when that call actually starts (POST), not from this preload.
+      const url = `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${encodeURIComponent(interview.agent_id)}`;
       const r = await fetch(url, {
         headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY },
       });
       if (r.ok) {
         const j = await r.json();
         signedUrl = j.signed_url;
-        if (
-          typeof j.conversation_id === "string" &&
-          j.conversation_id &&
-          !interview.conversation_id &&
-          !isPreviewTestMode()
-        ) {
-          const { error: bindError } = await supabaseAdmin
-            .from("ht_ai_interviews")
-            .update({ conversation_id: j.conversation_id })
-            .eq("id", interview.id);
-          if (bindError) console.error("ai-interview bind conversation failed");
-        }
       } else {
         console.error("ElevenLabs signed URL failed:", r.status);
       }
@@ -120,4 +113,68 @@ export async function GET(
     signed_url: signedUrl,
     dynamic_variables: dynamicVars,
   });
+}
+
+/**
+ * POST stores the conversation that just started. A reload gets a new signed
+ * URL; this replaces the previous id only after ElevenLabs shows this token.
+ */
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { token: string } },
+) {
+  if (isPreviewTestMode()) {
+    return NextResponse.json({ ok: true });
+  }
+
+  const { token } = params;
+  const body = await req.json().catch(() => ({}));
+  const conversationId = typeof body.conversation_id === "string" ? body.conversation_id.trim() : "";
+  if (!conversationId) {
+    return NextResponse.json({ error: "invalid_token" }, { status: 400 });
+  }
+
+  const { data: interview, error } = await supabaseAdmin
+    .from("ht_ai_interviews")
+    .select("id, token, status, agent_id, conversation_id")
+    .eq("token", token)
+    .single();
+
+  if (error || !interview) {
+    return NextResponse.json({ error: "invalid_token" }, { status: 401 });
+  }
+  if (interview.status === "completed") {
+    return NextResponse.json({ status: "completed" });
+  }
+  if (!allowFinalizeLookup(token)) {
+    return NextResponse.json({ status: "in_progress" }, { status: 429 });
+  }
+
+  const apiKey = process.env.ELEVENLABS_API_KEY || "";
+  if (!apiKey) {
+    return NextResponse.json({ status: "in_progress" });
+  }
+
+  const detail = await fetchElevenConversation(conversationId, apiKey);
+  const matches = detail && conversationMatchesInterview(detail, {
+    id: interview.id,
+    token,
+    status: interview.status,
+    agent_id: interview.agent_id,
+    conversation_id: interview.conversation_id,
+  });
+  if (!matches) {
+    return NextResponse.json({ ok: false }, { status: 409 });
+  }
+
+  const { error: writeError } = await supabaseAdmin
+    .from("ht_ai_interviews")
+    .update({ conversation_id: conversationId })
+    .eq("id", interview.id)
+    .neq("status", "completed");
+  if (writeError) {
+    console.error("ai-interview bind failed");
+    return NextResponse.json({ error: "invalid_token" }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true });
 }

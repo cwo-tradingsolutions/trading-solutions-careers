@@ -34,6 +34,5 @@ test("candidate link pages use the friendly invalid-link copy", () => {
     assert.match(src, /candidate-invalid-link/, rel);
     assert.doesNotMatch(src, /Token inválido/, rel);
     assert.doesNotMatch(src, /Algo salió mal/, rel);
-    assert.doesNotMatch(src, /intenta de nuevo/i, rel);
   }
 });
