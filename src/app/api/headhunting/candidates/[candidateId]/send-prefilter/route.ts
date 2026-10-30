@@ -104,7 +104,7 @@ export async function POST(
       <li>Your answers are saved automatically</li>
     </ul>
     <p>If you have any questions, just reply to this email.</p>
-    <p>Best regards,<br><strong>Talent Team</strong><br>Trading Solutions</p>
+    <p>Best regards,<br><strong>Talent Acquisition Team</strong><br>Trading Solutions</p>
     <div class="footer">This link is personal and non-transferable.</div>
   </div>
 </body></html>`;

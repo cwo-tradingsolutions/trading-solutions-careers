@@ -168,7 +168,7 @@ export async function POST(
     <p>Let us know through this same email when you are done. If anything comes up along the way, just write to us.</p>
 
     <p>Best regards,<br>
-    <strong>Talent Team</strong><br>
+    <strong>Talent Acquisition Team</strong><br>
     Talent Acquisition and Development<br>
     Trading Solutions</p>
 

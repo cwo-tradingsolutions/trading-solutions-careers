@@ -126,7 +126,7 @@ export async function POST(
       description: lang === 'en'
         ? `Interview for the ${vacTitle} position at Trading Solutions.\n\n${
             body.meeting_url ? `Meeting link: ${body.meeting_url}\n\n` : ''
-          }If you need to reschedule, just reply to this email. See you there!\n\nTalent Team · Trading Solutions`
+          }If you need to reschedule, just reply to this email. See you there!\n\nTalent Acquisition Team · Trading Solutions`
         : `Entrevista para la posición de ${vacTitle} en Trading Solutions.\n\n${
             body.meeting_url ? `Link de la reunión: ${body.meeting_url}\n\n` : ''
           }Si necesitas reagendar, responde a este correo. ¡Nos vemos!\n\nEquipo Talent Acquisition · Trading Solutions`,
@@ -134,7 +134,7 @@ export async function POST(
       durationMinutes: duration,
       location: body.location,
       meetingUrl: body.meeting_url,
-      organizer: { name: 'Kelly Castañeda', email: 'kcastaneda10@gmail.com' },
+      organizer: { name: 'Talent Acquisition Team', email: 'jointheteam@tradingsolutions.com' },
       attendees: [
         { name: cand.name, email: cand.email },
         ...(body.interviewer_emails || []).map((e: string) => ({ email: e })),
@@ -188,7 +188,7 @@ export async function POST(
                 <a href="${googleUrl}" style="display: inline-block; background: #2C64ED; color: #fff; padding: 12px 24px; text-decoration: none; font-weight: 700; border-radius: 8px; font-size: 13px;">📆 Add to Google Calendar</a>
               </div>
               <p style="margin: 16px 0 0; font-size: 12px; color: #555; line-height: 1.55;">The attached .ics file also works with Outlook, Apple Calendar and others. If you can't make it, please reply to this email as soon as possible so we can reschedule.</p>
-              <p style="margin: 22px 0 0; font-size: 12px; color: #888;">Talent Team · Trading Solutions</p>
+              <p style="margin: 22px 0 0; font-size: 12px; color: #888;">Talent Acquisition Team · Trading Solutions</p>
             </div>
           </div>
         `;

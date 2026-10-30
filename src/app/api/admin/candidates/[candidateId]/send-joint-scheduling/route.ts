@@ -83,7 +83,7 @@ export async function POST(req: NextRequest, { params }: { params: { candidateId
     <p>Choose the time that works best for you · you will only see options where everyone is available at the same time. Once you confirm, the Google Meet video call is created automatically.</p>
     <p style="text-align:center"><a href="${jointLink}" class="cta">Choose a time</a></p>
     <p>If none of the available times work for you, just reply to this email and we will find one together.</p>
-    <p>Best regards,<br><strong>Talent Team</strong> · Trading Solutions</p>
+    <p>Best regards,<br><strong>Talent Acquisition Team</strong> · Trading Solutions</p>
     <div class="footer">The link stays active for 7 days. The Google Meet video call is created automatically when you confirm your time.</div>
   </div>
 </body></html>`;

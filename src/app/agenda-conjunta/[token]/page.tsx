@@ -39,7 +39,7 @@ export default function AgendaConjuntaPage() {
         if (j.already_scheduled) {
           setAlreadyScheduled(j.session);
         } else if (j.error) {
-          setError(j.error === "expired" ? "Este enlace ya expiró. Por favor escribe a Kelly Castañeda para generar uno nuevo." :
+          setError(j.error === "expired" ? "Este enlace ya expiró. Por favor escribe a Talent Acquisition Team para generar uno nuevo." :
                    j.error === "invalid_token" ? "Enlace no válido." :
                    j.detail || j.error);
         } else {
@@ -166,10 +166,10 @@ export default function AgendaConjuntaPage() {
 
           {data.slots.length === 0 ? (
             <div className="bg-amber-50 border border-amber-200 rounded p-4 text-sm text-amber-800">
-              No hay horarios disponibles en los próximos días donde todos los entrevistadores coincidan. Por favor escríbele a Kelly Castañeda para coordinar manualmente.
+              No hay horarios disponibles en los próximos días donde todos los entrevistadores coincidan. Por favor escríbele a Talent Acquisition Team para coordinar manualmente.
               {data.slot_errors && Object.keys(data.slot_errors).length > 0 && (
                 <div className="mt-2 text-xs text-amber-700">
-                  Nota técnica: algunos calendarios no se pudieron leer. Kelly va a verificar.
+                  Nota técnica: algunos calendarios no se pudieron leer. Talent Acquisition Team va a verificar.
                 </div>
               )}
             </div>

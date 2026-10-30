@@ -114,7 +114,7 @@ export function htmlRecordatorio(d: DatosRecordatorio): string {
 
 /* ─── Versión en inglés · procesos que corren en inglés (China) ───────────── */
 
-export const EN_REMINDER_SIGNATURE = 'Talent Team';
+export const EN_REMINDER_SIGNATURE = 'Talent Acquisition Team';
 
 export function asuntoRecordatorioEn(vacante: string | null): string {
   return vacante

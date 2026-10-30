@@ -149,7 +149,7 @@ export async function POST(
                 <p style="margin: 18px 0 0; font-size: 12px; color: #737373;">If the button does not work, copy this link:<br/><span style="color: #0a0a0a; word-break: break-all;">${surveyLink}</span></p>
                 <p style="margin: 24px 0 0; padding-top: 18px; border-top: 1px solid #e8e8e8; font-size: 12px; color: #737373; line-height: 1.6;">
                   Best regards,<br/>
-                  <strong style="color: #0a0a0a;">Talent Team</strong> · Trading Solutions
+                  <strong style="color: #0a0a0a;">Talent Acquisition Team</strong> · Trading Solutions
                 </p>
               </div>
             </div>

@@ -161,7 +161,6 @@ export async function POST(request: NextRequest) {
               phone: phone || null,
               stage: "aplico",
               source: isInternal ? "public_form_internal" : canalPublico,
-              preferred_language: isEnglishTemplate(vacTemplate) ? "en" : "es",
               notes: why_ts ? `[Public form] ${why_ts}` : `[Public form] · application_id=${newId}`,
               preferred_language: isEnglishTemplate(vacTemplate) ? "en" : "es",
               created_at: new Date().toISOString(),
@@ -276,7 +275,7 @@ export async function POST(request: NextRequest) {
     <p>You can check the status of your application at any time:</p>
     <p style="text-align:center"><a href="${portalLink}" style="display:inline-block;background:#2C64ED;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600">View my process</a></p>
     <p style="font-size:12px;color:#666">If you have any questions, just reply to this email.</p>
-    <p style="margin-top:24px">Best regards,<br><strong>Talent Team · Trading Solutions</strong></p>
+    <p style="margin-top:24px">Best regards,<br><strong>Talent Acquisition Team · Trading Solutions</strong></p>
   </div>
   <div style="padding:18px 32px;text-align:center;color:#999;font-size:12px;border-top:1px solid #eee">Boutique Freight Forwarder · Operations in 10+ countries</div>
 </div></body></html>`;

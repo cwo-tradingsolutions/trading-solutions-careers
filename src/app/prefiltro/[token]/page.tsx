@@ -224,9 +224,9 @@ export default function PrefiltroForm() {
           const j = await r.json();
           setErrorMsg(
             j.error === "expired_token"
-              ? "Este enlace ya expiró. Por favor escríbele a Kelly para que te genere uno nuevo."
+              ? "Este enlace ya expiró. Por favor escríbele a Talent Acquisition Team para que te genere uno nuevo."
               : j.error === "already_completed"
-              ? "Ya completaste este cuestionario. Si necesitas modificar algo, escríbele a Kelly."
+              ? "Ya completaste este cuestionario. Si necesitas modificar algo, escríbele a Talent Acquisition Team."
               : "Este enlace no es válido. Verifica que copiaste el enlace completo."
           );
           setPhase("error");

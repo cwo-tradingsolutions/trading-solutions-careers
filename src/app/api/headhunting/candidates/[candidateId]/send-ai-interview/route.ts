@@ -150,7 +150,7 @@ export async function POST(
       <li>Better to do it in one go, without long pauses</li>
     </ul>
     <p>After the interview we will get in touch with you about the next steps. If you have any questions, just reply to this email.</p>
-    <p>Best regards,<br><strong>Talent Team</strong> · Trading Solutions</p>
+    <p>Best regards,<br><strong>Talent Acquisition Team</strong> · Trading Solutions</p>
   </div>
 </body></html>`;
 

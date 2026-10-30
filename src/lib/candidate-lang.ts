@@ -93,4 +93,4 @@ export function isChinaProcess(input: LangInput): boolean {
 }
 
 /** Firma de los correos en inglés · el equipo, no una persona. */
-export const EN_SIGNATURE_NAME = "Trading Solutions Talent Team";
+export const EN_SIGNATURE_NAME = "Talent Acquisition Team";

@@ -70,7 +70,7 @@ export async function GET(
         vacancy_title: vacancy?.title || "la vacante",
         vacancy_area: vacancy?.area || "—",
         client_name: client?.name || "Trading Solutions",
-        recruiter_name: "Kelly Castañeda",
+        recruiter_name: "Talent Acquisition Team",
       };
 
       // Request signed URL from ElevenLabs
