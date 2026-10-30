@@ -64,6 +64,13 @@ export default function AiInterviewPage() {
     (async () => {
       try {
         const r = await fetch(`/api/headhunting/ai-interview/${token}`, { cache: "no-store" });
+        if (r.status === 503) {
+          const j = await r.json().catch(() => ({}));
+          if (!cancelled && j.status === "disabled") {
+            setPhase("disabled");
+            return;
+          }
+        }
         if (!r.ok) {
           const j = await r.json().catch(() => ({}));
           if (!cancelled) {

@@ -1,9 +1,15 @@
 /**
  * The AI interview is off unless AI_INTERVIEW_ENABLED is 1, true, yes, or on.
  * A string argument checks only that flag, so existing callers stay valid.
- * An env object (or no argument) also requires ELEVENLABS_API_KEY, which is
- * what a later rebase of the flag module can call as aiInterviewEnabled(env).
+ * An env object (or no argument) also requires ELEVENLABS_API_KEY.
  */
+export const AI_INTERVIEW_OFF_NOTE = "Entrevista IA desactivada";
+
+export const AI_INTERVIEW_UNAVAILABLE_ES =
+  "La entrevista con IA no está disponible por ahora.";
+export const AI_INTERVIEW_UNAVAILABLE_EN =
+  "The AI interview is not available right now.";
+
 type AiInterviewEnv = {
   AI_INTERVIEW_ENABLED?: string | null;
   ELEVENLABS_API_KEY?: string | null;

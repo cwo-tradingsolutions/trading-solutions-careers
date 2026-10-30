@@ -27,6 +27,9 @@ export async function GET(
   { params }: { params: { token: string } }
 ) {
   const { token } = params;
+  if (!aiInterviewEnabled()) {
+    return NextResponse.json({ status: "disabled" }, { status: 503 });
+  }
 
   const { data: interview, error } = await supabaseAdmin
     .from("ht_ai_interviews")

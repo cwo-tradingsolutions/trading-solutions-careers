@@ -16,6 +16,7 @@ import { normalizeStage, STAGE_RANK } from "@/lib/stage-labels";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import crypto from "crypto";
 import { ATS_FROM_NAME, candidateSignatureHtml } from "@/lib/ats-from";
+import { aiInterviewEnabled } from "@/lib/ai-interview-flag";
 
 export async function POST(
   req: NextRequest,
@@ -23,6 +24,9 @@ export async function POST(
 ) {
   const authError = requireAdmin(req);
   if (authError) return authError;
+  if (!aiInterviewEnabled()) {
+    return NextResponse.json({ status: "disabled" }, { status: 503 });
+  }
 
   try {
     const { candidateId } = params;

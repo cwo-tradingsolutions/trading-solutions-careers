@@ -3081,6 +3081,14 @@ function AIInterviewBlock({ candidateId, candidateEmail }: { candidateId: string
   const [loading, setLoading] = React.useState(true);
   const [sending, setSending] = React.useState(false);
   const [feedback, setFeedback] = React.useState("");
+  const [aiEnabled, setAiEnabled] = React.useState(false);
+
+  React.useEffect(() => {
+    fetch("/api/admin/ai-interview-flag", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setAiEnabled(j.enabled === true))
+      .catch(() => setAiEnabled(false));
+  }, []);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -3101,7 +3109,7 @@ function AIInterviewBlock({ candidateId, candidateEmail }: { candidateId: string
   React.useEffect(() => { load(); }, [load]);
 
   async function sendInterview() {
-    if (sending) return;
+    if (sending || !aiEnabled) return;
     if (!confirm("¿Enviar entrevista IA por voz a este candidato? Se creará un draft en Gmail.")) return;
     setSending(true);
     setFeedback("Generando entrevista IA…");
@@ -3134,6 +3142,7 @@ function AIInterviewBlock({ candidateId, candidateEmail }: { candidateId: string
 
   return (
     <Section title="🎙️ Entrevista IA por voz">
+      {!aiEnabled && <p className="text-xs text-gray-600 mb-2">Entrevista IA desactivada</p>}
       {interview && interview.status === "completed" && interview.ai_score != null ? (
         <>
           <div className="bg-gradient-to-br from-pink-50 to-purple-50 border border-pink-100 rounded-lg p-3 mb-3">
@@ -3253,7 +3262,7 @@ function AIInterviewBlock({ candidateId, candidateEmail }: { candidateId: string
           )}
         </>
       ) : interview && interview.status === "completed" && interview.conversation_id && interview.ai_score == null ? (
-        <PendingScoringPanel interview={interview} onScored={() => load()} candidateEmail={candidateEmail} />
+        <PendingScoringPanel interview={interview} onScored={() => load()} candidateEmail={candidateEmail} enabled={aiEnabled} />
       ) : interview && interview.status === "in_progress" ? (
         <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-3 text-xs text-blue-900">
           ⏳ Candidato en entrevista — esperando que termine. Iniciada: {new Date(interview.started_at).toLocaleString("es-CO")}
@@ -3271,7 +3280,7 @@ function AIInterviewBlock({ candidateId, candidateEmail }: { candidateId: string
       <div className="flex gap-2 flex-wrap">
         <button
           onClick={sendInterview}
-          disabled={sending || (interview && interview.status === "in_progress")}
+          disabled={!aiEnabled || sending || (interview && interview.status === "in_progress")}
           className="text-xs font-semibold px-3 py-1.5 rounded-full bg-pink-600 text-white hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {sending ? "…" :
@@ -3296,7 +3305,7 @@ function AIInterviewBlock({ candidateId, candidateEmail }: { candidateId: string
 }
 
 // ─── Botón inline para correr scoring AI de UNA entrevista pendiente ─
-function PendingScoringPanel({ interview, onScored, candidateEmail }: { interview: any; onScored: () => void; candidateEmail?: string }) {
+function PendingScoringPanel({ interview, onScored, candidateEmail, enabled = true }: { interview: any; onScored: () => void; candidateEmail?: string; enabled?: boolean }) {
   const [running, setRunning] = React.useState(false);
   const [elapsed, setElapsed] = React.useState(0);
   const [result, setResult] = React.useState<{ ok: boolean; message: string; score?: number; error_kind?: string } | null>(null);
@@ -3310,6 +3319,7 @@ function PendingScoringPanel({ interview, onScored, candidateEmail }: { intervie
   }, [running]);
 
   const runScoring = async () => {
+    if (!enabled) return;
     setRunning(true);
     setResult(null);
     try {
@@ -3401,10 +3411,10 @@ function PendingScoringPanel({ interview, onScored, candidateEmail }: { intervie
       ) : (
         <button
           onClick={runScoring}
-          disabled={running}
+          disabled={running || !enabled}
           className="w-full bg-black hover:bg-gray-800 disabled:opacity-50 text-white text-xs font-bold py-2 rounded-full flex items-center justify-center gap-1.5"
         >
-          {running ? `⏳ Corriendo 3 agentes Claude · ${elapsed}s/90s` : '🤖 Correr scoring AI ahora'}
+          {!enabled ? "Entrevista IA desactivada" : running ? `⏳ Corriendo 3 agentes Claude · ${elapsed}s/90s` : "🤖 Correr scoring AI ahora"}
         </button>
       )}
     </div>

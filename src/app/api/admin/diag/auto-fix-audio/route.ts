@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { aiInterviewEnabled } from "@/lib/ai-interview-flag";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
@@ -25,6 +26,9 @@ export const maxDuration = 90;
 export async function POST(req: NextRequest) {
   const authError = requireAdmin(req);
   if (authError) return authError;
+  if (!aiInterviewEnabled()) {
+    return NextResponse.json({ status: "disabled" }, { status: 503 });
+  }
 
   try {
     const body = await req.json().catch(() => ({}));
