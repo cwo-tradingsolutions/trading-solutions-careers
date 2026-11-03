@@ -1,9 +1,17 @@
 import crypto from 'crypto';
+import { readAdminSession } from '../hr-admin-session';
+import { readSessionSecret } from '../hr-admin-secrets';
+import { passwordLoginAllowed } from '../hr-admin-session-format';
 
 const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 12;
 
 /** Valida la cookie hr_admin_session con el mismo HMAC del middleware. */
 export function isAdminSession(cookieValue: string | undefined): boolean {
+  // Sesión Google (email firmado con HR_ADMIN_SESSION_SECRET)
+  const sessionSecret = readSessionSecret();
+  if (cookieValue && sessionSecret && readAdminSession(cookieValue, sessionSecret)?.email) return true;
+  // Cookie legacy de clave: solo con el login por clave encendido
+  if (!passwordLoginAllowed(process.env.HR_ADMIN_PASSWORD_LOGIN_ENABLED)) return false;
   const secret = (process.env.ADMIN_SECRET ?? '').trim();
   if (!cookieValue || !secret) return false;
   const parts = cookieValue.split('.');

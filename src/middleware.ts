@@ -4,6 +4,7 @@ import { hasMaskedCredentialConfig } from './lib/credential-config';
 import { previewReadOnlyBlock } from '@/lib/preview-readonly';
 import {
   emailFromToken,
+  passwordLoginAllowed,
   sessionIssuedAtOk,
   sessionSigningInput,
 } from './lib/hr-admin-session-format';
@@ -108,7 +109,9 @@ export async function middleware(request: NextRequest) {
     const token = request.cookies.get(SESSION_COOKIE)?.value;
     const secret = (process.env.ADMIN_SECRET ?? '').trim();
     const sessionSecret = (process.env.HR_ADMIN_SESSION_SECRET ?? '').trim();
-    const ok = (await isValidSession(token, secret)) || (await isValidEmailSession(token, sessionSecret));
+    const legacyOk = passwordLoginAllowed(process.env.HR_ADMIN_PASSWORD_LOGIN_ENABLED) &&
+      (await isValidSession(token, secret));
+    const ok = legacyOk || (await isValidEmailSession(token, sessionSecret));
     if (!ok) {
       const url = request.nextUrl.clone();
       url.pathname = '/hr-admin/login';

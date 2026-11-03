@@ -8,6 +8,17 @@
  */
 
 export const HR_ADMIN_SESSION_COOKIE = "hr_admin_session";
+
+const PASSWORD_FLAG_ON = new Set(["1", "true", "yes", "on"]);
+
+/**
+ * ¿Login con clave (y su cookie legacy `<ts>.<hmac(ADMIN_SECRET)>`) permitido?
+ * Variable ausente = sí (comportamiento previo). Presente: solo 1/true/yes/on.
+ */
+export function passwordLoginAllowed(raw: string | undefined | null): boolean {
+  if (raw === undefined || raw === null) return true;
+  return PASSWORD_FLAG_ON.has(raw.trim().toLowerCase());
+}
 export const HR_ADMIN_SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 export const HR_ADMIN_SESSION_MAX_AGE_SEC = 8 * 60 * 60;
 

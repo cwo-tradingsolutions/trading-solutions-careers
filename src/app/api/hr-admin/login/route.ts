@@ -9,7 +9,7 @@
  */
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { isPasswordLoginEnabled } from "@/lib/hr-admin-access";
+import { passwordLoginAllowed } from "@/lib/hr-admin-session-format";
 
 export const runtime = "nodejs";
 
@@ -28,8 +28,7 @@ function timingSafeEqualStr(a: string, b: string): boolean {
 
 export async function POST(req: Request) {
   // Clave de respaldo: solo con HR_ADMIN_PASSWORD_LOGIN_ENABLED=1 (o sin la variable, como hasta hoy).
-  const flag = process.env.HR_ADMIN_PASSWORD_LOGIN_ENABLED;
-  if (flag !== undefined && !isPasswordLoginEnabled(flag)) {
+  if (!passwordLoginAllowed(process.env.HR_ADMIN_PASSWORD_LOGIN_ENABLED)) {
     return NextResponse.json({ error: "Usa «Continuar con Google»" }, { status: 403 });
   }
   const secret = (process.env.ADMIN_SECRET ?? "").trim();

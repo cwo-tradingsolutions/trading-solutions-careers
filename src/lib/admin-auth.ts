@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { readAdminSession } from './hr-admin-session';
 import { readSessionSecret } from './hr-admin-secrets';
+import { passwordLoginAllowed } from './hr-admin-session-format';
 
 /**
  * Admin auth — acepta DOS modos:
  *  (a) Authorization: Bearer <ADMIN_SECRET>     ← scripts / curl externos
- *  (b) Cookie hr_admin_session: <ts>.<hmac>    ← navegador HR Admin (12h, clave)
+ *  (b) Cookie hr_admin_session: <ts>.<hmac>    ← navegador HR Admin (12h, clave; solo con HR_ADMIN_PASSWORD_LOGIN_ENABLED encendido)
  *  (c) Cookie hr_admin_session: <ts>.<email>.<hmac> ← login con Google (8h, HR_ADMIN_SESSION_SECRET)
  *
  * La cookie es la misma que setea /api/hr-admin/login y valida middleware.ts.
@@ -41,7 +42,8 @@ export function requireAdmin(req: NextRequest): NextResponse | null {
 
   // (b) HR Admin session cookie
   const sessionToken = req.cookies.get(SESSION_COOKIE)?.value;
-  if (isValidSessionCookie(sessionToken, secret)) return null;
+  if (passwordLoginAllowed(process.env.HR_ADMIN_PASSWORD_LOGIN_ENABLED) &&
+      isValidSessionCookie(sessionToken, secret)) return null;
 
   // (c) Sesión Google con email firmado
   const sessionSecret = readSessionSecret();
