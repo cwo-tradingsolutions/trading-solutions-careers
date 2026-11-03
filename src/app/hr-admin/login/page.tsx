@@ -6,10 +6,26 @@ import { Lock, ArrowRight } from "lucide-react";
 const TS_HERO = "https://cdn.prod.website-files.com/68fb7b9474bf8f90808cd50f/691645b652c1e9091b25f59c_FotosWeb_TradingSolutions-14_4_11zon.webp";
 const TS_LOGO_WHITE = "https://cdn.prod.website-files.com/68fb7b9474bf8f90808cd50f/6913594489519813fe9e620e_logo%20web-03.png";
 
+const GOOGLE_ERRORS: Record<string, string> = {
+  not_allowed: "Esta cuenta de Google no tiene acceso a HR Admin.",
+  state: "La sesión de Google expiró. Intenta de nuevo.",
+  google: "Google no completó el inicio de sesión. Intenta de nuevo.",
+  config: "El acceso con Google no está configurado.",
+};
+
 export default function HRLoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [googleHref, setGoogleHref] = useState("/api/hr-admin/login/google");
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next");
+    if (next) setGoogleHref(`/api/hr-admin/login/google?next=${encodeURIComponent(next)}`);
+    const code = params.get("error");
+    if (code) setErr(GOOGLE_ERRORS[code] ?? "No se pudo iniciar sesión con Google.");
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,6 +116,16 @@ export default function HRLoginPage() {
             <p className="text-sm text-ts-secondary mt-2">
               Acceso restringido · Equipo de Talent Acquisition.
             </p>
+          </div>
+
+          <a
+            href={googleHref}
+            className="w-full border border-[color:var(--ts-line)] bg-ts-surface hover:border-ts-accent text-ts-ink text-sm font-medium rounded-ts-sm py-3 flex items-center justify-center gap-2 transition-colors"
+          >
+            Continuar con Google
+          </a>
+          <div className="flex items-center gap-3 my-5 text-[11px] text-gray-400">
+            <div className="h-px flex-1 bg-gray-200" />o con la clave de acceso<div className="h-px flex-1 bg-gray-200" />
           </div>
 
           <label className="block text-sm font-medium text-ts-secondary mb-2">

@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { hasMaskedCredentialConfig } from './lib/credential-config';
 import { previewReadOnlyBlock } from '@/lib/preview-readonly';
+import {
+  emailFromToken,
+  sessionIssuedAtOk,
+  sessionSigningInput,
+} from './lib/hr-admin-session-format';
 
 /**
  * Middleware combinado:
@@ -13,6 +18,34 @@ const SESSION_COOKIE = 'hr_admin_session';
 const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 12; // 12 h
 
 // Validación HMAC con Web Crypto (Edge runtime)
+async function hmacHex(secret: string, payload: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Sesión Google (email firmado con HR_ADMIN_SESSION_SECRET, 8 h): `<ts>.<b64url(email)>.<hmac>`
+async function isValidEmailSession(token: string | undefined, secret: string): Promise<boolean> {
+  if (!token || secret.length < 16) return false;
+  const parsed = sessionSigningInput(token);
+  if (!parsed || !parsed.emailToken || !sessionIssuedAtOk(parsed.issuedAt, Date.now())) return false;
+  try {
+    const expected = await hmacHex(secret, parsed.payload);
+    if (expected.length !== parsed.signature.length) return false;
+    let diff = 0;
+    for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ parsed.signature.charCodeAt(i);
+    return diff === 0 && Boolean(emailFromToken(parsed.emailToken));
+  } catch {
+    return false;
+  }
+}
+
 async function isValidSession(token: string | undefined, secret: string | undefined): Promise<boolean> {
   if (!token || !secret) return false;
   const parts = token.split('.');
@@ -74,7 +107,8 @@ export async function middleware(request: NextRequest) {
     }
     const token = request.cookies.get(SESSION_COOKIE)?.value;
     const secret = (process.env.ADMIN_SECRET ?? '').trim();
-    const ok = await isValidSession(token, secret);
+    const sessionSecret = (process.env.HR_ADMIN_SESSION_SECRET ?? '').trim();
+    const ok = (await isValidSession(token, secret)) || (await isValidEmailSession(token, sessionSecret));
     if (!ok) {
       const url = request.nextUrl.clone();
       url.pathname = '/hr-admin/login';
