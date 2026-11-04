@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { CONSENT_TEXT_VERSION } from '@/lib/bateria/items';
-import { consentVersionFor, batteryVersionFor, type BatLang } from '@/lib/bateria/i18n';
+import { batteryVersionFor, type BatLang } from '@/lib/bateria/i18n';
+import { consentVersionToRecord } from '@/lib/bateria/consent';
 import { isPreviewTestMode, previewTestJson } from '@/lib/preview-mode';
 import { publicStepBody } from '@/lib/candidate-public-error';
 
@@ -17,13 +17,19 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(req: NextRequest) {
   try {
-    const { token, camera, name, email, lang: langRaw } = await req.json();
+    const { token, camera, name, email, lang: langRaw, consent_version: shownVersion } = await req.json();
     // El idioma lo manda la pantalla que el candidato acaba de leer.
     const lang: BatLang = String(langRaw || '').toLowerCase() === 'en' ? 'en' : 'es';
+    // La versión es la del texto que la pantalla mostró (neutro o PIPL). Una
+    // página abierta antes del deploy no la manda: se registra lo que esa
+    // página mostraba. Ver src/lib/bateria/consent.ts.
+    const consentVersion = consentVersionToRecord(shownVersion, lang);
     if (!token) return NextResponse.json({ error: 'Token requerido' }, { status: 400 });
 
     const { data: session, error: eSes } = await supabaseAdmin
-      .from('ts_bat_sessions').select('id, status').eq('token', token).single();
+      .from('ts_bat_sessions')
+      .select('id, status, consent_data_at, consent_cam_at, consent_text_ver')
+      .eq('token', token).single();
     if (eSes) {
       console.error('bateria/consent buscar', eSes);
       return NextResponse.json(publicStepBody(), { status: 500 });
@@ -32,9 +38,21 @@ export async function POST(req: NextRequest) {
 
     if (isPreviewTestMode()) {
       return previewTestJson('POST /api/bateria/consent', {
-        version: CONSENT_TEXT_VERSION,
+        version: consentVersion,
         camara: !!camera,
         status: 'consented',
+      });
+    }
+
+    // Quien ya aceptó conserva el registro de lo que aceptó: una segunda
+    // pestaña o un reintento no reescribe la fecha ni la versión.
+    if (session.consent_data_at) {
+      return NextResponse.json({
+        ok: true,
+        version: session.consent_text_ver,
+        camara: !!session.consent_cam_at,
+        status: session.status,
+        ya_registrado: true,
       });
     }
 
@@ -46,9 +64,10 @@ export async function POST(req: NextRequest) {
     const patch: Record<string, unknown> = {
       consent_data_at: now,
       consent_cam_at: camera ? now : null,
-      // El candidato en inglés acepta el texto PIPL, no el de habeas data. Sin
-      // esta distinción la auditoría no puede mostrar QUÉ aceptó cada persona.
-      consent_text_ver: consentVersionFor(lang, CONSENT_TEXT_VERSION),
+      // Sin la versión exacta la auditoría no puede mostrar QUÉ aceptó cada
+      // persona. Solo se escribe en esta sesión: los registros anteriores
+      // conservan la versión que aceptaron.
+      consent_text_ver: consentVersion,
       consent_ip: ip,
       consent_ua: req.headers.get('user-agent'),
       modality: camera ? 'remoto' : 'presencial_pendiente',
@@ -65,7 +84,7 @@ export async function POST(req: NextRequest) {
       .from('ts_bat_sessions')
       .update(patch)
       .eq('id', session.id)
-      .select('id, consent_data_at, consent_cam_at, status');
+      .select('id, consent_data_at, consent_cam_at, consent_text_ver, status');
 
     if (error) {
       console.error('bateria/consent guardar', error);
@@ -86,7 +105,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      version: CONSENT_TEXT_VERSION,
+      version: filas[0].consent_text_ver ?? consentVersion,
       camara: !!filas[0].consent_cam_at,
       status: filas[0].status,
     });

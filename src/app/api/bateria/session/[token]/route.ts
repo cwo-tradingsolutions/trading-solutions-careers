@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { BLOCK_ORDER, ITEMS, sanitizeForCandidate, BATTERY_VERSION } from '@/lib/bateria/items';
 import { blocksFor, localizeItem, batteryVersionFor, type BatLang } from '@/lib/bateria/i18n';
-import { resolveCandidateLang } from '@/lib/candidate-lang';
+import { resolveCandidateLang, requiresPiplConsent } from '@/lib/candidate-lang';
+import { consentVersionForVariant, type ConsentVariant } from '@/lib/bateria/consent';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,9 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
   // El idioma sale del candidato al que está amarrada la sesión. Si la sesión
   // no tiene candidato (pilotos internos), se mira el título de la vacante.
   let lang: BatLang = 'es';
+  // Consentimiento: PIPL solo para vacantes de China; neutro para el resto
+  // (ver src/lib/bateria/consent.ts).
+  let consentVariant: ConsentVariant = 'neutral';
   if (session.ht_candidate_id) {
     const { data: cand } = await supabaseAdmin
       .from('ht_candidates')
@@ -32,6 +36,10 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
         jobTitle: (cand as any).ht_vacancies?.title ?? session.vacancy_title,
         country: (cand as any).ht_vacancies?.country,
       });
+      if (requiresPiplConsent({
+        formTemplateKey: (cand as any).ht_vacancies?.form_template_key,
+        country: (cand as any).ht_vacancies?.country,
+      })) consentVariant = 'pipl';
     }
   } else {
     lang = resolveCandidateLang({ jobTitle: session.vacancy_title });
@@ -61,6 +69,10 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
       lang,
       consent_data_at: session.consent_data_at,
       consent_cam_at: session.consent_cam_at,
+      // Lo que ya aceptó (no se toca) y lo que se le mostraría hoy.
+      consent_text_ver: session.consent_text_ver ?? null,
+      consent_variant: consentVariant,
+      consent_version: consentVersionForVariant(consentVariant),
       purpose: session.purpose,
     },
     blocks: BLOCK_ORDER.map((b) => ({

@@ -50,12 +50,11 @@ export function batteryVersionFor(lang: BatLang): string {
   return lang === 'en' ? `${BATTERY_VERSION}-en` : BATTERY_VERSION;
 }
 
-/** Consentimiento en ingles · PIPL, no habeas data colombiano. */
+/**
+ * Consentimiento PIPL (solo vacantes de China). Desde 2026-11-04 el resto de
+ * candidatos, en ingles o en espanol, ve el texto neutro: ver consent.ts.
+ */
 export const CONSENT_TEXT_VERSION_EN = 'pipl-2026-09-18';
-
-export function consentVersionFor(lang: BatLang, esVersion: string): string {
-  return lang === 'en' ? CONSENT_TEXT_VERSION_EN : esVersion;
-}
 
 export const BLOCKS_EN: Record<Block, { label: string; intro: string; timedSeconds: number | null }> = {
   A: {

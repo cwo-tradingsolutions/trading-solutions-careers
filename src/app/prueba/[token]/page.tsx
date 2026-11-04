@@ -59,14 +59,9 @@ type Dict = {
   errAlreadyTaken: string;
   errConsentSave: string;
   errConsentNetwork: string;
-  // consentimiento
-  consentTitle: string;
-  consentIntro: string;
-  consentBullets: string[];
+  // consentimiento (el texto legal vive en CONSENT, abajo)
   nameLabel: string;
   namePlaceholder: string;
-  consentDataCheck: string;
-  consentCamCheck: string;
   consentButton: string;
   camBlocked: string;
   // presentación
@@ -118,20 +113,8 @@ const T: Record<Lang, Dict> = {
     errConsentSave: "No pudimos registrar su autorización. Escríbanos y le enviamos un enlace nuevo.",
     errConsentNetwork: "No pudimos conectar para registrar su autorización. Revise su internet e intente de nuevo.",
 
-    consentTitle: "Autorización de tratamiento de datos personales",
-    consentIntro:
-      "Trading Solutions S.A.S. tratará los datos que usted suministre en esta prueba con la única finalidad de evaluar su candidatura al cargo al que aplicó. Se recogen sus respuestas, los tiempos de respuesta y las capturas de cámara durante la sesión.",
-    consentBullets: [
-      "Los resultados se conservan **dos años** y luego se eliminan.",
-      "No se comparten con terceros distintos al equipo de selección.",
-      "Sus derechos como titular y los canales para ejercerlos están descritos en la **Política de Tratamiento de Datos Personales** de Trading Solutions S.A.S., publicada en nuestro sitio de empleo.",
-      "La presentación **remota exige cámara activa** durante toda la sesión. Si prefiere no habilitarla, puede presentar la prueba de forma **presencial** en nuestras instalaciones: responda el correo con el que recibió este enlace y le agendamos.",
-    ],
     nameLabel: "Nombre completo",
     namePlaceholder: "Como aparece en su documento",
-    consentDataCheck: "**Autorizo** el tratamiento de mis datos en los términos descritos.",
-    consentCamCheck:
-      "**Autorizo la captura de imagen** durante la sesión y entiendo que es condición de la modalidad remota.",
     consentButton: "Acepto y continúo",
     camBlocked:
       "El navegador bloqueó la cámara. Habilite el permiso y vuelva a intentar, o escríbanos para presentar la prueba de forma presencial.",
@@ -178,13 +161,6 @@ const T: Record<Lang, Dict> = {
     autosave: "Sus respuestas se guardan automáticamente.",
   },
 
-  /**
-   * El consentimiento en inglés NO es la traducción del habeas data colombiano.
-   * El candidato está en China y la ley que lo cubre es la PIPL: lo que exige es
-   * decir quién trata la información, para qué, cuánto tiempo se guarda, que sale
-   * del país, y pedir un consentimiento aparte para la imagen. Citar la Ley 1581
-   * acá sería citarle una ley que no lo protege.
-   */
   en: {
     loading: "Loading…",
     errorTitle: "We could not open the assessment",
@@ -196,21 +172,8 @@ const T: Record<Lang, Dict> = {
     errConsentSave: "We could not record your consent. Write to us and we will send you a new link.",
     errConsentNetwork: "We could not connect to record your consent. Check your internet and try again.",
 
-    consentTitle: "Consent to the processing of your personal information",
-    consentIntro:
-      "Trading Solutions S.A.S. processes the answers you give in this assessment, your response times and the camera captures taken during the session, for the sole purpose of evaluating your application for the position you applied to.",
-    consentBullets: [
-      "The results are kept for **two years** and are then deleted.",
-      "They are not shared with anyone outside the selection team.",
-      "Trading Solutions S.A.S. is established outside China, so your information is **transferred to and stored outside China**, where the selection team reviews it.",
-      "The remote format **requires an active camera** throughout the session. If you prefer not to enable it, you can take the assessment **on site** at our offices: reply to the email that sent you this link and we will arrange it.",
-      "You may **withdraw your consent** at any time by replying to that same email.",
-    ],
     nameLabel: "Full name",
     namePlaceholder: "As it appears on your ID",
-    consentDataCheck: "**I consent** to the processing of my personal information as described above.",
-    consentCamCheck:
-      "**I consent to the capture of my image** during the session and understand that it is required for the remote format.",
     consentButton: "I consent and continue",
     camBlocked:
       "Your browser blocked the camera. Allow the permission and try again, or write to us to take the assessment on site.",
@@ -257,6 +220,93 @@ const T: Record<Lang, Dict> = {
     autosave: "Your answers are saved automatically.",
   },
 };
+
+/**
+ * ── Texto de consentimiento ───────────────────────────────────────────────
+ *
+ * Qué texto ve cada candidato lo decide el servidor (/api/bateria/session →
+ * consent_variant), no esta pantalla. Ver src/lib/bateria/consent.ts.
+ *
+ *   neutral · `consent-neutral-2026-11-04` · ES o EN según candidate-lang.ts.
+ *     Alineado con la invitación por correo: responsable Trading Solutions,
+ *     finalidad la evaluación del proceso de selección, derechos de acceso,
+ *     rectificación y supresión por jointheteam@, participación voluntaria.
+ *     No menciona ningún país ni ley: sirve a Panamá Ops y a Colombia.
+ *   pipl · `pipl-2026-09-18` · solo vacantes de China, solo en inglés.
+ *     Texto SIN CAMBIOS. La PIPL exige decir quién trata la información, para
+ *     qué, cuánto tiempo se guarda, que sale del país, y pedir consentimiento
+ *     aparte para la imagen.
+ *
+ * Cambiar una sola palabra de estos textos exige una versión nueva en
+ * consent.ts: la versión registrada tiene que identificar el texto exacto.
+ */
+type ConsentVariant = "neutral" | "pipl";
+type ConsentText = {
+  version: string;
+  title: string;
+  intro: string;
+  bullets: string[];
+  dataCheck: string;
+  camCheck: string;
+};
+
+const CONSENT_NEUTRAL: Record<Lang, ConsentText> = {
+  es: {
+    version: "consent-neutral-2026-11-04",
+    title: "Autorización de tratamiento de datos personales",
+    intro:
+      "Trading Solutions es el responsable de los datos personales que usted suministre en esta prueba: sus respuestas, los tiempos de respuesta y las imágenes de cámara capturadas durante la sesión. Los usamos únicamente para evaluar su candidatura dentro de este proceso de selección.",
+    bullets: [
+      "Su participación es **voluntaria**.",
+      "Los resultados se conservan **dos años** y luego se eliminan.",
+      "No se comparten con terceros distintos al equipo de selección.",
+      "Puede solicitar el **acceso, la rectificación o la supresión** de sus datos en cualquier momento escribiendo a **jointheteam@tradingsolutions.com**.",
+      "La presentación **remota exige cámara activa** durante toda la sesión. Si prefiere no habilitarla, puede presentar la prueba de forma **presencial** en nuestras instalaciones: responda el correo con el que recibió este enlace y le agendamos.",
+    ],
+    dataCheck: "**Autorizo** el tratamiento de mis datos en los términos descritos.",
+    camCheck:
+      "**Autorizo la captura de imagen** durante la sesión y entiendo que es condición de la modalidad remota.",
+  },
+  en: {
+    version: "consent-neutral-2026-11-04",
+    title: "Consent to the processing of your personal data",
+    intro:
+      "Trading Solutions is the controller of the personal data you provide in this assessment: your answers, response times and the camera images captured during the session. We use this data only to evaluate your application within this selection process.",
+    bullets: [
+      "Your participation is **voluntary**.",
+      "The results are kept for **two years** and are then deleted.",
+      "They are not shared with anyone outside the selection team.",
+      "You may request **access to, rectification of, or deletion of** your data at any time by writing to **jointheteam@tradingsolutions.com**.",
+      "The remote format **requires an active camera** throughout the session. If you prefer not to enable it, you can take the assessment **on site** at our offices: reply to the email that sent you this link and we will arrange it.",
+    ],
+    dataCheck: "**I consent** to the processing of my personal data as described above.",
+    camCheck:
+      "**I consent to the capture of my image** during the session and understand that it is required for the remote format.",
+  },
+};
+
+/** Texto PIPL de 2026-09-18, idéntico al anterior. Solo China, solo inglés. */
+const CONSENT_PIPL_EN: ConsentText = {
+  version: "pipl-2026-09-18",
+  title: "Consent to the processing of your personal information",
+  intro:
+    "Trading Solutions S.A.S. processes the answers you give in this assessment, your response times and the camera captures taken during the session, for the sole purpose of evaluating your application for the position you applied to.",
+  bullets: [
+    "The results are kept for **two years** and are then deleted.",
+    "They are not shared with anyone outside the selection team.",
+    "Trading Solutions S.A.S. is established outside China, so your information is **transferred to and stored outside China**, where the selection team reviews it.",
+    "The remote format **requires an active camera** throughout the session. If you prefer not to enable it, you can take the assessment **on site** at our offices: reply to the email that sent you this link and we will arrange it.",
+    "You may **withdraw your consent** at any time by replying to that same email.",
+  ],
+  dataCheck: "**I consent** to the processing of my personal information as described above.",
+  camCheck:
+    "**I consent to the capture of my image** during the session and understand that it is required for the remote format.",
+};
+
+/** PIPL solo si el servidor lo pide y la pantalla está en inglés. */
+function consentTextFor(variant: ConsentVariant, lang: Lang): ConsentText {
+  return variant === "pipl" && lang === "en" ? CONSENT_PIPL_EN : CONSENT_NEUTRAL[lang];
+}
 
 /** Reemplaza {n}, {total} … por su valor. */
 function fmt(text: string, vars: Record<string, string | number>): string {
@@ -315,6 +365,8 @@ export default function PruebaPage() {
   // El idioma lo decide la sesión (candidato de China → inglés). Si no viene,
   // español: es el caso de toda la operación en Colombia.
   const [lang, setLang] = useState<Lang>("es");
+  // Qué consentimiento mostrar lo decide el servidor (PIPL solo para China).
+  const [consentVariant, setConsentVariant] = useState<ConsentVariant>("neutral");
 
   const [bi, setBi] = useState(0);
   const [ii, setIi] = useState(0);
@@ -327,6 +379,7 @@ export default function PruebaPage() {
   const [fallaGuardado, setFallaGuardado] = useState<string | null>(null);
 
   const t = T[lang];
+  const ct = consentTextFor(consentVariant, lang);
 
   const shownAt = useRef<number>(Date.now());
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -365,6 +418,7 @@ export default function PruebaPage() {
         }
         setSession(j.session);
         setLang(j.session?.lang === "en" ? "en" : "es");
+        setConsentVariant(j.session?.consent_variant === "pipl" ? "pipl" : "neutral");
         setBlocks(j.blocks);
         setAnswers(j.existing || {});
         setName(j.session.candidate_name || "");
@@ -573,8 +627,8 @@ export default function PruebaPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // El idioma va en el cuerpo: el backend guarda la versión del texto que
-        // el candidato acaba de leer (habeas data o PIPL), no la del servidor.
-        body: JSON.stringify({ token, camera: okCam && camOk, name, lang }),
+        // el candidato acaba de leer (neutro o PIPL), no la del servidor.
+        body: JSON.stringify({ token, camera: okCam && camOk, name, lang, consent_version: ct.version }),
       });
       const j = await r.json().catch(() => ({}));
       // Si la autorizacion no queda registrada, la prueba NO empieza: sin ese
@@ -627,11 +681,11 @@ export default function PruebaPage() {
     return (
       <div style={shell}><div style={card}>
         <p style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: TS_BLUE, fontWeight: 700, margin: "0 0 10px" }}>Trading Solutions</p>
-        <h1 style={h1}>{t.consentTitle}</h1>
-        <p style={sub}>{t.consentIntro}</p>
+        <h1 style={h1}>{ct.title}</h1>
+        <p style={sub}>{ct.intro}</p>
         <ul style={{ ...sub, paddingLeft: 18, marginBottom: 22 }}>
-          {t.consentBullets.map((b, i) => (
-            <li key={i} style={i === t.consentBullets.length - 1 ? undefined : { marginBottom: 7 }}>{rich(b)}</li>
+          {ct.bullets.map((b, i) => (
+            <li key={i} style={i === ct.bullets.length - 1 ? undefined : { marginBottom: 7 }}>{rich(b)}</li>
           ))}
         </ul>
         <div style={{ marginBottom: 18 }}>
@@ -641,11 +695,11 @@ export default function PruebaPage() {
         </div>
         <label style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 12, fontSize: 14, cursor: "pointer" }}>
           <input type="checkbox" checked={okData} onChange={(e) => setOkData(e.target.checked)} style={{ marginTop: 3 }} />
-          <span>{rich(t.consentDataCheck)}</span>
+          <span>{rich(ct.dataCheck)}</span>
         </label>
         <label style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 20, fontSize: 14, cursor: "pointer" }}>
           <input type="checkbox" checked={okCam} onChange={(e) => setOkCam(e.target.checked)} style={{ marginTop: 3 }} />
-          <span>{rich(t.consentCamCheck)}</span>
+          <span>{rich(ct.camCheck)}</span>
         </label>
         <button style={{ ...btn, opacity: listo ? 1 : 0.4, cursor: listo ? "pointer" : "not-allowed" }} disabled={!listo} onClick={acceptConsent}>
           {t.consentButton}

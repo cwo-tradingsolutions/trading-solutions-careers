@@ -94,3 +94,13 @@ export function isChinaProcess(input: LangInput): boolean {
 
 /** Firma de los correos en inglés · el equipo, no una persona. */
 export const EN_SIGNATURE_NAME = "Talent Acquisition Team";
+
+/**
+ * ¿El consentimiento de la batería debe ser el de la PIPL?
+ * Solo vacantes de China: plantilla `china` o país en China. Más estricto que
+ * isChinaProcess a propósito: el título no cuenta ("Pricing Analyst · China
+ * Trade Lane" es un cargo en Colombia) y Panamá Ops nunca lo es.
+ */
+export function requiresPiplConsent(input: { formTemplateKey?: string | null; country?: string | null }): boolean {
+  return String(input.formTemplateKey || "").toLowerCase() === "china" || isChinaLocation(input.country);
+}
