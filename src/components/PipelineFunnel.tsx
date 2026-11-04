@@ -2539,11 +2539,16 @@ function CandDetailPanel({ cand, onClose, onChanged, hiringLeadEmail }: { cand: 
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({}),
                   });
-                  const j = await r.json();
-                  if (j.success) {
-                    setFeedback(`✅ ${j.note || "Borrador listo en Gmail. Antes de enviarlo, pega los enlaces de Bluesite y Psicoalianza."}`);
+                  const j = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+                  if (j.success && j.registro?.ok !== false) {
+                    setFeedback(`✅ ${j.note || "Borrador listo en Gmail (no se envió)."}`);
+                  } else if (j.success) {
+                    // Borrador creado pero sin constancia en el ATS: se muestra, no se oculta.
+                    console.error("Pruebas complementarias: registro falló", j.registro);
+                    setFeedback(`⚠️ ${j.note || "Borrador creado"} · PERO el envío NO quedó registrado en el ATS: ${j.registro?.error || j.detail || "error desconocido"}`);
                   } else {
-                    setFeedback(`❌ ${[j.error, j.detail].filter(Boolean).join(" · ") || "Error"}`);
+                    console.error("Pruebas complementarias: error", j);
+                    setFeedback(`❌ ${[j.error, j.detail].filter(Boolean).join(" · ") || `Error HTTP ${r.status}`}`);
                   }
                 } catch (e) {
                   setFeedback(`❌ ${(e as Error).message}`);
@@ -2553,7 +2558,7 @@ function CandDetailPanel({ cand, onClose, onChanged, hiringLeadEmail }: { cand: 
               }}
               disabled={busy}
               className="text-xs font-bold px-4 py-2 rounded-full border-2 border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 disabled:opacity-50"
-              title="Crea un borrador en Gmail. Antes de enviarlo, pega los enlaces personalizados de Bluesite y Psicoalianza."
+              title="Crea un BORRADOR en Gmail (no envía) con todas las pruebas del catálogo · DISC = DISC Prime. Antes de enviarlo, pega los enlaces personales (DISC Prime, Bluesite, Psicoalianza, Turing)."
             >
               Pruebas complementarias
             </button>
