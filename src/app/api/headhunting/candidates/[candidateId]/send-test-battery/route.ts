@@ -1,5 +1,10 @@
 /**
  * POST /api/headhunting/candidates/[candidateId]/send-test-battery
+ * GET  (mismo path) → { habilitado } para pintar o no el botón.
+ *
+ * Solo se permite si al candidato YA se le envió la batería (ver
+ * bateriaEnviada en src/lib/pruebas-complementarias.ts). Si no: 409, antes de
+ * leer el catálogo y antes de tocar Gmail o el registro.
  *
  * Botón «Pruebas complementarias». Crea un BORRADOR en Gmail (nunca envía)
  * con todas las pruebas externas activas del catálogo `ts_test_providers` que
@@ -29,7 +34,13 @@ import { isPreviewTestMode } from "@/lib/preview-mode";
 import { readAdminSession } from "@/lib/hr-admin-session";
 import { readSessionSecret } from "@/lib/hr-admin-secrets";
 import { listarProveedores } from "@/lib/pruebas-externas";
-import { armarBorrador, registrarBorrador, type ModoRegistro } from "@/lib/pruebas-complementarias";
+import {
+  armarBorrador,
+  bateriaEnviada,
+  MSG_BATERIA_NO_ENVIADA,
+  registrarBorrador,
+  type ModoRegistro,
+} from "@/lib/pruebas-complementarias";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +49,32 @@ function quienLoPide(req: NextRequest): string | null {
   const tok = req.cookies.get("hr_admin_session")?.value;
   if (secret && tok) return readAdminSession(tok, secret)?.email ?? null;
   return req.headers.get("authorization") ? "api-bearer" : null;
+}
+
+/** ¿Se le envió ya la batería? null = no se pudo leer (no se abre la puerta a ciegas). */
+async function estadoBateria(candidateId: string): Promise<{ enviada: boolean | null; sesiones: number; error?: string }> {
+  const { data, error } = await supabaseAdmin
+    .from("ts_bat_sessions")
+    .select("invited_at, consent_data_at, status")
+    .eq("ht_candidate_id", candidateId);
+  if (error) return { enviada: null, sesiones: 0, error: error.message };
+  return { enviada: bateriaEnviada(data as any[]), sesiones: (data ?? []).length };
+}
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { candidateId: string } }
+) {
+  const authError = requireAdmin(req);
+  if (authError) return authError;
+  const est = await estadoBateria(params.candidateId);
+  if (est.enviada === null) {
+    return NextResponse.json({ habilitado: false, error: "No se pudo leer ts_bat_sessions", detail: est.error }, { status: 500 });
+  }
+  return NextResponse.json(
+    { habilitado: est.enviada, sesiones: est.sesiones, motivo: est.enviada ? null : MSG_BATERIA_NO_ENVIADA },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 export async function POST(
@@ -71,6 +108,18 @@ export async function POST(
 
     if (error || !candidate) {
       return NextResponse.json({ error: "Candidato no encontrado" }, { status: 404 });
+    }
+
+    // Condición de Kelly: solo después de enviar la batería.
+    const est = await estadoBateria(candidateId);
+    if (est.enviada === null) {
+      return NextResponse.json({ error: "No se pudo leer ts_bat_sessions", detail: est.error }, { status: 500 });
+    }
+    if (!est.enviada) {
+      return NextResponse.json(
+        { error: MSG_BATERIA_NO_ENVIADA, code: "bateria_no_enviada", sesiones: est.sesiones },
+        { status: 409 },
+      );
     }
 
     // Catálogo: si no se puede leer, no se arma un correo a ciegas.

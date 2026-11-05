@@ -2293,6 +2293,19 @@ function CandDetailPanel({ cand, onClose, onChanged, hiringLeadEmail }: { cand: 
   const currentStage = cand.stage || "aplico";
   const nextStage = siguienteDelBoton(currentStage);
   const isTerminal = currentStage === "rechazado" || currentStage === "contratado";
+  // «Pruebas complementarias» solo después de enviar la batería (Kelly 4-nov).
+  // null = consultando o error → el botón no se pinta. El endpoint repite la
+  // misma condición (409), así que la UI no es la única barrera.
+  const [pcHabilitado, setPcHabilitado] = useState<boolean | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    setPcHabilitado(null);
+    fetch(`/api/headhunting/candidates/${cand.id}/send-test-battery`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (vivo) setPcHabilitado(j?.habilitado === true); })
+      .catch(() => { if (vivo) setPcHabilitado(false); });
+    return () => { vivo = false; };
+  }, [cand.id]);
 
   async function moveToStage(targetStage: string, label: string) {
     if (busy) return;
@@ -2527,7 +2540,7 @@ function CandDetailPanel({ cand, onClose, onChanged, hiringLeadEmail }: { cand: 
             </button>
           )}
 
-          {!isTerminal && (
+          {!isTerminal && pcHabilitado === true && (
             <button
               onClick={async () => {
                 if (busy) return;

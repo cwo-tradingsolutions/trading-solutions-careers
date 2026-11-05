@@ -290,3 +290,33 @@ export async function registrarBorrador(db: ClienteInsert, fila: FilaRegistro): 
     return { ok: false, error: msg };
   }
 }
+
+// ── Condición del botón (Kelly, 4-nov 9:28 p. m.) ─────────────────────────
+// «Que aparezca solo después de que se envió la batería.»
+//
+// Señal real del ATS: `ts_bat_sessions.invited_at`. La escriben los dos
+// caminos nativos de envío (api/bateria/enviar y lib/bateria/invitar.ts) en el
+// momento en que sale el correo o se crea el borrador, junto con
+// `invite_channel` e `invite_count`. Una sesión solo creada (status
+// `created`, `invited_at` nulo, p. ej. canal `manual-jointheteam-pendiente`)
+// NO cuenta: el link existe pero nadie lo ha mandado.
+//
+// Respaldo: si el candidato ya aceptó el consentimiento o empezó/terminó la
+// prueba, el link le llegó por algún lado (envío manual sin registrar), así
+// que también cuenta. La etapa `pruebas` sola NO basta.
+export type SesionBateria = {
+  invited_at?: string | null;
+  consent_data_at?: string | null;
+  status?: string | null;
+};
+
+const ESTADOS_ABIERTA = new Set(["consented", "in_progress", "completed"]);
+
+export function bateriaEnviada(sesiones: SesionBateria[] | null | undefined): boolean {
+  return (sesiones ?? []).some(
+    (s) => !!s.invited_at || !!s.consent_data_at || ESTADOS_ABIERTA.has(String(s.status ?? "")),
+  );
+}
+
+export const MSG_BATERIA_NO_ENVIADA =
+  "Pruebas complementarias solo después de enviar la batería: este candidato no tiene una batería enviada.";

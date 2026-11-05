@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   armarBorrador,
+  bateriaEnviada,
   registrarBorrador,
   seleccionarPruebas,
   TABLA_REGISTRO,
@@ -111,4 +112,28 @@ test("registro: el error de PostgREST ya no se traga", async () => {
     assert.deepEqual(r2, { ok: false, error: "red caída" });
     assert.equal(logs.length, 2);
   } finally { console.error = orig; }
+});
+
+// ── Condición del botón: solo después de enviar la batería ──────────────
+test("bateriaEnviada: sin sesiones → no", () => {
+  assert.equal(bateriaEnviada([]), false);
+  assert.equal(bateriaEnviada(null), false);
+});
+
+test("bateriaEnviada: sesión creada sin invited_at (los 7 de Panamá, manual-jointheteam-pendiente) → no", () => {
+  assert.equal(bateriaEnviada([{ status: "created", invited_at: null, consent_data_at: null }]), false);
+});
+
+test("bateriaEnviada: invited_at no nulo (gmail-borrador / resend) → sí", () => {
+  assert.equal(bateriaEnviada([{ status: "created", invited_at: "2026-11-04T10:00:00Z" }]), true);
+});
+
+test("bateriaEnviada: ya aceptó o presentó aunque no quedó invited_at (envío manual sin registrar) → sí", () => {
+  assert.equal(bateriaEnviada([{ status: "consented", invited_at: null, consent_data_at: "2026-11-04T10:00:00Z" }]), true);
+  assert.equal(bateriaEnviada([{ status: "completed", invited_at: null }]), true);
+  assert.equal(bateriaEnviada([{ status: "in_progress", invited_at: null }]), true);
+});
+
+test("bateriaEnviada: basta una sesión enviada entre varias", () => {
+  assert.equal(bateriaEnviada([{ status: "created" }, { status: "created", invited_at: "2026-11-01T00:00:00Z" }]), true);
 });
