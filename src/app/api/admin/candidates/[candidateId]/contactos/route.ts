@@ -41,8 +41,16 @@ export async function GET(req: NextRequest, { params }: { params: { candidateId:
   const vencido =
     !cand.contactos_sync_at || Date.now() - new Date(cand.contactos_sync_at).getTime() > 30 * 60_000;
   if (req.nextUrl.searchParams.get("sync") !== "0" && vencido) {
-    const r = await sincronizarGmailCandidato(cand);
-    sync = r.ok ? { ok: true, nuevos: r.nuevos } : { ok: false, error: r.error };
+    // Si Gmail falla (token revocado, red), el historial local se muestra igual:
+    // un throw aquí dejaba la respuesta sin cuerpo y la ficha mostraba
+    // «Unexpected end of JSON input».
+    try {
+      const r = await sincronizarGmailCandidato(cand);
+      sync = r.ok ? { ok: true, nuevos: r.nuevos } : { ok: false, error: r.error };
+    } catch (e: any) {
+      console.error("contactos: sync Gmail falló", e?.message);
+      sync = { ok: false, error: "Gmail desconectado: reconecte Gmail en Ajustes (cuenta jointheteam@)." };
+    }
   }
 
   const [{ data: contactos, error: e1 }, { data: etapas }] = await Promise.all([

@@ -112,6 +112,22 @@ export async function getValidAccessToken(): Promise<{ access_token: string; ema
   return { access_token: stored.access_token, email: stored.email };
 }
 
+/**
+ * Igual que getValidAccessToken pero sin lanzar: si Google rechaza el refresh
+ * (p. ej. 401 unauthorized_client tras revocar el acceso) devuelve un error
+ * legible para que la ruta responda JSON en vez de un 500 con cuerpo vacío.
+ */
+async function accesoGmail(): Promise<{ ok: true; access_token: string; email: string } | { ok: false; error: string }> {
+  try {
+    const v = await getValidAccessToken();
+    if (!v) return { ok: false, error: "Gmail no conectado. Pide a Kelly que vaya a Settings → Conectar Gmail." };
+    return { ok: true, ...v };
+  } catch (e: any) {
+    console.error("gmail: refresh falló", e?.message);
+    return { ok: false, error: "Gmail desconectado: Google rechazó la autorización guardada. Reconecte Gmail en Ajustes (cuenta jointheteam@)." };
+  }
+}
+
 export type GmailConnection = {
   connected: boolean;
   email?: string;
@@ -170,10 +186,8 @@ export async function createDraftViaGmail(opts: {
   bcc?: string;
   fromName?: string;
 }): Promise<{ ok: true; draft_id: string; gmail_email: string } | { ok: false; error: string }> {
-  const valid = await getValidAccessToken();
-  if (!valid) {
-    return { ok: false, error: "Gmail no conectado. Pide a Kelly que vaya a Settings → Conectar Gmail." };
-  }
+  const valid = await accesoGmail();
+  if (!valid.ok) return { ok: false, error: valid.error };
 
   const rfc822 = buildRfc822({
     from: formatFrom(opts.fromName, valid.email),
@@ -209,10 +223,8 @@ export async function sendViaGmail(opts: {
   bcc?: string;
   fromName?: string; // Display name (defaults to ATS_FROM_NAME when empty)
 }): Promise<{ ok: true; gmail_id: string } | { ok: false; error: string }> {
-  const valid = await getValidAccessToken();
-  if (!valid) {
-    return { ok: false, error: "Gmail no conectado. Pide a Kelly que vaya a Settings → Conectar Gmail." };
-  }
+  const valid = await accesoGmail();
+  if (!valid.ok) return { ok: false, error: valid.error };
 
   const rfc822 = buildRfc822({
     from: formatFrom(opts.fromName, valid.email),
@@ -249,8 +261,8 @@ export async function searchGmailMessages(
   query: string,
   maxResults = 10
 ): Promise<{ ok: true; ids: string[] } | { ok: false; error: string }> {
-  const valid = await getValidAccessToken();
-  if (!valid) return { ok: false, error: "Gmail no conectado" };
+  const valid = await accesoGmail();
+  if (!valid.ok) return { ok: false, error: valid.error };
 
   const params = new URLSearchParams({
     q: query,
@@ -278,8 +290,8 @@ export async function searchGmailMessages(
 export async function getGmailMessageMetadata(
   messageId: string
 ): Promise<{ ok: true; data: GmailMessageMeta } | { ok: false; error: string }> {
-  const valid = await getValidAccessToken();
-  if (!valid) return { ok: false, error: "Gmail no conectado" };
+  const valid = await accesoGmail();
+  if (!valid.ok) return { ok: false, error: valid.error };
 
   const params = new URLSearchParams({
     format: "metadata",
