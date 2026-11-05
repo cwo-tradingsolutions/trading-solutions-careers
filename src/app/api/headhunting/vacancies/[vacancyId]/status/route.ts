@@ -14,6 +14,11 @@
  *
  * Cerrar una vacante NO toca a sus candidatos: siguen en la base con su
  * historia intacta, solo dejan de contar en los indicadores.
+ *
+ * Tampoco reescribe `ht_requisitions`. El check de esa columna no tiene un
+ * estado de cierre de búsqueda, y un update a un valor nuevo fallaría hasta
+ * que alguien migre staging y prod. El tablero del líder deriva Closed o
+ * Hired al leer la vacante y los contratados.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";

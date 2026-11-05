@@ -15,12 +15,19 @@
  * El recorte pasa acá, en el servidor. Mandar todo y esconderlo en la pantalla
  * de WXM no serviría: los datos viajarían igual y se leen desde la consola del
  * navegador.
+ *
+ * CERRAR O CONTRATAR
+ * `ht_requisitions.status` se queda en `publicada` cuando la búsqueda termina:
+ * esa columna solo modela la aprobación. Acá se deriva Closed o Hired a partir
+ * de la vacante y de si hay alguien en `contratado`, y se apaga el reloj de
+ * SLA. WXM pinta `status_label` y no necesita otro estado en su base.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { requireWxm, correoDelLider } from "@/lib/wxm-auth";
 import { STAGES, normalizeStage, slaStatus, type StageCode } from "@/lib/stage-labels";
-import { STATUS_LABEL, STATUS_HINT, diasEnEstado, type RequisitionStatus } from "@/lib/requisitions";
+import { diasEnEstado } from "@/lib/requisitions";
+import { ETAPAS_CONTRATADO, esContratado, estadoTablero, relojSla } from "@/lib/requisition-board";
 
 export const runtime = "nodejs";
 
@@ -59,16 +66,64 @@ export async function GET(req: NextRequest) {
     if (reqErr) return NextResponse.json({ error: reqErr.message }, { status: 500 });
     const reqs = (reqsRaw || []) as any[];
 
-    // ── 2) Sus vacantes abiertas ────────────────────────────────────────
-    const { data: vacs } = await supabaseAdmin
+    // ── 2) Sus vacantes (abiertas y cerradas) ───────────────────────────
+    // Las cerradas también hacen falta: de su status sale Closed / Hired.
+    // El conteo de candidatos sigue usando solo las abiertas.
+    const { data: vacs, error: vacErr } = await supabaseAdmin
       .from("ht_vacancies")
       .select("id, title, area, status, requisition_id, created_at")
       .eq("client_id", TS_CLIENT_ID)
       .ilike("hiring_lead_email", leadEmail);
+    if (vacErr) return NextResponse.json({ error: vacErr.message }, { status: 500 });
+
+    const porIdVacante = new Map<string, any>();
+    for (const v of (vacs || []) as any[]) porIdVacante.set(v.id, v);
+
+    // La requisición puede apuntar a una vacante cuyo líder no coincide con
+    // el correo de esta consulta. Sin esa fila no se puede saber si está
+    // cerrada y el tablero seguiría diciendo Posted.
+    const faltan = reqs
+      .map((r) => r.vacancy_id as string | null)
+      .filter((id): id is string => !!id && !porIdVacante.has(id));
+    if (faltan.length > 0) {
+      const { data: extra, error: extraErr } = await supabaseAdmin
+        .from("ht_vacancies")
+        .select("id, title, area, status, requisition_id, created_at")
+        .in("id", faltan);
+      if (extraErr) return NextResponse.json({ error: extraErr.message }, { status: 500 });
+      for (const v of (extra || []) as any[]) porIdVacante.set(v.id, v);
+    }
+
+    const vacantesContratadas = new Set<string>();
+    const idsBusqueda = Array.from(porIdVacante.keys());
+    if (idsBusqueda.length > 0) {
+      const { data: hires, error: hireErr } = await supabaseAdmin
+        .from("ht_candidates")
+        .select("vacancy_id, stage, status")
+        .in("vacancy_id", idsBusqueda)
+        .in("stage", ETAPAS_CONTRATADO);
+      // Sin esta lectura el tablero volvería a decir Posted en una
+      // contratación que ya existe. Mejor fallar que mentir.
+      if (hireErr) return NextResponse.json({ error: hireErr.message }, { status: 500 });
+      for (const h of (hires || []) as any[]) {
+        if (!h.vacancy_id || h.status === "rejected" || !esContratado(h.stage)) continue;
+        vacantesContratadas.add(h.vacancy_id);
+      }
+    }
+
+    const vacanteDe = (r: any): any | null => {
+      if (r.vacancy_id && porIdVacante.has(r.vacancy_id)) return porIdVacante.get(r.vacancy_id);
+      for (const v of porIdVacante.values()) {
+        if (v.requisition_id === r.id) return v;
+      }
+      return null;
+    };
 
     // Whitelist: una vacante pausada o con un estado nuevo no es una vacante
-    // abierta.
-    const abiertas = (vacs || []).filter((v: any) => v.status == null || v.status === "open");
+    // abierta. Se incluyen las que llegaron por el id de la requisición.
+    const abiertas = Array.from(porIdVacante.values()).filter(
+      (v) => v.status == null || v.status === "open",
+    );
     const vacIds = abiertas.map((v: any) => v.id);
 
     // ── 3) Candidatos vivos de esas vacantes ────────────────────────────
@@ -128,8 +183,14 @@ export async function GET(req: NextRequest) {
 
     // ── 4) Armar una tarjeta por requisición ────────────────────────────
     const tarjetas = reqs.map((r: any) => {
-      const vac = abiertas.find((v: any) => v.id === r.vacancy_id);
+      const vacVinculada = vacanteDe(r);
+      const vac = abiertas.find((v: any) => v.id === (vacVinculada?.id || r.vacancy_id));
       const candidatos = vac ? porVacante.get(vac.id) || [] : [];
+      const estado = estadoTablero({
+        reqStatus: r.status,
+        vacancyStatus: vacVinculada?.status ?? null,
+        tieneContratado: !!(vacVinculada && vacantesContratadas.has(vacVinculada.id)),
+      });
 
       // Conteo por etapa. Se recorren las 13 etapas siempre, para que la
       // pantalla no cambie de forma según haya o no gente.
@@ -163,13 +224,20 @@ export async function GET(req: NextRequest) {
       const enTerna = candidatos.filter((c: any) => c.stage === "terna");
 
       const diasDesdeAprobacion = r.approved_at ? dias(r.approved_at) : null;
+      const reloj = relojSla(
+        estado.terminal,
+        diasDesdeAprobacion,
+        TTF_META_DIAS,
+        diasEnEstado(r.updated_at),
+      );
 
       // Qué necesita el proceso de él. Sin esto el tablero es algo que se
-      // mira una vez y nunca más.
+      // mira una vez y nunca más. Una búsqueda ya cerrada o contratada no
+      // le pide nada.
       let pendiente: string | null = null;
-      if (r.status === "devuelta") {
+      if (!estado.terminal && r.status === "devuelta") {
         pendiente = "Wellness te devolvió la requisición: falta información para armar el perfil.";
-      } else if (enTerna.length > 0) {
+      } else if (!estado.terminal && enTerna.length > 0) {
         const espera = Math.max(...enTerna.map((c: any) => c.dias));
         pendiente =
           `Tenés que entrevistar a ${enTerna.length} ` +
@@ -179,18 +247,23 @@ export async function GET(req: NextRequest) {
 
       return {
         requisicion_id: r.id,
-        vacancy_id: r.vacancy_id,
+        vacancy_id: r.vacancy_id || vacVinculada?.id || null,
         title: r.title,
         area: r.area,
         tipo: r.requisition_type,
-        status: r.status as RequisitionStatus,
-        status_label: STATUS_LABEL[r.status as RequisitionStatus] || r.status,
-        status_hint: STATUS_HINT[r.status as RequisitionStatus] || null,
-        dias_en_estado: diasEnEstado(r.updated_at),
-        motivo_devolucion: r.status === "devuelta" ? r.decision_note : null,
+        status: estado.status,
+        status_label: estado.status_label,
+        status_label_es: estado.status_label_es,
+        status_hint: estado.status_hint,
+        status_hint_es: estado.status_hint_es,
+        dias_en_estado: reloj.dias_en_estado,
+        motivo_devolucion: !estado.terminal && r.status === "devuelta" ? r.decision_note : null,
+        // La fecha en que se aprobó sigue siendo cierta. El reloj de SLA
+        // (dias_desde_aprobacion / meta_dias) es el que se apaga.
         aprobada_el: r.approved_at,
-        dias_desde_aprobacion: diasDesdeAprobacion,
-        meta_dias: TTF_META_DIAS,
+        dias_desde_aprobacion: reloj.dias_desde_aprobacion,
+        meta_dias: reloj.meta_dias,
+        sla_activo: reloj.sla_activo,
         activos: candidatos.length,
         etapas,
         cuello_de_botella: cuello

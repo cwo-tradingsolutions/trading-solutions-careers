@@ -58,7 +58,13 @@ export const TYPE_LABEL: Record<RequisitionType, string> = {
 /** Estados donde la pelota está del lado del líder. */
 export const ESPERA_AL_LIDER: RequisitionStatus[] = ["devuelta"];
 
-/** Estados donde ya no hay nada más que decidir. */
+/**
+ * Estados donde ya no hay nada más que decidir en la aprobación.
+ *
+ * `publicada` cierra ese circuito, no la búsqueda. Cerrar la vacante o
+ * contratar no reescribe esta columna: el check de la tabla no acepta otro
+ * valor. Closed / Hired se derivan al armar el tablero del líder.
+ */
 export const CERRADAS: RequisitionStatus[] = ["rechazada", "publicada"];
 
 type Transicion = {

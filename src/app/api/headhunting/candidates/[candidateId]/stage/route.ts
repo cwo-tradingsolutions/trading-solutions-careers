@@ -99,7 +99,11 @@ export async function POST(
       updates.status = "rejected";
     }
 
-    // Si se mueve a contratado, status también
+    // Si se mueve a contratado, status también.
+    // No se cierra la vacante ni se reescribe la requisición desde acá: el
+    // tablero del líder ve este stage y muestra Hired. El borrador de
+    // bienvenida de más abajo es el único correo de este camino, y sigue
+    // siendo un borrador — no se envía.
     if (targetStage === "contratado") {
       updates.status = "completed";
     }
