@@ -31,6 +31,15 @@ const CN_ENGLISH: ChipOption[] = [
   { value: "C1", label: "C1 · IELTS 7.0–8.0 · TEM-8" },
   { value: "C2", label: "C2 · near-native" },
 ];
+// Panama Ops · CEFR letters; soft mark below B1 (A1/A2).
+const PA_ENGLISH: ChipOption[] = [
+  { value: "A1", label: "A1 · basic" },
+  { value: "A2", label: "A2 · elementary" },
+  { value: "B1", label: "B1 · intermediate" },
+  { value: "B2", label: "B2 · upper-intermediate" },
+  { value: "C1", label: "C1 · advanced" },
+  { value: "C2", label: "C2 · near-native" },
+];
 // Education options · varían según template
 const EDU_COMEX = ["Industrial", "Sistemas / Software", "Otra ingeniería", "Otra carrera", "Estudiante últimos semestres", "Bachiller / técnico"];
 const EDU_HR = ["Psicología", "Administración / Negocios", "Recursos Humanos", "Comunicación / Mercadeo", "Otra carrera", "Estudiante últimos semestres"];
@@ -168,20 +177,40 @@ export default function PrefiltroForm() {
   const [cnTariff, setCnTariff] = useState("");            // A/B/C
   const [cnTariffWhy, setCnTariffWhy] = useState("");
 
+  // ─── Panama Ops (form EN · freight knock-outs) ────────────────────
+  const [paFullName, setPaFullName] = useState("");
+  const [paEmail, setPaEmail] = useState("");
+  const [paPhone, setPaPhone] = useState("");
+  const [paCity, setPaCity] = useState("");
+  const [paWorkAuth, setPaWorkAuth] = useState("");        // "yes" | "no"
+  const [paOnsite, setPaOnsite] = useState("");            // "yes" | "no"
+  const [paYearsFreight, setPaYearsFreight] = useState("");
+  const [paOcean, setPaOcean] = useState("");              // "yes" | "no"
+  const [paAir, setPaAir] = useState("");
+  const [paBlAwb, setPaBlAwb] = useState("");
+  const [paWarehouse, setPaWarehouse] = useState("");
+  const [paEnglish, setPaEnglish] = useState("");          // A1–C2
+  const [paSalaryUsd, setPaSalaryUsd] = useState("");
+  const [paWhyTs, setPaWhyTs] = useState("");
+
   // Template seleccionado (default comex si no hay info)
   const templateKey = data?.vacancy?.form_template_key || "comex";
   const isComex = templateKey === "comex";
   const isHR = templateKey === "hr_lead";
   const isFinance = templateKey === "finance";
   const isChina = templateKey === "china";
+  const isPanamaOps = templateKey === "panama_ops";
+  const isEnForm = isChina || isPanamaOps;
   const isSIG = templateKey === "sig_sst";
   const isDoc = templateKey === "customer_doc";
 
-  // Prefill de nombre/email del candidato cuando cargan los datos (China)
+  // Prefill de nombre/email del candidato (plantillas EN)
   useEffect(() => {
     if (data) {
       if (!cnFullName) setCnFullName(data.candidate.name || "");
       if (!cnEmail) setCnEmail(data.candidate.email || "");
+      if (!paFullName) setPaFullName(data.candidate.name || "");
+      if (!paEmail) setPaEmail(data.candidate.email || "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
@@ -253,6 +282,26 @@ export default function PrefiltroForm() {
         habeasAccepted // en China este check = consentimiento PIPL
       );
     }
+    // Panama Ops · EN · freight knock-outs + privacy consent
+    if (isPanamaOps) {
+      return !!(
+        paFullName.trim().length >= 3 &&
+        /\S+@\S+\.\S+/.test(paEmail.trim()) &&
+        paPhone.trim().length >= 5 &&
+        paCity.trim().length >= 2 &&
+        paWorkAuth &&
+        paOnsite &&
+        paYearsFreight !== "" &&
+        paOcean &&
+        paAir &&
+        paBlAwb &&
+        paWarehouse &&
+        paEnglish &&
+        paSalaryUsd.trim() !== "" &&
+        paWhyTs.trim().length >= 10 &&
+        habeasAccepted // privacy consent EN
+      );
+    }
     // Comunes a todos los templates
     const commonOk = !!(
       docType && docNumber.trim().length >= 6 && phone.trim().length >= 7 && city.trim().length >= 3 &&
@@ -301,7 +350,7 @@ export default function PrefiltroForm() {
 
   async function handleSubmit() {
     if (!isFormValid()) {
-      alert(isChina ? "Please complete all required fields before submitting." : "Por favor completa todos los campos antes de enviar.");
+      alert(isEnForm ? "Please complete all required fields before submitting." : "Por favor completa todos los campos antes de enviar.");
       return;
     }
     setPhase("submitting");
@@ -332,6 +381,49 @@ export default function PrefiltroForm() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(chinaPayload),
+        });
+        if (!res.ok) {
+          const j = await res.json();
+          setErrorMsg(j.error || "Submission error.");
+          setPhase("error");
+          return;
+        }
+        setPhase("done");
+      } catch {
+        setErrorMsg("Connection error.");
+        setPhase("error");
+      }
+      return;
+    }
+
+    // ─── Panama Ops · payload EN ─────────────────────────────────────
+    if (isPanamaOps) {
+      const panamaPayload = {
+        template_key: "panama_ops",
+        full_name: paFullName.trim(),
+        email: paEmail.trim(),
+        phone: paPhone.trim(),
+        current_city: paCity.trim(),
+        work_authorized_panama: paWorkAuth === "yes",
+        onsite_panama_city: paOnsite === "yes",
+        years_freight_panama: parseInt(paYearsFreight) || 0,
+        ocean_fcl_lcl: paOcean === "yes",
+        air_freight: paAir === "yes",
+        bl_awb_docs: paBlAwb === "yes",
+        warehouse_ftz: paWarehouse === "yes",
+        english_level: paEnglish,
+        salary_usd: paSalaryUsd.trim(), // dato · no descarta
+        why_ts: paWhyTs.trim(),
+        extra: extra.trim(),
+        privacy_consent: true,
+        privacy_consent_at: new Date().toISOString(),
+        submitted_at: new Date().toISOString(),
+      };
+      try {
+        const res = await fetch(`/api/headhunting/prefilter/${token}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(panamaPayload),
         });
         if (!res.ok) {
           const j = await res.json();
@@ -479,9 +571,9 @@ export default function PrefiltroForm() {
           <div style={{ width: 64, height: 64, borderRadius: 32, background: "#DCFCE7", margin: "0 auto 24px", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#166534" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
           </div>
-          <h1 style={{ color: TS_BLACK, fontSize: 28, fontWeight: 700, margin: "0 0 12px" }}>{isChina ? "All set!" : "¡Listo!"}</h1>
-          <p style={{ color: TS_GRAY, fontSize: 16, margin: "0 0 8px" }}>{isChina ? "We received your answers successfully." : "Recibimos tus respuestas correctamente."}</p>
-          <p style={{ color: TS_GRAY, fontSize: 14 }}>{isChina ? "We'll be in touch soon with next steps." : "Te contactaremos pronto con los próximos pasos."}</p>
+          <h1 style={{ color: TS_BLACK, fontSize: 28, fontWeight: 700, margin: "0 0 12px" }}>{isEnForm ? "All set!" : "¡Listo!"}</h1>
+          <p style={{ color: TS_GRAY, fontSize: 16, margin: "0 0 8px" }}>{isEnForm ? "We received your answers successfully." : "Recibimos tus respuestas correctamente."}</p>
+          <p style={{ color: TS_GRAY, fontSize: 14 }}>{isEnForm ? "We'll be in touch soon with next steps." : "Te contactaremos pronto con los próximos pasos."}</p>
         </div>
       </div>
     );
@@ -531,6 +623,77 @@ export default function PrefiltroForm() {
               />
               <span style={{ fontSize: 14, fontWeight: 500 }}>
                 I consent to Trading Solutions processing my personal information for the purpose of this recruitment process, in accordance with the PIPL.
+              </span>
+            </label>
+          </div>
+
+          <button
+            onClick={() => habeasAccepted && setPhase("form")}
+            disabled={!habeasAccepted}
+            style={{
+              width: "100%", padding: "16px 32px",
+              background: habeasAccepted ? TS_BLACK : "#999",
+              color: "white", border: "none", borderRadius: 999,
+              fontSize: 16, fontWeight: 700,
+              cursor: habeasAccepted ? "pointer" : "not-allowed",
+            }}
+          >
+            Continue to the questionnaire →
+          </button>
+          {!habeasAccepted && (
+            <p style={{ color: TS_GRAY, fontSize: 13, textAlign: "center", marginTop: 12 }}>
+              Check the consent box to continue.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Panama Ops · EN privacy consent (not PIPL, not CO habeas) ────
+  if (phase === "habeas" && isPanamaOps) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#fafafa", padding: "32px 16px", fontFamily: "Inter, -apple-system, sans-serif", color: TS_BLACK }}>
+        <div style={{ maxWidth: 720, margin: "0 auto" }}>
+          <div style={{ marginBottom: 32 }}>
+            <p style={{ color: TS_GRAY, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 8 }}>
+              Trading Solutions · Initial questionnaire
+            </p>
+            <h1 style={{ fontSize: 32, fontWeight: 700, margin: "0 0 12px", lineHeight: 1.2 }}>
+              Hi {data?.candidate.name.split(" ")[0]} — let&apos;s get to know you
+            </h1>
+            <p style={{ color: TS_GRAY, fontSize: 16, lineHeight: 1.6 }}>
+              Before moving forward with the <strong>{data?.vacancy.title}</strong> process, please complete this short questionnaire. It covers freight operations essentials for Panama and takes about 5–7 minutes.
+            </p>
+          </div>
+
+          <div style={{ background: "white", borderRadius: 16, padding: 32, border: `1px solid ${TS_BORDER}`, marginBottom: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 12, background: "#EBF0FF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={TS_BLUE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2l8 4v6c0 5.25-3.5 9.74-8 11-4.5-1.26-8-5.75-8-11V6l8-4z" />
+                </svg>
+              </div>
+              <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Privacy notice</h2>
+            </div>
+            <p style={{ color: TS_GRAY, fontSize: 14, lineHeight: 1.7, marginBottom: 16 }}>
+              The information you share in this form will be processed by <strong>Trading Solutions</strong> for the sole purpose of managing the recruitment process for the Panama Operations position you are applying to.
+            </p>
+            <ul style={{ color: TS_GRAY, fontSize: 14, lineHeight: 1.7, paddingLeft: 20, marginBottom: 16 }}>
+              <li>Your data will be stored securely in our candidate database.</li>
+              <li>It will not be shared with third parties without your authorization.</li>
+              <li>You may access, update, correct or request deletion of your data at any time.</li>
+              <li>To exercise your rights, write to <strong>jointheteam@tradingsolutions.com</strong>.</li>
+            </ul>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 16, border: `2px solid ${habeasAccepted ? TS_BLACK : TS_BORDER}`, borderRadius: 12, cursor: "pointer", background: habeasAccepted ? "#F9FAFB" : "white" }}>
+              <input
+                type="checkbox"
+                checked={habeasAccepted}
+                onChange={(e) => setHabeasAccepted(e.target.checked)}
+                style={{ width: 18, height: 18, marginTop: 2, accentColor: TS_BLACK, cursor: "pointer" }}
+              />
+              <span style={{ fontSize: 14, fontWeight: 500 }}>
+                I consent to Trading Solutions processing my personal information for the purpose of this recruitment process.
               </span>
             </label>
           </div>
@@ -703,6 +866,110 @@ export default function PrefiltroForm() {
           </Section>
 
           <Section title="6 · Anything else">
+            <Q label="Anything else we should know? (optional)">
+              <textarea value={extra} onChange={(e) => setExtra(e.target.value.slice(0, 500))} rows={3} style={inputStyle} />
+            </Q>
+          </Section>
+
+          <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${TS_BORDER}` }}>
+            <button
+              onClick={handleSubmit}
+              disabled={(phase as Phase) === "submitting" || !isFormValid()}
+              style={{
+                width: "100%", padding: "16px 32px",
+                background: isFormValid() ? TS_BLACK : "#999",
+                color: "white", border: "none", borderRadius: 999,
+                fontSize: 16, fontWeight: 700,
+                cursor: isFormValid() ? "pointer" : "not-allowed",
+                transition: "background 0.2s",
+              }}
+            >
+              {(phase as Phase) === "submitting" ? "Submitting…" : "Submit answers"}
+            </button>
+            {!isFormValid() && (
+              <p style={{ color: TS_GRAY, fontSize: 13, textAlign: "center", marginTop: 12 }}>
+                Please complete all required questions before submitting.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Panama Ops · Form phase (EN · freight knock-outs) ────────────
+  if (isPanamaOps) {
+    const YESNO_EN = [{ label: "Yes", value: "yes" }, { label: "No", value: "no" }];
+    return (
+      <div style={{ minHeight: "100vh", background: "#fafafa", padding: "32px 16px", fontFamily: "Inter, -apple-system, sans-serif", color: TS_BLACK }}>
+        <div style={{ maxWidth: 720, margin: "0 auto" }}>
+          <div style={{ marginBottom: 32 }}>
+            <p style={{ color: TS_GRAY, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 8 }}>
+              Trading Solutions · {data?.vacancy.title}
+            </p>
+            <h1 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 12px" }}>Tell us about yourself, {data?.candidate.name.split(" ")[0]}</h1>
+            <p style={{ color: TS_GRAY, fontSize: 15, lineHeight: 1.6 }}>
+              Freight operations in Panama — please answer honestly. There are no right or wrong answers.
+            </p>
+          </div>
+
+          <Section title="1 · Your details">
+            <Q label="Full name">
+              <input value={paFullName} onChange={(e) => setPaFullName(e.target.value)} style={inputStyle} placeholder="Your full name" />
+            </Q>
+            <Q label="Email">
+              <input value={paEmail} onChange={(e) => setPaEmail(e.target.value)} style={inputStyle} placeholder="you@email.com" inputMode="email" />
+            </Q>
+            <Q label="Phone">
+              <input value={paPhone} onChange={(e) => setPaPhone(e.target.value)} style={inputStyle} placeholder="+507 …" inputMode="tel" />
+            </Q>
+            <Q label="Current city">
+              <input value={paCity} onChange={(e) => setPaCity(e.target.value)} style={inputStyle} placeholder="e.g. Panama City, Colón" />
+            </Q>
+          </Section>
+
+          <Section title="2 · Eligibility">
+            <Q label="Are you legally authorized to work in Panama?">
+              <SelectChips value={paWorkAuth} onChange={setPaWorkAuth} options={YESNO_EN} />
+            </Q>
+            <Q label="Can you work on-site in Panama City?">
+              <SelectChips value={paOnsite} onChange={setPaOnsite} options={YESNO_EN} />
+            </Q>
+          </Section>
+
+          <Section title="3 · Freight experience">
+            <Q label="Years of experience in freight forwarding / logistics in Panama (or equivalent)">
+              <input type="number" min={0} max={50} value={paYearsFreight} onChange={(e) => setPaYearsFreight(e.target.value)} style={inputStyle} placeholder="0" />
+              <p style={hintStyle}>We typically look for <strong>4+ years</strong>. Fewer years still go to review — they are not an automatic no.</p>
+            </Q>
+            <Q label="Hands-on experience with ocean freight (FCL / LCL)?">
+              <SelectChips value={paOcean} onChange={setPaOcean} options={YESNO_EN} />
+            </Q>
+            <Q label="Hands-on experience with air freight?">
+              <SelectChips value={paAir} onChange={setPaAir} options={YESNO_EN} />
+            </Q>
+            <Q label="Experience preparing / handling B/L and AWB documents?">
+              <SelectChips value={paBlAwb} onChange={setPaBlAwb} options={YESNO_EN} />
+            </Q>
+            <Q label="Experience with warehouse / free trade zone (FTZ) operations?">
+              <SelectChips value={paWarehouse} onChange={setPaWarehouse} options={YESNO_EN} />
+            </Q>
+          </Section>
+
+          <Section title="4 · English &amp; compensation">
+            <Q label="English level">
+              <SelectChips value={paEnglish} onChange={setPaEnglish} options={PA_ENGLISH} />
+              <p style={hintStyle}>This role needs about <strong>B1 or above</strong>. Below B1 is flagged for review, not auto-rejected.</p>
+            </Q>
+            <Q label="Expected monthly base (USD)">
+              <input value={paSalaryUsd} onChange={(e) => setPaSalaryUsd(e.target.value)} style={inputStyle} placeholder="e.g. 1400" inputMode="numeric" />
+            </Q>
+          </Section>
+
+          <Section title="5 · About you">
+            <Q label="Why Trading Solutions / why this Operations role?">
+              <textarea value={paWhyTs} onChange={(e) => setPaWhyTs(e.target.value.slice(0, 800))} rows={3} style={inputStyle} placeholder="A few sentences…" />
+            </Q>
             <Q label="Anything else we should know? (optional)">
               <textarea value={extra} onChange={(e) => setExtra(e.target.value.slice(0, 500))} rows={3} style={inputStyle} />
             </Q>

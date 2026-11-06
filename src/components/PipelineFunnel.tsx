@@ -107,25 +107,43 @@ type PrefilterData = {
   years_leading_sig?: number;
   cert_audit_cycles?: number;
   case_answer?: string;
-  // China · plantilla china. El _meta del prefiltro trae los knock-outs y el
-  // salario; sin esto la ficha no mostraba nada de lo que el candidato
-  // respondió y había que ir a la base a mirarlo.
+  // China / Panama Ops · plantillas EN. El _meta del prefiltro trae los
+  // knock-outs y el salario; sin esto la ficha no mostraba nada de lo que
+  // el candidato respondió y había que ir a la base a mirarlo.
   current_city?: string;
   work_authorized?: boolean;
   onsite_available?: boolean;
+  work_authorized_panama?: boolean;
+  onsite_panama_city?: boolean;
+  years_freight_panama?: number;
+  ocean_fcl_lcl?: boolean;
+  air_freight?: boolean;
+  bl_awb_docs?: boolean;
+  warehouse_ftz?: boolean;
   salary_usd?: string;
   years_experience?: number;
   pipl_consent?: boolean;
+  privacy_consent?: boolean;
   _meta?: {
     china?: boolean;
+    panama_ops?: boolean;
     salary_usd_expectation?: string | null;
     salary_usd_parsed?: number | null;
     salary_cap_usd?: number;
     salary_over_budget?: boolean;
     english_candidate_rank?: number;
     english_min_required_rank?: number;
+    english_fails?: boolean;
     work_authorized?: boolean;
     onsite_available?: boolean;
+    work_authorized_panama?: boolean;
+    onsite_panama_city?: boolean;
+    years_freight_panama?: number;
+    years_freight_short?: boolean;
+    ocean_fcl_lcl?: boolean;
+    air_freight?: boolean;
+    bl_awb_docs?: boolean;
+    warehouse_ftz?: boolean;
   };
 };
 
@@ -2234,6 +2252,79 @@ function CandDetailPanel({ cand, onClose, onChanged }: { cand: Cand; onClose: ()
                     <Row k="Presencial" v={pf._meta.onsite_available ? "Sí" : "No"} />
                   )}
                   {typeof pf.years_experience === "number" && <Row k="Años de experiencia" v={`${pf.years_experience}`} />}
+                  {(pf._meta.salary_usd_expectation || pf.salary_usd) && (
+                    <Row
+                      k="Expectativa (USD/mes)"
+                      v={
+                        <span className={pf._meta.salary_over_budget ? "text-red-700 font-bold" : "font-bold"}>
+                          {pf._meta.salary_usd_expectation || pf.salary_usd}
+                          {pf._meta.salary_over_budget && pf._meta.salary_cap_usd
+                            ? ` · sobre el tope de USD ${pf._meta.salary_cap_usd}`
+                            : ""}
+                        </span>
+                      }
+                    />
+                  )}
+                </Section>
+              )}
+
+              {pf._meta?.panama_ops && (
+                <Section title="🇵🇦 Prefiltro Panama Ops">
+                  {pf.current_city && <Row k="Ciudad" v={pf.current_city} />}
+                  {typeof pf._meta.work_authorized_panama === "boolean" && (
+                    <Row
+                      k="Autorizado para trabajar (PA)"
+                      v={
+                        <strong className={pf._meta.work_authorized_panama ? "text-emerald-700" : "text-red-700"}>
+                          {pf._meta.work_authorized_panama ? "Sí" : "No"}
+                        </strong>
+                      }
+                    />
+                  )}
+                  {typeof pf._meta.onsite_panama_city === "boolean" && (
+                    <Row
+                      k="Presencial Panamá City"
+                      v={
+                        <strong className={pf._meta.onsite_panama_city ? "text-emerald-700" : "text-red-700"}>
+                          {pf._meta.onsite_panama_city ? "Sí" : "No"}
+                        </strong>
+                      }
+                    />
+                  )}
+                  {typeof (pf._meta.years_freight_panama ?? pf.years_freight_panama) === "number" && (
+                    <Row
+                      k="Años freight Panamá"
+                      v={
+                        <span className={pf._meta.years_freight_short ? "text-amber-700 font-bold" : undefined}>
+                          {pf._meta.years_freight_panama ?? pf.years_freight_panama}
+                          {pf._meta.years_freight_short ? " · bajo el mínimo (4)" : ""}
+                        </span>
+                      }
+                    />
+                  )}
+                  {typeof pf._meta.ocean_fcl_lcl === "boolean" && (
+                    <Row k="Ocean FCL/LCL" v={pf._meta.ocean_fcl_lcl ? "Sí" : "No"} />
+                  )}
+                  {typeof pf._meta.air_freight === "boolean" && (
+                    <Row k="Air freight" v={pf._meta.air_freight ? "Sí" : "No"} />
+                  )}
+                  {typeof pf._meta.bl_awb_docs === "boolean" && (
+                    <Row k="B/L · AWB docs" v={pf._meta.bl_awb_docs ? "Sí" : "No"} />
+                  )}
+                  {typeof pf._meta.warehouse_ftz === "boolean" && (
+                    <Row k="Warehouse / FTZ" v={pf._meta.warehouse_ftz ? "Sí" : "No"} />
+                  )}
+                  {pf.english_level && (
+                    <Row
+                      k="Inglés"
+                      v={
+                        <span className={pf._meta.english_fails ? "text-amber-700 font-bold" : undefined}>
+                          {pf.english_level}
+                          {pf._meta.english_fails ? " · bajo B1" : ""}
+                        </span>
+                      }
+                    />
+                  )}
                   {(pf._meta.salary_usd_expectation || pf.salary_usd) && (
                     <Row
                       k="Expectativa (USD/mes)"

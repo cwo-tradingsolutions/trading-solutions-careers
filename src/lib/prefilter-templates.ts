@@ -10,7 +10,7 @@
  * archivo para validar qué campos son obligatorios según template.
  */
 
-export type TemplateKey = "comex" | "hr_lead" | "finance" | "tech" | "china" | "sig_sst" | "customer_doc";
+export type TemplateKey = "comex" | "hr_lead" | "finance" | "tech" | "china" | "panama_ops" | "sig_sst" | "customer_doc";
 
 export type SectionKey =
   | "personal"           // todos
@@ -22,6 +22,7 @@ export type SectionKey =
   | "hr_experience"      // solo hr_lead
   | "finance_experience" // solo finance
   | "china_core"         // solo china · form en inglés, innegociables
+  | "panama_core"        // solo panama_ops · form EN, freight knock-outs
   | "sig_experience"     // solo sig_sst · licencia, cursos, auditorías
   | "doc_experience"     // solo customer_doc · documentos, conciliación, plataformas
   | "doc_case"           // solo customer_doc · el caso de la diferencia de peso
@@ -77,6 +78,13 @@ export const PREFILTER_TEMPLATES: Record<TemplateKey, PrefilterTemplate> = {
     label: "China Builder Team (EN · knock-outs only)",
     description: "Para vacantes de China · formulario en inglés, corto, solo innegociables. Salario en USD es dato, no descarta. Consentimiento PIPL en vez de habeas data colombiano.",
     sections: ["china_core", "about_you"],
+  },
+  panama_ops: {
+    key: "panama_ops",
+    label: "Panama Operations (EN · freight knock-outs)",
+    description:
+      "Para Operations Specialist en Panamá · formulario en inglés. Knock-outs de autorización y presencialidad en Ciudad de Panamá; freight (ocean/air/docs/FTZ). Salario USD es dato, no descarta. Consentimiento de privacidad EN (no PIPL China, no habeas CO).",
+    sections: ["panama_core", "about_you"],
   },
 };
 
@@ -155,6 +163,16 @@ export const TEMPLATE_REQUIRED_FIELDS: Record<TemplateKey, string[]> = {
     "years_experience", "onsite_available", "salary_usd",
     "tariff_choice", "pipl_consent",
   ],
+  // Panama Ops · form EN. Knock-outs (flag → review): work_authorized_panama,
+  // onsite_panama_city. Soft mark: years_freight_panama < 4, english < B1,
+  // salary_usd > cap. Salario nunca auto-rechaza. Consentimiento privacy EN.
+  panama_ops: [
+    "full_name", "email", "phone", "current_city",
+    "work_authorized_panama", "onsite_panama_city",
+    "years_freight_panama", "ocean_fcl_lcl", "air_freight",
+    "bl_awb_docs", "warehouse_ftz", "english_level",
+    "salary_usd", "why_ts", "privacy_consent",
+  ],
 };
 
 /**
@@ -175,9 +193,20 @@ export const TEMPLATE_ENGLISH_MIN_RANK: Partial<Record<TemplateKey, number>> = {
   // Customer Documentation lee documentos en inglés; no negocia en inglés.
   // A2 alcanza (rank 2). Y como nada descarta solo, esto apenas marca.
   customer_doc: 2,
+  // Panama Ops · B1 mínimo (rank 3). Debajo se marca soft, no auto-rechaza.
+  panama_ops: 3,
 };
 
 /** Tope de la banda en COP. Sobre esto se marca, nunca se rechaza. */
 export const TEMPLATE_SALARY_CAP: Partial<Record<TemplateKey, number>> = {
   customer_doc: 3_500_000,
+};
+
+/**
+ * Tope mensual USD (bruto) por template EN. Sobre esto se marca review;
+ * nunca auto-rechaza. El path china/panama_ops usa estas constantes en la
+ * ruta de prefiltro (no TEMPLATE_SALARY_CAP, que es COP).
+ */
+export const TEMPLATE_SALARY_CAP_USD: Partial<Record<TemplateKey, number>> = {
+  panama_ops: 1500,
 };
