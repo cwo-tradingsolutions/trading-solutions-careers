@@ -59,6 +59,8 @@ test("abierta: estado_final null, el SLA sigue y el status de aprobación no se 
   assert.equal(campos.candidatos_total, 2);
   assert.equal(campos.conteos.aplico, 1);
   assert.equal(campos.conteos.contratado, 0);
+  assert.equal(campos.reinicio_el, null);
+  assert.equal(campos.reinicio_motivo, null);
   assert.equal(campos.hitos_fechas.aprobada_el, "2026-09-07T20:10:50.000Z");
   assert.equal(campos.hitos_fechas.publicada_el, "2026-09-08T14:00:00.000Z");
   assert.equal(campos.hitos_fechas.primera_aplicacion_el, "2026-09-10T12:00:00.000Z");
@@ -331,9 +333,241 @@ test("el route del board agrega los campos y no selecciona salario ni reescribe 
   assert.match(src, /sla_activo: campos\.sla_activo/);
   assert.match(src, /candidatos_total: campos\.candidatos_total/);
   assert.match(src, /hitos_fechas: campos\.hitos_fechas/);
+  assert.match(src, /reinicio_el: campos\.reinicio_el/);
+  assert.match(src, /reinicio_motivo: campos\.reinicio_motivo/);
+  assert.match(src, /dias_desde_aprobacion: campos\.dias_desde_aprobacion/);
+  assert.match(src, /inicioDelReloj/);
+  assert.match(src, /searchRestartedAt: vac\?\.search_restarted_at/);
+  assert.equal((src.match(/search_restarted_at, search_restart_reason/g) || []).length, 2);
+  assert.equal(src.includes("diasDesdeAprobacion"), false);
   assert.match(src, /status: r\.status as RequisitionStatus/);
   assert.match(src, /correoDelLider\(req\)/);
   assert.match(src, /\.ilike\("lead_email", leadEmail\)/);
   assert.equal(src.includes("salary"), false);
   assert.equal(src.includes("salario"), false);
+});
+
+/**
+ * TA, ciclo 2. El ciclo 1 cerró el 1-oct; la búsqueda se reinició el 19-oct.
+ * Andrés entra a hired el 5-nov y su hire_date es el 16-nov. El reloj del
+ * ciclo activo es 19-oct → 16-nov (28 días calendario, la misma unidad que
+ * `dias()` del board y que reloj.ts). Una oferta de antes del reinicio no
+ * puede dejar el ciclo en "oferta hecha" si el contratado no tiene ese evento.
+ */
+test("reinicio 19-oct + hire_date 16-nov: los días del ciclo salen del reinicio y la oferta vieja no cuenta", () => {
+  const motivo = "Cambio de perfil. El ciclo 1 cerró el 1 de octubre.";
+  const candidatos = [
+    persona({
+      id: "ciclo1",
+      vacancy_id: TA,
+      stage: "rechazado",
+      status: "rejected",
+      created_at: "2026-09-02T15:00:00.000Z",
+    }),
+    persona({
+      id: "andres",
+      vacancy_id: TA,
+      stage: "hired",
+      status: "completed",
+      created_at: "2026-10-20T15:00:00.000Z",
+    }),
+  ];
+  const eventos = [
+    evento({
+      candidate_id: "ciclo1",
+      to_stage: "terna",
+      changed_at: "2026-09-20T15:00:00.000Z",
+    }),
+    evento({
+      candidate_id: "ciclo1",
+      to_stage: "recruiter_interview",
+      changed_at: "2026-09-15T15:00:00.000Z",
+    }),
+    evento({
+      candidate_id: "ciclo1",
+      to_stage: "oferta",
+      changed_at: "2026-10-01T16:00:00.000Z",
+    }),
+    evento({
+      candidate_id: "andres",
+      to_stage: "recruiter_interview",
+      changed_at: "2026-10-28T15:00:00.000Z",
+    }),
+    evento({
+      candidate_id: "andres",
+      to_stage: "hired",
+      changed_at: "2026-11-05T15:00:00.000Z",
+    }),
+  ];
+  const campos = camposBoard({
+    vacancyStatus: "closed",
+    approvedAt: "2026-08-26T22:15:17.000Z",
+    searchRestartedAt: "2026-10-19T00:00:00.000Z",
+    searchRestartReason: motivo,
+    candidatos,
+    eventos,
+    hireDate: "2026-11-16",
+    closedAt: null,
+    ahora: new Date("2026-12-01T00:00:00.000Z"),
+  });
+
+  assert.equal(campos.estado_final, "contratada");
+  assert.equal(campos.sla_activo, false);
+  assert.equal(campos.reinicio_el, "2026-10-19T00:00:00.000Z");
+  assert.equal(campos.reinicio_motivo, motivo);
+  assert.equal(campos.dias_desde_aprobacion, 28);
+  assert.equal(campos.hitos_fechas.aprobada_el, "2026-08-26T22:15:17.000Z");
+  assert.equal(campos.hitos_fechas.primera_aplicacion_el, "2026-10-20T15:00:00.000Z");
+  assert.equal(campos.hitos_fechas.terna_el, null);
+  assert.equal(campos.hitos_fechas.entrevista_el, "2026-10-28T15:00:00.000Z");
+  assert.equal(campos.hitos_fechas.oferta_el, null);
+  assert.equal(campos.hitos_fechas.contratado_el, "2026-11-05T15:00:00.000Z");
+  assert.equal(JSON.stringify(campos.hitos_fechas).includes("2026-10-01"), false);
+  assert.equal(JSON.stringify(campos.hitos_fechas).includes("2026-09-15"), false);
+
+  const desdeLaAprobacion = Math.round(
+    (Date.parse("2026-11-16T00:00:00.000Z") - Date.parse("2026-08-26T22:15:17.000Z")) / 86_400_000,
+  );
+  assert.notEqual(campos.dias_desde_aprobacion, desdeLaAprobacion);
+
+  const sinHireDate = camposBoard({
+    vacancyStatus: "closed",
+    approvedAt: "2026-08-26T22:15:17.000Z",
+    searchRestartedAt: "2026-10-19T00:00:00.000Z",
+    candidatos,
+    eventos,
+    hireDate: null,
+    ahora: new Date("2026-12-01T00:00:00.000Z"),
+  });
+  // Sin hire_date el fin es el alta del 5-nov 15:00, no el 1-dic de `ahora`.
+  assert.equal(sinHireDate.dias_desde_aprobacion, 18);
+  assert.equal(sinHireDate.hitos_fechas.oferta_el, null);
+});
+
+test("reinicio: una oferta del ciclo actual sí cuenta y la anterior no se adelanta", () => {
+  const campos = camposBoard({
+    vacancyStatus: "closed",
+    approvedAt: "2026-08-26T22:15:17.000Z",
+    searchRestartedAt: "2026-10-19T00:00:00.000Z",
+    candidatos: [
+      persona({
+        id: "viejo",
+        vacancy_id: TA,
+        stage: "rechazado",
+        status: "rejected",
+        created_at: "2026-09-02T15:00:00.000Z",
+      }),
+      persona({
+        id: "andres",
+        vacancy_id: TA,
+        stage: "hired",
+        status: "completed",
+        created_at: "2026-10-20T15:00:00.000Z",
+      }),
+    ],
+    eventos: [
+      evento({
+        candidate_id: "viejo",
+        to_stage: "oferta",
+        changed_at: "2026-10-01T16:00:00.000Z",
+      }),
+      evento({
+        candidate_id: "andres",
+        to_stage: "oferta",
+        changed_at: "2026-10-30T16:00:00.000Z",
+      }),
+      evento({
+        candidate_id: "andres",
+        to_stage: "hired",
+        changed_at: "2026-11-05T15:00:00.000Z",
+      }),
+    ],
+    hireDate: "2026-11-16",
+  });
+
+  assert.equal(campos.hitos_fechas.oferta_el, "2026-10-30T16:00:00.000Z");
+  assert.equal(campos.dias_desde_aprobacion, 28);
+});
+
+test("búsqueda abierta con reinicio: el reloj sale del reinicio y no de la aprobación", () => {
+  const campos = camposBoard({
+    vacancyStatus: "open",
+    approvedAt: "2026-08-26T22:15:17.000Z",
+    searchRestartedAt: "2026-10-19T00:00:00.000Z",
+    candidatos: [persona({ id: "a", stage: "aplico", created_at: "2026-10-21T12:00:00.000Z" })],
+    ahora: new Date("2026-11-06T00:00:00.000Z"),
+  });
+
+  assert.equal(campos.estado_final, null);
+  assert.equal(campos.sla_activo, true);
+  assert.equal(campos.reinicio_el, "2026-10-19T00:00:00.000Z");
+  assert.equal(campos.dias_desde_aprobacion, 18);
+  assert.equal(campos.hitos_fechas.primera_aplicacion_el, "2026-10-21T12:00:00.000Z");
+});
+
+test("reinicio y cierre sin alta: el reloj para en cerrada_el, no en ahora", () => {
+  const campos = camposBoard({
+    vacancyStatus: "closed",
+    approvedAt: "2026-08-01T00:00:00.000Z",
+    searchRestartedAt: "2026-10-19T00:00:00.000Z",
+    closedAt: "2026-11-02T00:00:00.000Z",
+    candidatos: [],
+    ahora: new Date("2026-12-01T00:00:00.000Z"),
+  });
+
+  assert.equal(campos.estado_final, "cerrada");
+  assert.equal(campos.dias_desde_aprobacion, 14);
+});
+
+test("sin reinicio, dias_desde_aprobacion sigue hasta ahora aunque haya hire_date", () => {
+  const aprobada = "2026-09-07T20:10:50.000Z";
+  const ahora = new Date("2026-11-06T13:40:00.000Z");
+  const campos = camposBoard({
+    vacancyStatus: "closed",
+    approvedAt: aprobada,
+    candidatos: [persona({ id: "h", stage: "hired", status: "completed" })],
+    eventos: [
+      evento({
+        candidate_id: "h",
+        to_stage: "hired",
+        changed_at: "2026-10-07T22:17:39.000Z",
+      }),
+    ],
+    hireDate: "2026-10-01",
+    ahora,
+  });
+  const hastaAhora = Math.max(0, Math.round((ahora.getTime() - Date.parse(aprobada)) / 86_400_000));
+  const hastaHire = Math.max(
+    0,
+    Math.round((Date.parse("2026-10-01T00:00:00.000Z") - Date.parse(aprobada)) / 86_400_000),
+  );
+  assert.equal(campos.reinicio_el, null);
+  assert.equal(campos.dias_desde_aprobacion, hastaAhora);
+  assert.notEqual(campos.dias_desde_aprobacion, hastaHire);
+});
+
+test("reinicio_motivo se recorta y no sale si no hubo reinicio", () => {
+  const cola = "COLA-QUE-NO-DEBE-SALIR";
+  const largo = `${"cambio de perfil ".repeat(20)}${cola}`;
+  assert.ok(largo.length > 200);
+  const campos = camposBoard({
+    vacancyStatus: "open",
+    searchRestartedAt: "2026-10-19T00:00:00.000Z",
+    searchRestartReason: `  ${largo}\n`,
+    candidatos: [],
+    ahora: new Date("2026-10-20T00:00:00.000Z"),
+  });
+  assert.ok(campos.reinicio_motivo);
+  assert.ok((campos.reinicio_motivo || "").length <= 200);
+  assert.equal((campos.reinicio_motivo || "").endsWith("…"), true);
+  assert.equal((campos.reinicio_motivo || "").includes(cola), false);
+  assert.equal(campos.reinicio_motivo?.startsWith("cambio de perfil"), true);
+
+  const sinReinicio = camposBoard({
+    vacancyStatus: "open",
+    searchRestartReason: "no debería salir",
+    candidatos: [],
+  });
+  assert.equal(sinReinicio.reinicio_el, null);
+  assert.equal(sinReinicio.reinicio_motivo, null);
 });

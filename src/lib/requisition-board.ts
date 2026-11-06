@@ -11,6 +11,7 @@
  * se reconstruyó de `updated_at` (migración del 18-ago-2026) y no es una
  * fecha real: se omite. Si no hay fecha, el campo queda null.
  */
+import { inicioDelReloj } from "./reloj";
 import { STAGES, normalizeStage } from "./stage-labels";
 
 /** Una pausa no es un cierre: la búsqueda se puede retomar. */
@@ -53,7 +54,21 @@ export type CamposBoard = {
   candidatos_total: number;
   conteos: Record<string, number>;
   hitos_fechas: HitosFechas;
+  /** ISO del `search_restarted_at` de la vacante. Null si esta búsqueda no se reinició. */
+  reinicio_el: string | null;
+  /** Motivo del reinicio, recortado. Null si no hay. */
+  reinicio_motivo: string | null;
+  /**
+   * Días calendario del reloj que ve el líder. Sin reinicio: desde la
+   * aprobación hasta ahora. Con reinicio: desde el reinicio (la misma
+   * regla que `inicioDelReloj`) y, si ya se contrató o se cerró, hasta
+   * el fin del ciclo — `hire_date` cuando existe.
+   */
+  dias_desde_aprobacion: number | null;
 };
+
+/** El tablero no es el lugar para un párrafo. */
+const MOTIVO_MAX = 200;
 
 const HITOS_VACIOS: HitosFechas = {
   aprobada_el: null,
@@ -143,6 +158,68 @@ export function isoONull(value: unknown): string | null {
   return parsed.toISOString();
 }
 
+export function motivoReinicio(value: unknown): string | null {
+  if (value == null) return null;
+  const raw = String(value).replace(/[\r\n]+/g, " ").trim();
+  if (!raw) return null;
+  if (raw.length <= MOTIVO_MAX) return raw;
+  return `${raw.slice(0, MOTIVO_MAX - 1).trimEnd()}…`;
+}
+
+function diasEntre(desde: string, hasta: string | Date): number {
+  const ms = new Date(hasta).getTime() - new Date(desde).getTime();
+  if (!Number.isFinite(ms)) return 0;
+  return Math.max(0, Math.round(ms / 86_400_000));
+}
+
+/**
+ * Arranque del reloj de la tarjeta.
+ *
+ * Misma regla que el reloj de un candidato: si la búsqueda se reinició,
+ * cuenta desde el reinicio, no desde la aprobación anterior. Si la
+ * aprobación fuera posterior al reinicio, manda la aprobación.
+ */
+export function inicioDelCiclo(
+  aprobadaEl: string | null | undefined,
+  reinicioEl: string | null | undefined,
+): string | null {
+  return inicioDelReloj(aprobadaEl, reinicioEl);
+}
+
+/**
+ * Días calendario del ciclo que el tablero muestra en `dias_desde_aprobacion`.
+ *
+ * Sin reinicio el número sigue hasta ahora, también en una cerrada: el hub
+ * apaga Overdue con `sla_activo` y ese histórico no se reescribe.
+ *
+ * Con reinicio el tramo es reinicio → fin. En una contratada el fin es
+ * `hire_date` si está; si no, la fecha del alta. En una cerrada, el cierre
+ * registrado. Una búsqueda que sigue abierta llega hasta `ahora`.
+ */
+export function diasDelCiclo(input: {
+  approvedAt?: string | null;
+  reinicioEl?: string | null;
+  estado: EstadoFinal;
+  hireDate?: string | null;
+  contratadoEl?: string | null;
+  cerradaEl?: string | null;
+  ahora?: Date;
+}): number | null {
+  const ahora = input.ahora ?? new Date();
+  const reinicioEl = isoONull(input.reinicioEl);
+  const inicio = inicioDelCiclo(input.approvedAt, reinicioEl);
+  if (!inicio) return null;
+  if (!reinicioEl) return diasEntre(inicio, ahora);
+
+  let fin: string | Date = ahora;
+  if (input.estado === "contratada") {
+    fin = isoONull(input.hireDate) || input.contratadoEl || ahora;
+  } else if (input.estado === "cerrada") {
+    fin = input.cerradaEl || ahora;
+  }
+  return diasEntre(inicio, fin);
+}
+
 function laMasTemprana(valores: Array<string | null | undefined>): string | null {
   let mejor: string | null = null;
   let mejorMs = Infinity;
@@ -214,10 +291,24 @@ export function hitosFechas(input: {
   hireDate?: string | null;
   /** Solo si la base tiene un cierre registrado. El route de prod pasa null. */
   closedAt?: string | null;
+  /** Si la búsqueda se reinició, los hitos de etapa anteriores son otro ciclo. */
+  searchRestartedAt?: string | null;
 }): HitosFechas {
   const visibles = input.candidatos.filter(cuentaEnTablero);
   const ids = new Set(visibles.map((c) => c.id));
-  const eventos = (input.eventos || []).filter((ev) => ids.has(ev.candidate_id));
+  // Una oferta o una terna de antes del reinicio no pintan el ciclo que
+  // está corriendo. La aprobación y la publicación sí se quedan: no se
+  // volvieron a hacer, y el campo `reinicio_el` dice desde cuándo cuenta.
+  const corte = isoONull(input.searchRestartedAt);
+  const corteMs = corte ? new Date(corte).getTime() : null;
+  const delCiclo = (cuando: string | null | undefined): boolean => {
+    if (corteMs == null) return true;
+    const iso = isoONull(cuando);
+    return iso != null && new Date(iso).getTime() >= corteMs;
+  };
+  const eventos = (input.eventos || []).filter(
+    (ev) => ids.has(ev.candidate_id) && delCiclo(ev.changed_at),
+  );
   const contratadoPorEvento = primerEvento(eventos, esAlta);
   // hire_date solo completa el alta que ya vimos en un stage. Si no hay
   // contratado, una fecha suelta no convierte la búsqueda en una contratación.
@@ -226,7 +317,9 @@ export function hitosFechas(input: {
   return {
     aprobada_el: isoONull(input.approvedAt),
     publicada_el: laMasTemprana(input.publicadaEn || []),
-    primera_aplicacion_el: laMasTemprana(visibles.map((c) => c.created_at)),
+    primera_aplicacion_el: laMasTemprana(
+      visibles.filter((c) => delCiclo(c.created_at)).map((c) => c.created_at),
+    ),
     terna_el: primerEvento(eventos, esTerna),
     entrevista_el: primerEvento(eventos, esEntrevista),
     oferta_el: primerEvento(eventos, esOferta),
@@ -247,6 +340,10 @@ export function camposBoard(input: {
   eventos?: EventoEtapa[];
   hireDate?: string | null;
   closedAt?: string | null;
+  searchRestartedAt?: string | null;
+  searchRestartReason?: string | null;
+  /** Solo para fijar el reloj en tests. El route lo deja en el instante del request. */
+  ahora?: Date;
 }): CamposBoard {
   const tieneContratado = input.candidatos.some(cuentaComoContratado);
   const estado_final = estadoFinalDe({
@@ -254,12 +351,25 @@ export function camposBoard(input: {
     tieneContratado,
   });
   const visibles = input.candidatos.filter(cuentaEnTablero);
+  const hitos_fechas = hitosFechas(input);
+  const reinicio_el = isoONull(input.searchRestartedAt);
   return {
     estado_final,
     sla_activo: slaActivoDe(estado_final),
     candidatos_total: visibles.length,
     conteos: conteosEtapa(input.candidatos),
-    hitos_fechas: hitosFechas(input),
+    hitos_fechas,
+    reinicio_el,
+    reinicio_motivo: reinicio_el ? motivoReinicio(input.searchRestartReason) : null,
+    dias_desde_aprobacion: diasDelCiclo({
+      approvedAt: input.approvedAt,
+      reinicioEl: reinicio_el,
+      estado: estado_final,
+      hireDate: input.hireDate,
+      contratadoEl: hitos_fechas.contratado_el,
+      cerradaEl: hitos_fechas.cerrada_el,
+      ahora: input.ahora,
+    }),
   };
 }
 
