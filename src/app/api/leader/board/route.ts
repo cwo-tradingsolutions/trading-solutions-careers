@@ -20,8 +20,11 @@
  * CERRAR O CONTRATAR
  * `ht_requisitions.status` se queda como está: esa columna solo modela la
  * aprobación y no se reescribe al leer. Encima se agregan `estado_final`,
- * `sla_activo`, `candidatos_total` y `hitos_fechas`. Las etapas de una
- * vacante cerrada dejan de ir en cero. Nada de esto escribe en la base.
+ * `sla_activo`, `candidatos_total`, `hitos_fechas`, `reinicio_el` y
+ * `reinicio_motivo`. Las etapas de una vacante cerrada dejan de ir en cero.
+ * Si la vacante tiene `search_restarted_at`, el reloj del ciclo
+ * (`dias_desde_aprobacion` y los días de etapa) arranca ahí, con la misma
+ * regla que `inicioDelReloj`. Nada de esto escribe en la base.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -29,6 +32,7 @@ import { requireWxm, correoDelLider } from "@/lib/wxm-auth";
 import { STAGES, slaStatus, type StageCode } from "@/lib/stage-labels";
 import { STATUS_LABEL, STATUS_HINT, diasEnEstado, type RequisitionStatus } from "@/lib/requisitions";
 import { fetchAllRows } from "@/lib/fetch-all-rows";
+import { inicioDelReloj } from "@/lib/reloj";
 import {
   camposBoard,
   cuentaEnTablero,
@@ -114,7 +118,9 @@ export async function GET(req: NextRequest) {
     // leerla: si no, el tablero seguiría hablando solo de la aprobación.
     const { data: vacs, error: vacErr } = await supabaseAdmin
       .from("ht_vacancies")
-      .select("id, title, area, status, requisition_id, created_at")
+      .select(
+        "id, title, area, status, requisition_id, created_at, search_restarted_at, search_restart_reason",
+      )
       .eq("client_id", TS_CLIENT_ID)
       .ilike("hiring_lead_email", leadEmail);
     if (vacErr) return NextResponse.json({ error: vacErr.message }, { status: 500 });
@@ -129,7 +135,9 @@ export async function GET(req: NextRequest) {
       const extra = await enLotes<any>(faltan, (lote) =>
         supabaseAdmin
           .from("ht_vacancies")
-          .select("id, title, area, status, requisition_id, created_at")
+          .select(
+            "id, title, area, status, requisition_id, created_at, search_restarted_at, search_restart_reason",
+          )
           .eq("client_id", TS_CLIENT_ID)
           .in("id", lote),
       );
@@ -275,6 +283,8 @@ export async function GET(req: NextRequest) {
         // Cerrar la vacante solo escribe `status`. No hay closed_at fiable
         // y updated_at no se movió al cerrar: el hito queda null.
         closedAt: null,
+        searchRestartedAt: vac?.search_restarted_at ?? null,
+        searchRestartReason: vac?.search_restart_reason ?? null,
       });
 
       const visibles = filas.filter(cuentaEnTablero);
@@ -295,11 +305,15 @@ export async function GET(req: NextRequest) {
         const aprox = !ev || (ev.source || "").toLowerCase() === "backfill";
         if (aprox) sinHistorial++;
         totalVivos++;
+        const marca = ev?.at || c.updated_at;
+        // Quien entró a la etapa antes del reinicio pertenece al ciclo
+        // anterior: su reloj de SLA arranca en el reinicio, no en ese evento.
+        const ancla = marca ? inicioDelReloj(marca, vac?.search_restarted_at) : null;
         return {
           id: c.id,
           name: c.name,
           stage: etapaCanon(c.stage) as StageCode,
-          dias: dias(ev?.at || c.updated_at),
+          dias: dias(ancla),
           aprox,
         };
       });
@@ -336,8 +350,6 @@ export async function GET(req: NextRequest) {
       const busquedaAbierta = campos.estado_final == null;
       const enTerna = busquedaAbierta ? conDias.filter((c) => c.stage === "terna") : [];
 
-      const diasDesdeAprobacion = r.approved_at ? dias(r.approved_at) : null;
-
       let pendiente: string | null = null;
       if (busquedaAbierta && r.status === "devuelta") {
         pendiente = "Wellness te devolvió la requisición: falta información para armar el perfil.";
@@ -362,7 +374,9 @@ export async function GET(req: NextRequest) {
         dias_en_estado: diasEnEstado(r.updated_at),
         motivo_devolucion: busquedaAbierta && r.status === "devuelta" ? r.decision_note : null,
         aprobada_el: r.approved_at,
-        dias_desde_aprobacion: diasDesdeAprobacion,
+        reinicio_el: campos.reinicio_el,
+        reinicio_motivo: campos.reinicio_motivo,
+        dias_desde_aprobacion: campos.dias_desde_aprobacion,
         meta_dias: TTF_META_DIAS,
         sla_activo: campos.sla_activo,
         activos: conDias.length,
