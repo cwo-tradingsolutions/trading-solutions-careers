@@ -76,7 +76,7 @@ export const PREFILTER_TEMPLATES: Record<TemplateKey, PrefilterTemplate> = {
   china: {
     key: "china",
     label: "China Builder Team (EN · knock-outs only)",
-    description: "Para vacantes de China · formulario en inglés, corto, solo innegociables. Salario en USD es dato, no descarta. Consentimiento PIPL en vez de habeas data colombiano.",
+    description: "Para vacantes de China · formulario en inglés, corto, solo innegociables. Expectativa mensual en CNY: dato obligatorio; sobre el tope interno queda en revisión y no descarta. Consentimiento PIPL en vez de habeas data colombiano.",
     sections: ["china_core", "about_you"],
   },
   panama_ops: {
@@ -143,9 +143,11 @@ export const TEMPLATE_REQUIRED_FIELDS: Record<TemplateKey, string[]> = {
     "excel_level", "case_answer",
     "why_ts",
   ],
-  // China · form en inglés. NO pide doc_type/doc_number/nacionalidad. Salario
-  // (salary_usd) es dato, no descarta. Knock-outs: work_authorized, english_level
-  // (>=B2), onsite_available. Consentimiento PIPL obligatorio.
+  // China · form en inglés. NO pide doc_type/doc_number/nacionalidad.
+  // salary_cny es la expectativa mensual, numérica y obligatoria. Sobre el
+  // tope interno queda en revisión; no descarta. Un JSON viejo puede traer
+  // salary_usd: se muestra como USD y no se relee como CNY. Knock-outs:
+  // work_authorized, english_level (>=B2), onsite_available. PIPL obligatorio.
   // Customer Documentation · lo innegociable es la experiencia documental en
   // comercio exterior y haber conciliado facturas contra órdenes. El resto
   // (plataformas, cursos, tipo de empresa) ordena la terna y no bloquea.
@@ -160,7 +162,7 @@ export const TEMPLATE_REQUIRED_FIELDS: Record<TemplateKey, string[]> = {
   china: [
     "full_name", "email", "phone_wechat", "current_city",
     "work_authorized", "english_level", "english_cert",
-    "years_experience", "onsite_available", "salary_usd",
+    "years_experience", "onsite_available", "salary_cny",
     "tariff_choice", "pipl_consent",
   ],
   // No salary_usd. New answers leave that key null; old JSON values stay.
@@ -202,8 +204,8 @@ export const TEMPLATE_SALARY_CAP: Partial<Record<TemplateKey, number>> = {
 
 /**
  * Tope mensual USD (bruto) por template EN. Sobre esto se marca review;
- * nunca auto-rechaza. El path china/panama_ops usa estas constantes en la
- * ruta de prefiltro (no TEMPLATE_SALARY_CAP, que es COP).
+ * nunca auto-rechaza. Panamá Ops lo usa en su ruta. China ya no: las
+ * respuestas nuevas van en CNY y el tope de ese template no vive aquí.
  */
 export const TEMPLATE_SALARY_CAP_USD: Partial<Record<TemplateKey, number>> = {
   panama_ops: 1500,
