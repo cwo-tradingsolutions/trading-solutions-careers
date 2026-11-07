@@ -309,6 +309,55 @@ export const PERFILES: Record<string, PerfilCargo> = {
         'Necesidad alta de seguridad no es un riesgo aqui: encaja. Necesidad alta de autonomia si, porque el aviso pide escalar la inconsistencia de inmediato, no resolverla por cuenta propia.',
     },
   },
+
+  // ── IT Operations & Security Administrator ─────────────────────────
+  // Analogia: ops-exec es el perfil de operacion mas cercano (SLA, exactitud,
+  // incidencia del dia). No se parte de fullstack-jr: esa ficha dice que la
+  // bateria no mide si la persona programa, y este cargo administra sistemas
+  // y accesos, no construye producto. Los desplazamientos respecto de
+  // ops-exec estan justificados en `fundamento` y `fundamentoPesos`.
+  'it-ops-sec': {
+    key: 'it-ops-sec',
+    nombre: 'IT Operations & Security',
+    version: '1.0 · analogia con Operations Executive',
+    descripcion:
+      'Administra la operacion de TI y la seguridad: accesos, cuentas, equipos y la continuidad de los sistemas. El dia se mide por lo que quedo concedido, revocado, registrado y cerrado, no por una entrega comercial ni por codigo nuevo.',
+    fundamento:
+      'El perfil de partida es Operations Executive (ops-exec), el de operacion mas cercano del catalogo: el trabajo se mide por cumplir a tiempo y por no quebrarse cuando algo se cae. ' +
+      'No se parte de FullStack Junior. Esa ficha advierte que la bateria no mide si la persona sabe programar, y este cargo no es de desarrollo: administra sistemas y accesos. ' +
+      'Respecto de ops-exec se mueven cuatro cosas, cada una por el titulo. ' +
+      'Uno: C7 en vez de C6, el mismo techo que Customer Documentation, porque un acceso mal concedido o un registro que no cuadra es un incidente de seguridad, no un documento que se reimprime. ' +
+      'Dos: I4 y Extraversion 50, por debajo de I5 y 60 de ops-exec. Ese perfil sube el trato porque negocia con navieras y le da la cara al cliente; aqui el interlocutor es interno. ' +
+      'Tres: Responsabilidad 85, por encima de los 80 de ops-exec y el mismo numero de SIG y de documentacion, porque el cargo se prueba por lo que quedo registrado y revocado. ' +
+      'Cuatro: la integridad pesa 0,25 y no 0,20. ops-exec llega a 0,20 por transmitir ISF y AMS. China Admin llega a 0,30 porque maneja dinero sin supervision. Este cargo concede accesos y custodia credenciales, con un lider al que escalar: queda en el medio, el mismo 0,25 de Customer Documentation.',
+    disc: { D: 4, I: 4, S: 5, C: 7 },
+    bigfive: { EXT: 50, APE: 60, AMA: 50, RES: 85, EST: 75 },
+    tolerancia: 12,
+    pesos: { personalidad: 0.25, estilo: 0.2, razonamiento: 0.3, integridad: 0.25 },
+    fundamentoPesos:
+      'Se parte de ops-exec (personalidad 0,30, estilo 0,25, razonamiento 0,25, integridad 0,20) y se reparte el mismo 1. ' +
+      'Razonamiento 0,30: diagnosticar un acceso, un log o una caida es mas analisis que emitir un booking, y menos que el 0,45 del junior de desarrollo, donde el razonamiento es el unico predictor que la bateria puede aportar. ' +
+      'Integridad 0,25: ver el parrafo de fundamento. No es el piso generico de un empleado (0,15 en desarrollo) ni el maximo del catalogo (0,30 en China Admin). ' +
+      'Personalidad 0,25, sostenida en Responsabilidad: el cargo se mide por cierres y registros. ' +
+      'Estilo 0,20, por debajo de ops-exec porque el trato no es el trabajo, y por encima del 0,15 de desarrollo porque si hay que hablar con quien se quedo sin acceso.',
+    pisos: {
+      razonamiento: 50,
+      integridad: 70,
+      porDimension: { 'INT-act': 70, 'INT-ver': 70, 'INT-nor': 65 },
+    },
+    criticos: [
+      { key: 'RES', label: 'Responsabilidad', porque: 'Un acceso que no se revoco o un incidente que no se cerro ya ocurrio. El cargo se mide por eso, no por la intencion.' },
+      { key: 'INT-act', label: 'Cuidado de activos', porque: 'Administra cuentas, equipos y credenciales. El activo aqui es el sistema, no la caja menor, y el riesgo es el mismo: usarlo para otra cosa.' },
+      { key: 'INT-ver', label: 'Veracidad', porque: 'El registro de quien tuvo acceso es la evidencia. Un dato acomodado en ese registro deja el incidente sin rastro.' },
+    ],
+    motivadores: {
+      alto: ['MOT-log', 'MOT-seg'],
+      bajo: ['MOT-rec'],
+      nota:
+        'ops-exec marca la necesidad alta de seguridad como riesgo de permanencia porque esa operacion se esta montando. Este cargo es de administracion y control: la estabilidad encaja, no estorba. ' +
+        'Logro alto sostiene el cierre de incidentes. Necesidad alta de reconocimiento es riesgo: el mejor dia de este rol es que no haya pasado nada, y eso no se aplaude.',
+    },
+  },
 };
 
 /** Para el selector del panel: no hay que adivinar el cargo cuando la sesion
@@ -338,5 +387,29 @@ export function perfilPorTitulo(titulo: string | null | undefined): string | nul
   // 'support', y el documental no se mide contra un perfil de operacion.
   if (t.includes('customer document')) return 'customer-doc';
   if (t.includes('operations executive')) return 'ops-exec';
+  // Despues de las reglas anteriores a proposito: un titulo que ya calza con
+  // otro perfil no se lo lleva este. Solo el titulo completo, sin depender
+  // de mayusculas ni de tildes. «operations» o «administrator» sueltos no
+  // alcanzan: el primero chocaria con Operations Executive, el segundo con
+  // el «administration» de China.
+  if (esTituloItOpsSec(titulo)) return 'it-ops-sec';
   return null;
+}
+
+/** Minusculas, sin tildes y con un solo espacio. Solo lo usa el titulo de IT. */
+function plegarTitulo(titulo: string): string {
+  return titulo
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function esTituloItOpsSec(titulo: string): boolean {
+  const t = plegarTitulo(titulo);
+  return (
+    t.includes('it operations & security administrator') ||
+    t.includes('it operations and security administrator')
+  );
 }
