@@ -20,6 +20,7 @@ import HistorialContactos from "@/components/HistorialContactos";
 import SeguimientoVacante from "@/components/SeguimientoVacante";
 import { CanalSelect, errorCanal } from "@/components/CamposObligatorios";
 import { etiquetaCanal } from "@/lib/candidate-source";
+import { presentarExpectativaChina } from "@/lib/prefilter-salary";
 import { InvitarEntrevistaModal } from "@/components/InvitarEntrevistaModal";
 
 // Map de stage → icono Lucide. Centralizado para reutilizar en cualquier render.
@@ -140,6 +141,7 @@ type PrefilterData = {
   bl_awb_docs?: boolean;
   warehouse_ftz?: boolean;
   salary_usd?: string;
+  salary_cny?: number | string | null;
   years_experience?: number;
   pipl_consent?: boolean;
   privacy_consent?: boolean;
@@ -150,6 +152,8 @@ type PrefilterData = {
     salary_usd_parsed?: number | null;
     salary_cap_usd?: number;
     salary_over_budget?: boolean;
+    salary_cny?: number | string | null;
+    salary_cny_over_budget?: boolean;
     english_candidate_rank?: number;
     english_min_required_rank?: number;
     english_fails?: boolean;
@@ -2785,19 +2789,33 @@ function CandDetailPanel({ cand, onClose, onChanged, hiringLeadEmail }: { cand: 
                     <Row k="Presencial" v={pf._meta.onsite_available ? "Sí" : "No"} />
                   )}
                   {typeof pf.years_experience === "number" && <Row k="Años de experiencia" v={`${pf.years_experience}`} />}
-                  {(pf._meta.salary_usd_expectation || pf.salary_usd) && (
-                    <Row
-                      k="Expectativa (USD/mes)"
-                      v={
-                        <span className={pf._meta.salary_over_budget ? "text-red-700 font-bold" : "font-bold"}>
-                          {pf._meta.salary_usd_expectation || pf.salary_usd}
-                          {pf._meta.salary_over_budget && pf._meta.salary_cap_usd
-                            ? ` · sobre el tope de USD ${pf._meta.salary_cap_usd}`
-                            : ""}
-                        </span>
-                      }
-                    />
-                  )}
+                  {(() => {
+                    const exp = presentarExpectativaChina({
+                      salary_cny: pf.salary_cny ?? pf._meta.salary_cny,
+                      salary_usd: pf.salary_usd,
+                      salary_usd_expectation: pf._meta.salary_usd_expectation,
+                      salary_over_budget: pf._meta.salary_over_budget,
+                      salary_cny_over_budget: pf._meta.salary_cny_over_budget,
+                    });
+                    if (!exp) return null;
+                    const sufijo =
+                      exp.moneda === "USD" && pf._meta.salary_over_budget && pf._meta.salary_cap_usd
+                        ? ` · sobre el tope de USD ${pf._meta.salary_cap_usd}`
+                        : exp.moneda === "CNY" && exp.marcar
+                          ? " · sobre el tope"
+                          : "";
+                    return (
+                      <Row
+                        k={exp.etiqueta}
+                        v={
+                          <span className={exp.marcar ? "text-red-700 font-bold" : "font-bold"}>
+                            {exp.texto}
+                            {sufijo}
+                          </span>
+                        }
+                      />
+                    );
+                  })()}
                 </Section>
               )}
 
