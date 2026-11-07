@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { parseSalarioCny } from "@/lib/prefilter-salary";
 import "./submit.css";
 
 const TS_BLACK = "#111111";
@@ -175,7 +176,7 @@ export default function PrefiltroForm() {
   const [cnEnglishCert, setCnEnglishCert] = useState("");
   const [cnYearsExp, setCnYearsExp] = useState("");
   const [cnOnsite, setCnOnsite] = useState("");            // "yes" | "no"
-  const [cnSalaryUsd, setCnSalaryUsd] = useState("");
+  const [cnSalaryCny, setCnSalaryCny] = useState("");
   const [cnTariff, setCnTariff] = useState("");            // A/B/C
   const [cnTariffWhy, setCnTariffWhy] = useState("");
 
@@ -279,7 +280,7 @@ export default function PrefiltroForm() {
         cnEnglishCert.trim().length >= 3 &&
         cnYearsExp !== "" &&
         cnOnsite &&
-        cnSalaryUsd.trim() !== "" &&
+        parseSalarioCny(cnSalaryCny) != null &&
         cnTariff &&
         habeasAccepted // en China este check = consentimiento PIPL
       );
@@ -370,7 +371,7 @@ export default function PrefiltroForm() {
         english_cert: cnEnglishCert.trim(),
         years_experience: parseInt(cnYearsExp) || 0,
         onsite_available: cnOnsite === "yes",
-        salary_usd: cnSalaryUsd.trim(), // dato · no descarta
+        salary_cny: parseSalarioCny(cnSalaryCny),
         tariff_choice: cnTariff, // A/B/C
         tariff_reasoning: cnTariffWhy.trim(),
         extra: extra.trim(),
@@ -853,8 +854,14 @@ export default function PrefiltroForm() {
             <Q label="Years of relevant experience in freight forwarding / the role area">
               <input type="number" min={0} max={50} value={cnYearsExp} onChange={(e) => setCnYearsExp(e.target.value)} style={inputStyle} placeholder="0" />
             </Q>
-            <Q label="Monthly salary expectation in USD (gross)">
-              <input value={cnSalaryUsd} onChange={(e) => setCnSalaryUsd(e.target.value)} style={inputStyle} placeholder="e.g. 2000" inputMode="numeric" />
+            <Q label="What is your expected monthly salary in CNY (Chinese yuan)?">
+              <input
+                value={cnSalaryCny}
+                onChange={(e) => setCnSalaryCny(e.target.value)}
+                style={inputStyle}
+                placeholder="e.g. 15000"
+                inputMode="decimal"
+              />
             </Q>
           </Section>
 

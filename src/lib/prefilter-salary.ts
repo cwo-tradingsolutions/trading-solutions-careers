@@ -69,8 +69,66 @@ export function etiquetaAvisoPrefiltro(
   return { label: "EN ROJO · decide tú", emoji: "🔴", enRojo: true };
 }
 
-/** El aviso lee salary o salary_usd. Vacío no se muestra como un guion. */
-export function textoSalarioAviso(body: { salary?: unknown; salary_usd?: unknown }): string {
+/**
+ * Expectativa mensual en CNY de una respuesta nueva del prefiltro China.
+ * Número finito y positivo, como número o como texto decimal sin separadores.
+ * Un rango USD («1800-2000») no es un monto CNY: devuelve null y no se reinterpreta.
+ */
+export function parseSalarioCny(raw: unknown): number | null {
+  if (typeof raw === "number") {
+    return Number.isFinite(raw) && raw > 0 ? raw : null;
+  }
+  if (typeof raw !== "string") return null;
+  const t = raw.trim();
+  if (!/^\d+(\.\d+)?$/.test(t)) return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** El aviso lee salary (COP) o salary_usd. Un salary_cny válido se muestra en CNY y no convierte el USD histórico. */
+export function textoSalarioAviso(body: { salary?: unknown; salary_usd?: unknown; salary_cny?: unknown }): string {
+  const cny = parseSalarioCny(body.salary_cny);
+  if (cny != null && (body.salary == null || body.salary === "")) return `${cny} CNY`;
   const salarioRaw = body.salary || body.salary_usd;
   return salarioRaw ? String(salarioRaw) : "Salario no informado";
+}
+
+export type ExpectativaChina = {
+  moneda: "CNY" | "USD";
+  texto: string;
+  marcar: boolean;
+  etiqueta: string;
+};
+
+/**
+ * Cómo se muestra una respuesta ya guardada. Si hay salary_cny válido, es CNY.
+ * Si no, el texto USD se muestra tal cual: no se pasa por el parser de CNY
+ * ni por el tope. `marcar` sale de la bandera guardada, no de un recálculo.
+ */
+export function presentarExpectativaChina(input: {
+  salary_cny?: unknown;
+  salary_usd?: unknown;
+  salary_usd_expectation?: unknown;
+  salary_over_budget?: boolean;
+  salary_cny_over_budget?: boolean;
+}): ExpectativaChina | null {
+  const cny = parseSalarioCny(input.salary_cny);
+  if (cny != null) {
+    return {
+      moneda: "CNY",
+      texto: String(cny),
+      marcar: input.salary_cny_over_budget === true,
+      etiqueta: "Expectativa (CNY/mes)",
+    };
+  }
+  const usd = input.salary_usd_expectation ?? input.salary_usd;
+  if (usd == null) return null;
+  const texto = String(usd).trim();
+  if (!texto) return null;
+  return {
+    moneda: "USD",
+    texto: String(usd),
+    marcar: input.salary_over_budget === true,
+    etiqueta: "Expectativa (USD/mes)",
+  };
 }
