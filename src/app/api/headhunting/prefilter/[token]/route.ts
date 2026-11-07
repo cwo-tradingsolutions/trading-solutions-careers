@@ -28,6 +28,7 @@ import { enviarBateriaAuto } from "@/lib/bateria/invitar";
 import { batteryAutoSendEnabled, NOTA_BATERIA_PENDIENTE } from "@/lib/battery-auto-send";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { TEMPLATE_ENGLISH_MIN_RANK, TEMPLATE_SALARY_CAP, type TemplateKey } from "@/lib/prefilter-templates";
+import { evaluarSalarioCny } from "@/lib/china-salary";
 import { etiquetaAvisoPrefiltro, textoSalarioAviso } from "@/lib/prefilter-salary";
 
 // Techos por vacancy_id (en COP mensuales)
@@ -224,31 +225,6 @@ function checkEnglishLevel(englishLevel: string | undefined, vacancyId: string, 
   return { fails: true, sub_detail: sub, minRank, candidateRank };
 }
 
-/**
- * Tope mensual (USD bruto) aprobado para el cargo de China.
- *
- * NO descarta: quien pide más queda en revisión con la bandera puesta. El
- * salario se negocia y el presupuesto puede moverse; lo que no puede pasar es
- * que alguien que pide el doble aparezca como «pasó el prefiltro» y se le
- * gaste una entrevista sin que nadie lo haya visto.
- */
-const CHINA_SALARY_CAP_USD = 1500;
-
-/**
- * Lee un monto o un rango en USD.
- * "USD 2,500" y "2.300" → 2500 / 2300 (el punto de miles no es decimal).
- * "1800-2000" → min 1800, max 2000. "1.500,00" → 1500. Sin número → null.
- * El tope se compara contra `min`: un rango que empieza bajo el techo no lo supera.
- */
-function parseSalaryRangeUsd(raw: unknown): { min: number; max: number } | null {
-  const toks = String(raw ?? "").match(/\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?/g) ?? [];
-  const nums = toks.map((t) => {
-    const m = t.match(/^(\d{1,3}(?:[.,]\d{3})+)(?:[.,]\d{1,2})?$/);
-    return m ? Number(m[1].replace(/[.,]/g, "")) : Number(t.replace(",", "."));
-  }).filter((n) => Number.isFinite(n) && n > 0).slice(0, 2);
-  return nums.length ? { min: Math.min(...nums), max: Math.max(...nums) } : null;
-}
-
 function panamaCandidateMailLine(
   decision: string,
   battery: { enviado: boolean; canal?: string; motivo?: string; pendiente?: boolean } | null,
@@ -357,11 +333,16 @@ export async function POST(
   if (templateKey === "china") {
     // ─── Rama CHINA · knock-outs solamente ──────────────────────────
     //   - Consentimiento PIPL es OBLIGATORIO · sin él no se procesa.
-    //   - Salario (salary_usd) nunca descarta. Sobre el tope (mínimo del
-    //     rango) entra como bloqueo blando y la decisión pasa a revisión.
+    //   - salary_cny es mensual, numérico y obligatorio. Sobre el tope
+    //     interno entra como bloqueo blando y la decisión pasa a revisión.
+    //     No descarta. Un salary_usd viejo no se relee como CNY.
     //   - Knock-outs: work_authorized, inglés (>=B2), onsite_available.
     if (!isYes(body.pipl_consent)) {
       return NextResponse.json({ error: "pipl_consent_required" }, { status: 400 });
+    }
+    const salarioCny = evaluarSalarioCny(body.salary_cny);
+    if (!salarioCny.ok) {
+      return NextResponse.json({ error: salarioCny.error }, { status: 400 });
     }
 
     const englishRank = CHINA_ENGLISH_RANK[String(body.english_level || "").trim().toUpperCase()] ?? 0;
@@ -402,28 +383,18 @@ export async function POST(
     }
     decision = bloqueos.length ? "review" : "pass";
 
-    // Presupuesto · se compara el mínimo del rango. Sobre el tope no se
-    // rechaza: queda un bloqueo blando y, si iba a pasar, pasa a revisión.
-    const salaryRange = parseSalaryRangeUsd(body.salary_usd);
-    const salaryOverBudget = salaryRange !== null && salaryRange.min > CHINA_SALARY_CAP_USD;
-    if (salaryOverBudget) {
-      bloqueos.push({
-        regla: "salario_sobre_tope",
-        severidad: "blando",
-        categoria: "pretension_salarial",
-        sub_detail: "salario_sobre_tope",
-        valor: String(body.salary_usd),
-      });
+    // Presupuesto mensual en CNY. Sobre el tope no se rechaza: queda un
+    // bloqueo blando y, si iba a pasar, pasa a revisión. El tope no se
+    // guarda en el meta: la ficha no lo imprime.
+    if (salarioCny.bloqueo) {
+      bloqueos.push(salarioCny.bloqueo);
       if (decision === "pass") decision = "review";
     }
 
     meta = {
       china: true,
-      salary_usd_expectation: body.salary_usd ?? null, // dato · no descarta
-      salary_usd_parsed: salaryRange?.min ?? null,
-      salary_usd_max: salaryRange?.max ?? null,
-      salary_cap_usd: CHINA_SALARY_CAP_USD,
-      salary_over_budget: salaryOverBudget,
+      salary_cny: salarioCny.amount,
+      salary_cny_over_budget: salarioCny.overBudget,
       english_min_required_rank: CHINA_ENGLISH_MIN_RANK,
       english_candidate_rank: englishRank,
       english_fails: englishFails,

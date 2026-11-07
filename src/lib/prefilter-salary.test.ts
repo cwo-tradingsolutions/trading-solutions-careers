@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { etiquetaAvisoPrefiltro, parseSalaryRangeUsd, textoSalarioAviso } from "./prefilter-salary.ts";
+import {
+  etiquetaAvisoPrefiltro,
+  parseSalaryRangeUsd,
+  presentarExpectativaChina,
+  textoSalarioAviso,
+} from "./prefilter-salary.ts";
 
 describe("parseSalaryRangeUsd", () => {
   it("lee miles con punto, coma o prefijo USD", () => {
@@ -52,6 +57,10 @@ describe("etiqueta del aviso", () => {
     assert.equal(textoSalarioAviso({}), "Salario no informado");
     assert.equal(textoSalarioAviso({ salary: "" }), "Salario no informado");
     assert.equal(textoSalarioAviso({ salary_usd: "1800-2000" }), "1800-2000");
+    assert.equal(textoSalarioAviso({ salary: "4 – 5 M" }), "4 – 5 M");
+    assert.equal(textoSalarioAviso({ salary_usd: "23401" }), "23401");
+    assert.equal(textoSalarioAviso({ salary_cny: 18000 }), "18000 CNY");
+    assert.equal(textoSalarioAviso({ salary_cny: "no", salary_usd: "1800-2000" }), "1800-2000");
   });
 
   it("EN ROJO solo con un bloqueo que no es el tope", () => {
@@ -62,5 +71,36 @@ describe("etiqueta del aviso", () => {
     assert.equal(e.label, "EN ROJO · decide tú");
     assert.equal(e.emoji, "🔴");
     assert.equal(e.enRojo, true);
+  });
+});
+
+describe("expectativa China ya guardada", () => {
+  it("muestra un USD histórico como USD, aunque el texto sea 23401", () => {
+    const exp = presentarExpectativaChina({
+      salary_usd_expectation: "23401",
+      salary_over_budget: true,
+    });
+    assert.ok(exp);
+    assert.equal(exp.moneda, "USD");
+    assert.equal(exp.texto, "23401");
+    assert.equal(exp.etiqueta, "Expectativa (USD/mes)");
+    assert.equal(exp.marcar, true);
+    assert.equal(presentarExpectativaChina({ salary_usd: "1800-2000" })?.texto, "1800-2000");
+    assert.equal(presentarExpectativaChina({ salary_usd: "1800-2000" })?.marcar, false);
+  });
+
+  it("una respuesta nueva en CNY no relee el USD y no trae el tope en el texto", () => {
+    const exp = presentarExpectativaChina({
+      salary_cny: 23401,
+      salary_usd: "1800-2000",
+      salary_cny_over_budget: true,
+      salary_over_budget: true,
+    });
+    assert.ok(exp);
+    assert.equal(exp.moneda, "CNY");
+    assert.equal(exp.texto, "23401");
+    assert.equal(exp.etiqueta, "Expectativa (CNY/mes)");
+    assert.equal(exp.marcar, true);
+    assert.equal(exp.texto.includes("23400"), false);
   });
 });
