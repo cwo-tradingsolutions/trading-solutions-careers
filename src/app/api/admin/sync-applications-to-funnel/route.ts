@@ -4,8 +4,8 @@
  * Sincroniza nuevas aplicaciones del formulario público (Neon · applications)
  * hacia el funnel del ATS (Supabase · ht_candidates).
  *
- * Idempotente · usa email como clave única. Si ya existe en ht_candidates
- * actualiza el campo updated_at sin pisar el stage.
+ * Idempotente por correo y vacante. Si ya existe en ht_candidates actualiza
+ * updated_at sin pisar el stage y sin registrar otro evento de entrada.
  *
  * Body opcional:
  *   { since?: string }   // ISO date · default: hace 7 días
@@ -20,7 +20,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { recordStageEvents } from "@/lib/stage-events";
 // El mapa job_id → vacancy_id es compartido con /api/applications · esta copia
 // se había quedado con solo los ids 2-5 y descartaba las vacantes nuevas.
-import { resolverVacante } from "@/lib/vacancy-map";
+import { decidirAltaFunnel, resolverVacanteDetallada } from "@/lib/vacancy-map";
 
 export const runtime = "nodejs";
 
@@ -54,17 +54,30 @@ export async function POST(req: NextRequest) {
     // al que aplicó, no quedarse en la ficha del cargo anterior.
     const emails = apps.map((a: any) => String(a.email || "").toLowerCase().trim()).filter(Boolean);
     const orFilter = emails.map(e => `email.ilike.${e}`).join(",");
-    const { data: existing } = await supabaseAdmin
+    const { data: existing, error: existingErr } = await supabaseAdmin
       .from("ht_candidates")
       .select("id, email, vacancy_id")
       .or(orFilter);
+    if (existingErr) {
+      // Un error de lectura no es "no hay candidatos". Insertar igual
+      // duplicaría a quien ya está en el funnel. La solicitud sigue en Neon.
+      console.error(
+        "[sync-applications-to-funnel] no se leyó ht_candidates; no se inserta nada:",
+        existingErr.message,
+      );
+      return NextResponse.json(
+        { error: "No se pudo leer el funnel; no se insertó nada para no duplicar candidatos.", detail: existingErr.message },
+        { status: 500 },
+      );
+    }
     const llave = (email: string, vacancyId: string) => `${email}|${vacancyId}`;
-    const existingMap = new Map(
-      (existing || []).map((c: any) => [
-        llave(String(c.email || "").toLowerCase().trim(), String(c.vacancy_id || "")),
-        c.id,
-      ]),
-    );
+    const existentesPorLlave = new Map<string, { id: string }[]>();
+    for (const c of existing || []) {
+      const k = llave(String(c.email || "").toLowerCase().trim(), String(c.vacancy_id || ""));
+      const lista = existentesPorLlave.get(k) ?? [];
+      if (c.id) lista.push({ id: String(c.id) });
+      existentesPorLlave.set(k, lista);
+    }
 
     // Lo que hay que mirar aunque la sincronización "salga bien": una vacante
     // del mapa que ya está cerrada significa que el cargo se volvió a abrir
@@ -84,25 +97,34 @@ export async function POST(req: NextRequest) {
         skipped++;
         continue;
       }
-      const resuelta = await resolverVacante(app.job_id, app.job_title);
-      const vacancyId = resuelta?.id ?? null;
-      if (!vacancyId) {
+      const resuelta = await resolverVacanteDetallada(app.job_id, app.job_title);
+      if (!resuelta.vacante) {
         skipped++;
-        details.push({ email, action: "skipped", reason: `job_id ${app.job_id} no mapeado` });
+        details.push({ email, action: "skipped", reason: resuelta.motivo });
         continue;
       }
-      if (resuelta?.aviso && !avisos.includes(resuelta.aviso)) avisos.push(resuelta.aviso);
+      const vacancyId = resuelta.vacante.id;
+      if (resuelta.vacante.aviso && !avisos.includes(resuelta.vacante.aviso)) avisos.push(resuelta.vacante.aviso);
 
-      if (existingMap.has(llave(email, vacancyId))) {
-        // Ya existe · solo touch updated_at
+      const decision = decidirAltaFunnel(existentesPorLlave.get(llave(email, vacancyId)) ?? [], false);
+      if (decision.accion === "detener") {
+        skipped++;
+        details.push({ email, action: "skipped", reason: decision.motivo });
+        continue;
+      }
+      if (decision.accion === "actualizar") {
+        if (decision.duplicadosPrevios) {
+          console.error(
+            `[sync-applications-to-funnel] ya hay más de un candidato en la vacante ${vacancyId}; no se inserta otro ni otro evento`,
+          );
+        }
         await supabaseAdmin
           .from("ht_candidates")
           .update({ updated_at: new Date().toISOString() })
-          .eq("id", existingMap.get(llave(email, vacancyId)));
+          .eq("id", decision.candidateId);
         updated++;
         details.push({ email, action: "updated" });
       } else {
-        // Nuevo · insert
         const { data: created, error: insertErr } = await supabaseAdmin
           .from("ht_candidates")
           .insert({
@@ -121,14 +143,14 @@ export async function POST(req: NextRequest) {
           })
           .select("id")
           .maybeSingle();
-        if (insertErr) {
+        if (insertErr || !created?.id) {
           skipped++;
-          details.push({ email, action: "skipped", reason: insertErr.message });
+          details.push({ email, action: "skipped", reason: insertErr?.message || "insert sin id" });
         } else {
           inserted++;
           details.push({ email, action: "inserted" });
-          if (created?.id) existingMap.set(llave(email, vacancyId), created.id);
-          if (created?.id) {
+          existentesPorLlave.set(llave(email, vacancyId), [{ id: created.id }]);
+          if (decision.registrarEvento) {
             entryEvents.push({ candidateId: created.id, toStage: "aplico", fromStage: null, vacancyId });
           }
         }
