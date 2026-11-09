@@ -16,12 +16,28 @@
  * Full Stack, que compartía el id 6 con una vacante de China y mandaba sus
  * candidatos al funnel equivocado.
  *
- * Ahora, si el id no está en el mapa, se busca la vacante por título en
- * ht_vacancies. El mapa sigue mandando cuando existe: es más rápido y explícito.
+ * Si el id no está en el mapa, manda el vínculo de la requisición
+ * (ht_requisitions.web_vacancy_id → vacancy_id). El título queda último y
+ * solo si ese vínculo no existe y hay un único destino. Buscar por título
+ * exige que el título del ATS contenga el de la web: un sufijo de ciudad en
+ * la web deja la coincidencia en cero, y el mismo título en varias ciudades
+ * deja varias vacantes abiertas. Elegir la primera mezcla postulaciones.
  */
 import { supabaseAdmin } from "@/lib/supabase";
+import {
+  decidirAltaFunnel,
+  patronTitulo,
+  resolverVacanteCon,
+  type ConsultaVacantes,
+  type FilaVacante,
+  type ResolucionVacante,
+  type VacanteResuelta,
+} from "./vacancy-resolve";
 
-const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
+export { decidirAltaFunnel, patronTitulo, resolverVacanteCon };
+export type { ConsultaVacantes, FilaVacante, ResolucionVacante, VacanteResuelta };
+
+export const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
 export const VACANCY_MAP: Record<number, string> = {
   // CERRADAS · el mapeo se conserva para que las aplicaciones históricas
@@ -55,35 +71,71 @@ export const VACANCY_MAP: Record<number, string> = {
 };
 
 /**
- * Títulos con los que buscar en ht_vacancies cuando el job_id no está mapeado.
- * Se comparan con ILIKE, así que alcanza con un fragmento distintivo.
+ * Títulos con los que buscar en ht_vacancies cuando el job_id no está mapeado
+ * y tampoco hay un vínculo de requisición. Se comparan con ILIKE, así que
+ * alcanza con un fragmento distintivo.
  */
-const TITLE_HINTS: Record<number, string> = {
+export const TITLE_HINTS: Record<number, string> = {
   3: "customer documentation specialist",
   10: "full stack",
 };
 
-/** Lo que se resolvió y cómo, para poder avisar cuando algo huele mal. */
-export type VacanteResuelta = {
-  id: string;
-  titulo: string | null;
-  cerrada: boolean;
-  via: "mapa" | "titulo" | "mapa_reemplazado";
-  aviso: string | null;
+type ResultadoLectura = { data: unknown; error: { message: string } | null };
+
+type FiltroLectura = PromiseLike<ResultadoLectura> & {
+  eq(columna: string, valor: unknown): FiltroLectura;
+  ilike(columna: string, patron: string): FiltroLectura;
+  maybeSingle(): Promise<ResultadoLectura>;
 };
 
-type FilaVacante = { id: string; title: string | null; status: string | null };
+export type LectorVacantes = {
+  from(tabla: string): {
+    select(columnas: string): FiltroLectura;
+  };
+};
 
-const estaAbierta = (v: FilaVacante) => v.status == null || v.status === "open";
+function filasDe(data: unknown): FilaVacante[] {
+  return Array.isArray(data) ? (data as FilaVacante[]) : [];
+}
 
-async function buscarPorTitulo(hint: string): Promise<FilaVacante[]> {
-  const { data, error } = await supabaseAdmin
-    .from("ht_vacancies")
-    .select("id, title, status")
-    .eq("client_id", TS_CLIENT_ID)
-    .ilike("title", `%${hint}%`);
-  if (error || !data) return [];
-  return data as FilaVacante[];
+/**
+ * Lecturas que usa el resolvedor. El vínculo se pide a ht_requisitions por
+ * web_vacancy_id y client_id; el título, solo como fallback, con un patrón
+ * que el ATS tiene que contener.
+ */
+export function consultaDe(db: LectorVacantes): ConsultaVacantes {
+  return {
+    async vacantePorId(id) {
+      const { data, error } = await db
+        .from("ht_vacancies")
+        .select("id, title, status, client_id")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) return { fila: null, error: true };
+      return { fila: (data as FilaVacante | null) ?? null, error: false };
+    },
+    async vinculosPorWebJob(jobId) {
+      const { data, error } = await db
+        .from("ht_requisitions")
+        .select("vacancy_id")
+        .eq("client_id", TS_CLIENT_ID)
+        .eq("web_vacancy_id", jobId);
+      if (error) return { vacancyIds: [], error: true };
+      return {
+        vacancyIds: filasDe(data).map((fila) => (fila as { vacancy_id?: string | null }).vacancy_id ?? null),
+        error: false,
+      };
+    },
+    async porTitulo(hint) {
+      const { data, error } = await db
+        .from("ht_vacancies")
+        .select("id, title, status")
+        .eq("client_id", TS_CLIENT_ID)
+        .ilike("title", patronTitulo(hint));
+      if (error) return { filas: [], error: true };
+      return { filas: filasDe(data), error: false };
+    },
+  };
 }
 
 /**
@@ -96,70 +148,42 @@ async function buscarPorTitulo(hint: string): Promise<FilaVacante[]> {
  * igual y al candidato le llegaba su correo de confirmación.
  *
  * Un cargo que se vuelve a abrir nace con otro id, y el mapa se queda con el
- * viejo hasta que alguien se acuerde de editarlo. Así que ahora, si lo que
- * dice el mapa está CERRADO y existe una vacante abierta con ese mismo
- * nombre, manda la abierta. El mapa sigue valiendo mientras su vacante esté
- * viva, que es el caso normal.
+ * viejo hasta que alguien se acuerde de editarlo. Si lo que dice el mapa está
+ * cerrado y existe una vacante abierta con ese mismo nombre, manda la abierta.
+ *
+ * POR QUÉ EL VÍNCULO VA ANTES QUE EL TÍTULO
+ * Tres cargos de China se llaman OVERSEAS SALES en el ATS y en la web se
+ * distinguen por la ciudad. El título de Guangzhou no cabe dentro del título
+ * del ATS, así que la búsqueda devuelve cero. El de Shenzhen sí cabe, pero
+ * cabe en las tres. La requisición ya guarda web_vacancy_id → vacancy_id;
+ * si hay exactamente un destino, es ese. Si no hay vínculo o hay más de uno,
+ * no se elige una fila al azar y la aplicación queda en Neon con el fallo
+ * visible en el log.
  */
+export async function resolverVacanteDetallada(
+  jobId: number,
+  jobTitle?: string,
+  consulta: ConsultaVacantes = consultaDe(supabaseAdmin as unknown as LectorVacantes),
+): Promise<ResolucionVacante> {
+  let resuelta: ResolucionVacante;
+  try {
+    resuelta = await resolverVacanteCon(jobId, jobTitle, consulta, VACANCY_MAP, TITLE_HINTS, TS_CLIENT_ID);
+  } catch (e: unknown) {
+    const mensaje = e instanceof Error ? e.message : String(e);
+    console.error(`[vacancy-map] fallo resolviendo job_id ${jobId}:`, mensaje);
+    return { vacante: null, motivo: `job_id ${jobId}: excepción al resolver (${mensaje})` };
+  }
+  if (!resuelta.vacante) console.error(`[vacancy-map] ${resuelta.motivo}`);
+  else if (resuelta.vacante.aviso) console.warn(`[vacancy-map] ${resuelta.vacante.aviso}`);
+  return resuelta;
+}
+
 export async function resolverVacante(
   jobId: number,
   jobTitle?: string,
 ): Promise<VacanteResuelta | null> {
-  const hint = TITLE_HINTS[jobId] || (jobTitle || "").trim();
-  const mapeada = VACANCY_MAP[jobId];
-
-  if (mapeada) {
-    const { data } = await supabaseAdmin
-      .from("ht_vacancies")
-      .select("id, title, status")
-      .eq("id", mapeada)
-      .maybeSingle();
-    const fila = (data as FilaVacante) || null;
-
-    if (fila && !estaAbierta(fila) && hint) {
-      const abierta = (await buscarPorTitulo(hint)).find(estaAbierta);
-      if (abierta && abierta.id !== mapeada) {
-        const aviso =
-          `el mapa manda el job_id ${jobId} a "${fila.title}" (${mapeada}), que está cerrada; ` +
-          `se usó la abierta "${abierta.title}" (${abierta.id}). Actualiza VACANCY_MAP.`;
-        console.warn(`[vacancy-map] ${aviso}`);
-        return { id: abierta.id, titulo: abierta.title, cerrada: false, via: "mapa_reemplazado", aviso };
-      }
-    }
-
-    const cerrada = Boolean(fila && !estaAbierta(fila));
-    return {
-      id: mapeada,
-      titulo: fila?.title ?? null,
-      cerrada,
-      via: "mapa",
-      aviso: cerrada
-        ? `la vacante del mapa para el job_id ${jobId} está cerrada y no hay una abierta con ese nombre`
-        : null,
-    };
-  }
-
-  if (!hint) return null;
-
-  try {
-    const encontradas = await buscarPorTitulo(hint);
-    if (!encontradas.length) return null;
-    const elegida = encontradas.find(estaAbierta) || encontradas[0];
-    const aviso =
-      `job_id ${jobId} no está en VACANCY_MAP · resuelto por título "${hint}" → ` +
-      `${elegida.title} (${elegida.id})`;
-    console.warn(`[vacancy-map] ${aviso}`);
-    return {
-      id: elegida.id,
-      titulo: elegida.title,
-      cerrada: !estaAbierta(elegida),
-      via: "titulo",
-      aviso,
-    };
-  } catch (e: any) {
-    console.error(`[vacancy-map] fallo resolviendo job_id ${jobId}:`, e?.message || e);
-    return null;
-  }
+  const resuelta = await resolverVacanteDetallada(jobId, jobTitle);
+  return resuelta.vacante;
 }
 
 /**

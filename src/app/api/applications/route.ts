@@ -8,7 +8,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { recordStageEvent } from "@/lib/stage-events";
 // La resolución job_id → vacancy_id es compartida con
 // /api/admin/sync-applications-to-funnel · no duplicarla acá.
-import { resolverVacante } from "@/lib/vacancy-map";
+import { decidirAltaFunnel, resolverVacante } from "@/lib/vacancy-map";
 import { isEnglishTemplate, resolveCandidateLang } from "@/lib/candidate-lang";
 import { candidateSignatureHtml } from "@/lib/ats-from";
 import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
@@ -112,8 +112,8 @@ export async function POST(request: NextRequest) {
 
     // ─── Auto-sync al funnel del ATS (Supabase ht_candidates) ──
     // Cada nueva aplicación entra directo al funnel en stage 'aplico'
-    // sin necesidad de correr sync manual. Idempotente · si ya existe el email
-    // solo actualiza el updated_at.
+    // sin necesidad de correr sync manual. Idempotente por correo Y vacante:
+    // un reintento no inserta otro candidato ni otro evento de entrada.
     let vacTemplate: string | null = null;
     try {
       const resuelta = await resolverVacante(job_id, job_title);
@@ -142,18 +142,32 @@ export async function POST(request: NextRequest) {
         // lo único que pasaba era que se le tocaba la fecha: su postulación
         // nueva no entraba a ninguna parte. El 8 de octubre fueron diez de
         // quince, y dos de ellos figuraban rechazados de un proceso de abril.
-        const { data: existing } = await supabaseAdmin
+        const { data: existingRows, error: existingErr } = await supabaseAdmin
           .from("ht_candidates")
           .select("id")
           .ilike("email", emailNormalized)
           .eq("vacancy_id", vacancyId)
-          .maybeSingle();
+          .limit(5);
+        // maybeSingle con dos filas devuelve error y data vacía. Tratar eso
+        // como "no existe" insertaría un tercero. Si no se puede leer, no
+        // se inserta: la solicitud ya está en Neon y el reintento la retoma.
+        const decision = decidirAltaFunnel(
+          existingErr ? null : (existingRows as { id: string }[] | null),
+          Boolean(existingErr),
+        );
 
-        if (existing?.id) {
+        if (decision.accion === "detener") {
+          console.error(`[applications] aplicación ${newId}: ${decision.motivo}`);
+        } else if (decision.accion === "actualizar") {
+          if (decision.duplicadosPrevios) {
+            console.error(
+              `[applications] aplicación ${newId}: ya hay más de un candidato en la vacante ${vacancyId}; no se inserta otro ni otro evento`,
+            );
+          }
           await supabaseAdmin
             .from("ht_candidates")
             .update({ updated_at: new Date().toISOString() })
-            .eq("id", existing.id);
+            .eq("id", decision.candidateId);
         } else {
           const { data: created, error: insertErr } = await supabaseAdmin
             .from("ht_candidates")
@@ -174,8 +188,9 @@ export async function POST(request: NextRequest) {
             .maybeSingle();
 
           // La entrada al funnel es el primer evento del candidato: sin él
-          // "días en aplicó" no tiene punto de partida real.
-          if (!insertErr && created?.id) {
+          // "días en aplicó" no tiene punto de partida real. Solo en el alta
+          // nueva: un reintento que encuentra la fila no registra otro.
+          if (!insertErr && created?.id && decision.registrarEvento) {
             await recordStageEvent({
               candidateId: created.id,
               fromStage: null,
@@ -184,15 +199,19 @@ export async function POST(request: NextRequest) {
               source: "system",
               note: "formulario público",
             });
+          } else if (insertErr || !created?.id) {
+            console.error(
+              `[applications] aplicación ${newId} no entró al funnel:`,
+              insertErr?.message || "insert sin id",
+            );
           }
         }
       } else {
-        // Sin mapeo la aplicación se guarda en Neon pero nunca entra al funnel,
-        // y el candidato igual recibe "aplicación recibida". Queda invisible
-        // para el equipo hasta que alguien mapee el job_id.
+        // La solicitud ya quedó en Neon. No entra al funnel y no se adivina
+        // una vacante: el motivo concreto lo dejó resolverVacante en el log.
         console.error(
           `[applications] job_id ${job_id} (${job_title || "sin título"}) no se pudo resolver ` +
-          `ni por mapa ni por título · la aplicación ${newId} de ${emailLower} NO entró al funnel`
+          `a una vacante inequívoca · la aplicación ${newId} de ${emailLower} NO entró al funnel`
         );
       }
     } catch (syncErr) {
