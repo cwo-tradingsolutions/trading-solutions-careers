@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { recordStageEvent } from "@/lib/stage-events";
+import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -119,6 +120,10 @@ export async function POST(
     const validDecisions = ['avanza','no_avanza','needs_more_info','recommend_other_vacancy'];
     if (!validDecisions.includes(body.decision)) {
       return NextResponse.json({ error: "Decisión inválida" }, { status: 400 });
+    }
+
+    if (isPreviewTestMode()) {
+      return previewTestJson("POST /api/decision/[token]");
     }
 
     const updates: any = {

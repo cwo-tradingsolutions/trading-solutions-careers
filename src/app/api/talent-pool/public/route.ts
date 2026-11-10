@@ -1,5 +1,6 @@
 import { neon } from "@/lib/sql";
 import { NextRequest, NextResponse } from "next/server";
+import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
 
 /**
  * Talent pool público · "Join us" del portal de empleo (pack rev J, Kelly P0).
@@ -46,6 +47,11 @@ export async function POST(request: NextRequest) {
   }
   if (cv_data && (cv_data.length > MAX_CV_CHARS || !cv_data.startsWith("data:"))) {
     return NextResponse.json({ error: "CV must be a PDF or Word file up to 5 MB" }, { status: 413 });
+  }
+
+  // Same gate as POST /api/applications: validate, then stop before any write.
+  if (isPreviewTestMode()) {
+    return previewTestJson("POST /api/talent-pool/public");
   }
 
   try {

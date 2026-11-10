@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { recordStageEvent } from '@/lib/stage-events';
+import { isPreviewTestMode, previewTestJson } from '@/lib/preview-mode';
 
 function calculateIntegrityScore(proctoring: {
   camera_enabled?: boolean;
@@ -35,6 +36,10 @@ export async function POST(req: NextRequest) {
 
     if (!candidate || candidate.status !== 'in_progress') {
       return NextResponse.json({ error: 'Sesión inválida' }, { status: 403 });
+    }
+
+    if (isPreviewTestMode()) {
+      return previewTestJson('POST /api/headhunting/assessment/complete');
     }
 
     // Mark all non-final responses as final
