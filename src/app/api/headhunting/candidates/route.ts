@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
+import { fetchAllRows } from '@/lib/fetch-all-rows';
 import { supabaseAdmin } from '@/lib/supabase';
+import { validarCanalReclutador } from '@/lib/candidate-source';
 
 // GET /api/headhunting/candidates?vacancy_id=xxx&client_id=xxx
 export async function GET(req: NextRequest) {
@@ -9,23 +11,29 @@ export async function GET(req: NextRequest) {
 
   try {
     const vacancyId = req.nextUrl.searchParams.get('vacancy_id');
-    const clientId = req.nextUrl.searchParams.get('client_id');
+    // `clientId` se acepta por compatibilidad: el funnel lo mandó así meses y
+    // el filtro se ignoraba en silencio.
+    const clientId = req.nextUrl.searchParams.get('client_id') ?? req.nextUrl.searchParams.get('clientId');
 
-    let query = supabaseAdmin
-      .from('ht_candidates')
-      .select('*, ht_results(match_percentage, recommendation), ht_vacancies(title)')
-      .order('created_at', { ascending: false });
-
-    if (vacancyId) query = query.eq('vacancy_id', vacancyId);
-    if (clientId) query = query.eq('client_id', clientId);
-
-    const { data, error } = await query;
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    let data;
+    try {
+      data = await fetchAllRows(() => {
+        let query = supabaseAdmin
+          .from('ht_candidates')
+          .select('*, notes, ht_results(match_percentage, recommendation), ht_vacancies(title)');
+        if (vacancyId) query = query.eq('vacancy_id', vacancyId);
+        if (clientId) query = query.eq('client_id', clientId);
+        return query;
+      }, 1000, [
+        { column: 'created_at', ascending: false },
+        { column: 'id', ascending: true },
+      ]);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return NextResponse.json({ error: message }, { status: 500 });
     }
 
-    return NextResponse.json({ candidates: data || [] });
+    return NextResponse.json({ candidates: data });
   } catch (err) {
     console.error('List candidates error:', err);
     return NextResponse.json(
@@ -49,6 +57,11 @@ export async function POST(req: NextRequest) {
         { error: 'client_id, vacancy_id, name, y email son requeridos' },
         { status: 400 }
       );
+    }
+
+    const canal = validarCanalReclutador(body.source);
+    if (!canal.ok) {
+      return NextResponse.json({ error: canal.error }, { status: 400 });
     }
 
     // Check for duplicate email in same vacancy
@@ -76,6 +89,8 @@ export async function POST(req: NextRequest) {
         phone: phone || null,
         cv_url: cv_url || null,
         status: 'pending',
+        source: canal.source,
+        stage: 'aplico',
       })
       .select()
       .single();

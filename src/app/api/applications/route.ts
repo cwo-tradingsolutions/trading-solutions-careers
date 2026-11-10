@@ -9,7 +9,13 @@ import { recordStageEvent } from "@/lib/stage-events";
 // La resolución job_id → vacancy_id es compartida con
 // /api/admin/sync-applications-to-funnel · no duplicarla acá.
 import { resolverVacante } from "@/lib/vacancy-map";
-import { resolveCandidateLang } from "@/lib/candidate-lang";
+import { isEnglishTemplate, resolveCandidateLang } from "@/lib/candidate-lang";
+import { candidateSignatureHtml } from "@/lib/ats-from";
+import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
+import { candidateMailBcc } from "@/lib/candidate-bcc";
+import { requireAdmin } from "@/lib/admin-auth";
+import { canalPostulacionPublica } from "@/lib/candidate-source";
+import { publicStepBody } from "@/lib/candidate-public-error";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -24,10 +30,29 @@ async function ensureDB() {
 
 export async function POST(request: NextRequest) {
   try {
-    await ensureDB();
-
     const body = await request.json();
+
+    if (body?.talent_pool === true) {
+      const poolName = String(body.full_name || "").trim();
+      const poolEmail = String(body.email || "").trim();
+      if (!poolName || !poolEmail) {
+        return NextResponse.json(
+          { error: "Missing required fields: full_name, email" },
+          { status: 400 }
+        );
+      }
+      if (!isPreviewTestMode()) {
+        return NextResponse.json(
+          { error: "Talent pool applications are not connected" },
+          { status: 400 }
+        );
+      }
+      return previewTestJson("POST /api/applications talent_pool");
+    }
+
     const { job_id, job_title, full_name, email, phone, linkedin, cv_filename, cv_data, why_ts, ref } = body;
+    // El formulario público no pide canal y no se bloquea por eso.
+    const canalPublico = canalPostulacionPublica({ ref, interno: false });
 
     if (!job_id || !full_name || !email) {
       return NextResponse.json(
@@ -35,6 +60,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    if (isPreviewTestMode()) {
+      return previewTestJson("POST /api/applications");
+    }
+
+    await ensureDB();
 
     // ─── Detectar candidato INTERNO ────────────────────────────────────
     // Criterios (cualquiera dispara internal):
@@ -83,6 +114,7 @@ export async function POST(request: NextRequest) {
     // Cada nueva aplicación entra directo al funnel en stage 'aplico'
     // sin necesidad de correr sync manual. Idempotente · si ya existe el email
     // solo actualiza el updated_at.
+    let vacTemplate: string | null = null;
     try {
       const resuelta = await resolverVacante(job_id, job_title);
       const vacancyId = resuelta?.id ?? null;
@@ -90,6 +122,20 @@ export async function POST(request: NextRequest) {
         console.warn(`[applications] aplicación ${newId} de ${emailLower}: ${resuelta.aviso}`);
       }
       if (vacancyId) {
+        // Plantilla de la vacante (panama_ops → inglés). Si la lectura falla,
+        // se sigue con el comportamiento de hoy: el acuse usa id/título/país
+        // y la aplicación pública no se bloquea.
+        try {
+          const { data: v, error: vacErr } = await supabaseAdmin
+            .from("ht_vacancies")
+            .select("form_template_key")
+            .eq("id", vacancyId)
+            .maybeSingle();
+          if (!vacErr) vacTemplate = (v?.form_template_key as string | null) ?? null;
+        } catch (lookupErr) {
+          console.error("[applications] form_template_key lookup failed:", lookupErr);
+        }
+
         const emailNormalized = emailLower;
         // El duplicado se mide por correo Y VACANTE. Con la llave solo en el
         // correo, quien ya estaba en el ATS por otro cargo volvía a aplicar y
@@ -118,8 +164,9 @@ export async function POST(request: NextRequest) {
               email: emailNormalized,
               phone: phone || null,
               stage: "aplico",
-              source: isInternal ? "public_form_internal" : "public_form",
+              source: isInternal ? "public_form_internal" : canalPublico,
               notes: why_ts ? `[Public form] ${why_ts}` : `[Public form] · application_id=${newId}`,
+              preferred_language: isEnglishTemplate(vacTemplate) ? "en" : "es",
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             })
@@ -162,16 +209,15 @@ export async function POST(request: NextRequest) {
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://trading-solutions-careers.vercel.app';
         const portalLink = `${baseUrl}/portal/${portalToken}`;
 
-        // Pull config de bcc/reply_to dinámicos
-        let bcc: string | null = process.env.EMAIL_BCC ?? null;
+        // Kelly: no BCC on candidate mail. Reply-To still comes from config.
+        const bcc = candidateMailBcc();
         let replyTo: string | null = null;
         try {
-          const cfgRows = await sql`SELECT email_bcc, email_reply_to FROM recruiter_config WHERE id = 1`;
+          const cfgRows = await sql`SELECT email_reply_to FROM recruiter_config WHERE id = 1`;
           if (cfgRows.length > 0) {
-            bcc = (cfgRows[0].email_bcc as string) || bcc;
             replyTo = (cfgRows[0].email_reply_to as string) || null;
           }
-        } catch { /* config no existe aún — usa defaults */ }
+        } catch { /* config no existe aún — el acuse sale sin Reply-To */ }
 
         const firstName = full_name.split(' ')[0];
         // Las vacantes de China corren en inglés · mandarles el acuse en
@@ -184,7 +230,12 @@ export async function POST(request: NextRequest) {
           const locRows = await sql`SELECT location FROM vacancies WHERE id = ${job_id} LIMIT 1`;
           if (locRows.length > 0) jobLocation = (locRows[0].location as string) ?? null;
         } catch { /* si no se puede leer, quedan el id y el título */ }
-        const lang = resolveCandidateLang({ jobId: job_id, jobTitle: job_title, country: jobLocation });
+        const lang = resolveCandidateLang({
+          formTemplateKey: vacTemplate,
+          jobId: job_id,
+          jobTitle: job_title,
+          country: jobLocation,
+        });
         const subject = lang === "en"
           ? `Trading Solutions · We received your application for ${job_title}`
           : `Trading Solutions · Recibimos tu aplicación a ${job_title}`;
@@ -198,14 +249,13 @@ export async function POST(request: NextRequest) {
       <p style="margin:0 0 8px"><strong>Nuestros compromisos contigo:</strong></p>
       <ul style="margin:0;padding-left:20px">
         <li>Te respondemos en <strong>máximo 7 días hábiles</strong>, avances o no</li>
-        <li>Si no avanzas, te decimos por qué con respeto y honestidad</li>
         <li>Tu información se mantiene confidencial</li>
       </ul>
     </div>
     <p>Puedes ver el estado de tu aplicación en cualquier momento:</p>
     <p style="text-align:center"><a href="${portalLink}" style="display:inline-block;background:#2C64ED;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600">Ver mi proceso</a></p>
     <p style="font-size:12px;color:#666">Si tienes preguntas, simplemente responde este correo.</p>
-    <p style="margin-top:24px">Un abrazo,<br><strong>Equipo Trading Solutions</strong></p>
+    ${candidateSignatureHtml("es")}
   </div>
   <div style="padding:18px 32px;text-align:center;color:#999;font-size:12px;border-top:1px solid #eee">Boutique Freight Forwarder · Operación en +10 países</div>
 </div></body></html>`;
@@ -220,14 +270,13 @@ export async function POST(request: NextRequest) {
       <p style="margin:0 0 8px"><strong>What we commit to:</strong></p>
       <ul style="margin:0;padding-left:20px">
         <li>We get back to you within <strong>7 business days</strong>, either way</li>
-        <li>If you don't move forward, we tell you why, honestly and respectfully</li>
         <li>Your information stays confidential</li>
       </ul>
     </div>
     <p>You can check the status of your application at any time:</p>
     <p style="text-align:center"><a href="${portalLink}" style="display:inline-block;background:#2C64ED;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600">View my process</a></p>
     <p style="font-size:12px;color:#666">If you have any questions, just reply to this email.</p>
-    <p style="margin-top:24px">Best regards,<br><strong>Talent Team · Trading Solutions</strong></p>
+    ${candidateSignatureHtml("en")}
   </div>
   <div style="padding:18px 32px;text-align:center;color:#999;font-size:12px;border-top:1px solid #eee">Boutique Freight Forwarder · Operations in 10+ countries</div>
 </div></body></html>`;
@@ -269,12 +318,14 @@ export async function POST(request: NextRequest) {
     );
   } catch (error: unknown) {
     console.error("Error creating application:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(publicStepBody(), { status: 500 });
   }
 }
 
 export async function GET(request: NextRequest) {
+  const authError = requireAdmin(request);
+  if (authError) return authError;
+
   try {
     await ensureDB();
 
@@ -364,7 +415,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error("Error fetching applications:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(publicStepBody(), { status: 500 });
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { isPreviewTestMode, previewTestJson } from '@/lib/preview-mode';
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,6 +31,10 @@ export async function POST(req: NextRequest) {
 
     if (!candidate || candidate.status !== 'in_progress') {
       return NextResponse.json({ error: 'Sesión inválida' }, { status: 403 });
+    }
+
+    if (isPreviewTestMode()) {
+      return previewTestJson('POST /api/headhunting/assessment/save');
     }
 
     // Check if response already exists (upsert logic)

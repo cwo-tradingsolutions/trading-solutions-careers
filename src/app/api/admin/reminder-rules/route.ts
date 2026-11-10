@@ -46,6 +46,13 @@ export async function PATCH(req: NextRequest) {
     for (const k of allowed) if (k in patch) update[k] = patch[k];
     update.updated_at = new Date().toISOString();
 
+    // Auto-rechazo OFF hasta GO de Kelly. No se persiste mark_rejected.
+    let warning: string | undefined;
+    if (update.on_exhausted_action === "mark_rejected") {
+      update.on_exhausted_action = "mark_paused";
+      warning = "mark_rejected está apagado hasta GO de Kelly; se guardó mark_paused";
+    }
+
     const { data, error } = await supabaseAdmin
       .from("ts_reminder_rules")
       .update(update)
@@ -54,7 +61,7 @@ export async function PATCH(req: NextRequest) {
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ success: true, rule: data });
+    return NextResponse.json({ success: true, rule: data, ...(warning ? { warning } : {}) });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || "Error" }, { status: 500 });
   }

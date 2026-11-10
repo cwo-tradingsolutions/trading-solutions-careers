@@ -1,0 +1,420 @@
+/* Careers overrides on top of the scoped kit. Primary action is #0870D6, hover #066AC9. */
+
+html.ts-careers-root,
+html.ts-careers-root body {
+  background: #f7f7f5;
+  color: #111111;
+  font-family: "Open Sauce Two", Inter, "Helvetica Neue", Arial, sans-serif;
+}
+
+html[lang="zh-CN"] .ts-x,
+.ts-x[data-lang="zh-CN"] {
+  font-family: "Open Sauce Two", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+}
+
+html[lang="zh-CN"] .ts-x h1,
+.ts-x[data-lang="zh-CN"] h1 {
+  line-height: 1.08;
+}
+
+.ts-preview-banner {
+  background: #111111;
+  color: #ffffff;
+  text-align: center;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.3;
+  font-family: "Open Sauce Two", "Noto Sans SC", Inter, sans-serif;
+}
+@media (max-width: 360px) {
+  .ts-preview-banner {
+    padding: 8px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+}
+
+.ts-lang {
+  position: relative;
+  flex: none;
+}
+.ts-lang-btn {
+  height: 36px;
+  min-width: 44px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line, #e6e6e1);
+  background: #fff;
+  color: var(--ink, #111);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.nav.over .ts-lang-btn {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+.ts-lang-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 80;
+  min-width: 132px;
+  max-width: calc(100vw - 24px);
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: #fff;
+  color: #111;
+  border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+}
+.ts-lang-up .ts-lang-menu {
+  top: auto;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: auto;
+}
+.ts-lang-menu button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #111;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.ts-lang-menu button[aria-selected="true"] {
+  background: #efefec;
+  font-weight: 500;
+}
+.ts-lang-menu button:hover {
+  background: #f7f7f5;
+}
+@media (max-width: 420px) {
+  .ts-lang-btn {
+    height: 34px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+}
+
+/* 320–375: logo + language + jobs CTA overflowed and pushed the burger off-screen. */
+@media (max-width: 1100px) {
+  .ts-x .nav,
+  .ts-x .nav-in {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .ts-x .nav-in {
+    gap: 6px;
+  }
+  .ts-x .nav-logo {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .ts-x .nav-logo img {
+    width: auto;
+    max-width: 100%;
+    height: 18px;
+  }
+  /* Keep the light/dark logo swap. display:block on every img showed both. */
+  .ts-x .nav-logo img.logo-dark { display: none; }
+  .ts-x .nav.over .nav-logo img.logo-light { display: none; }
+  .ts-x .nav.over .nav-logo img.logo-dark { display: block; }
+  .ts-x .nav.open.over .nav-logo img.logo-light { display: block; }
+  .ts-x .nav.open.over .nav-logo img.logo-dark { display: none; }
+  .ts-x .nav-right {
+    flex: none;
+    margin-left: auto;
+    gap: 6px;
+  }
+  .ts-x .nav-right .btn-dark {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 8px;
+    font-size: 11px;
+    line-height: 1;
+    letter-spacing: 0;
+    white-space: nowrap;
+    flex: none;
+  }
+  .ts-x .burger {
+    flex: none;
+  }
+  .ts-x .nav.open .nav-links {
+    left: 0;
+    right: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+@media (max-width: 390px) {
+  .ts-x .nav-logo img { height: 16px; }
+  .ts-x .nav-in { gap: 4px; }
+  .ts-x .nav-right { gap: 4px; }
+  .ts-x .nav-right .btn-dark {
+    height: 30px;
+    padding: 0 6px;
+    font-size: 10px;
+  }
+}
+
+.ts-x {
+  min-height: 100vh;
+  background: var(--bg, #f7f7f5);
+  color: var(--ink, #111);
+  font-family: "Open Sauce Two", Inter, "Helvetica Neue", Arial, sans-serif;
+}
+
+.ts-x .sr-only,
+.ts-x .field input.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* P1-2 — blue only on the primary button */
+.ts-x .v3-link,
+.ts-x .cr-step .n b,
+.ts-x .cr-job:hover h3,
+.ts-x .cr-share a,
+.ts-x a.sec-row:hover h3,
+.ts-x .foot-in a:hover {
+  color: var(--ink);
+}
+.ts-x .cr-share a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* P1-4 — second tone passes large-text contrast */
+.ts-x .cr-head h2 span,
+.ts-x .v3-big span {
+  color: #85857f;
+}
+
+/* P1-5 — read the hero and the top of area cards */
+.ts-x .cr-hero::before {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.28) 40%, rgba(0, 0, 0, 0) 65%);
+}
+.ts-x .cr-hero .v3-eyebrow {
+  color: #fff;
+}
+.ts-x .cr-area::after {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0) 32%, rgba(0, 0, 0, 0.1) 55%, rgba(0, 0, 0, 0.72) 100%);
+}
+@media (max-width: 640px) {
+  /* The two people sit at the edges of a wide photo. A 390px cover crop
+     has to pick one side; 96% frames the worker on the right. */
+  .ts-x .cr-hero .bg img {
+    object-position: 96% center;
+  }
+  /* Bottom of the hero holds the eyebrow. Dark enough that white type stays at least 4.5:1 on the bright sky. */
+  .ts-x .cr-hero::before {
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.28) 0%, rgba(0, 0, 0, 0.62) 46%, rgba(0, 0, 0, 0.9) 100%);
+  }
+  .ts-x .cr-hero.v3-hero::after {
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.28) 62%, rgba(0, 0, 0, 0.08) 100%);
+  }
+}
+
+/* P1-3 — filter chips must not widen the page */
+@media (max-width: 560px) {
+  .ts-x .cr-filters {
+    align-items: stretch;
+  }
+  .ts-x .cr-filter {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .ts-x .cr-filter .chips {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ts-x .cr-filter .chips::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.ts-x .lang button {
+  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  color: var(--ink-2);
+  line-height: 1.2;
+}
+.ts-x .lang button.on {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.ts-x .chip[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.ts-x .cr-search {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.ts-x .cr-search input {
+  width: 100%;
+  font: inherit;
+  font-size: 15px;
+  padding: 12px 14px;
+  border: 1px solid #8e8e88;
+  border-radius: var(--r-sm);
+  background: #efefec;
+  color: var(--ink);
+}
+.ts-x .cr-search input:focus {
+  outline: none;
+  border-color: var(--ink);
+  background: var(--surface);
+}
+
+/* Contrast: hints, placeholders, field edges */
+.ts-x .field .hint,
+.ts-x .field .req-note {
+  color: var(--ink-2);
+}
+.ts-x .field input,
+.ts-x .field textarea,
+.ts-x .field select {
+  border-color: #8e8e88;
+  background: #efefec;
+}
+.ts-x .field input::placeholder,
+.ts-x .field textarea::placeholder {
+  color: #5c5c56;
+  opacity: 1;
+}
+.ts-x .field,
+.ts-x .check,
+.ts-x .field input,
+.ts-x .field textarea,
+.ts-x .field select,
+.ts-x .check input {
+  scroll-margin-top: 96px;
+}
+.ts-x .err {
+  color: #a52a2a;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.ts-x .check + .err {
+  display: block;
+  margin-top: 6px;
+}
+.ts-x .form-success h2 {
+  margin-bottom: 12px;
+}
+.ts-x .field input[aria-invalid="true"],
+.ts-x .field textarea[aria-invalid="true"],
+.ts-x .field select[aria-invalid="true"] {
+  border-color: #a52a2a;
+}
+.ts-x .form-status.gap {
+  color: var(--ink);
+}
+.ts-x .file-btn {
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-2);
+  padding: 8px 14px;
+  cursor: pointer;
+  color: var(--ink);
+}
+.ts-x .file-name {
+  margin-left: 10px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.ts-x :focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.ts-x .cr-hero :focus-visible,
+.ts-x .v3-chapter :focus-visible,
+.ts-x .cr-area :focus-visible,
+.ts-x .nav.over :focus-visible {
+  outline-color: #fff;
+}
+
+.ts-x .cr-body .intro {
+  white-space: pre-line;
+}
+.ts-x .cr-lang-note {
+  display: inline-block;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 6px 12px;
+}
+.ts-x .cr-closed {
+  padding-bottom: clamp(80px, 10vw, 150px);
+}
+.ts-x .cr-closed .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.ts-x .cr-apply-jump {
+  display: none;
+}
+@media (max-width: 900px) {
+  .ts-x .cr-apply-jump {
+    display: flex;
+    position: fixed;
+    z-index: 40;
+    left: 16px;
+    right: 16px;
+    bottom: 12px;
+    width: auto;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  }
+  .ts-x .cr-apply-jump[hidden] {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ts-x .ts-fade {
+    filter: none !important;
+  }
+}

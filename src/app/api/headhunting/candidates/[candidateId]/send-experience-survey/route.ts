@@ -8,8 +8,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
-import { resolveCandidateLang, EN_SIGNATURE_NAME } from "@/lib/candidate-lang";
+import { candidateSignatureHtml } from "@/lib/ats-from";
+import { resolveCandidateLang } from "@/lib/candidate-lang";
 import crypto from "crypto";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
+import { shouldDropVacancyId, surveySendBody } from "@/lib/candidate-public-error";
 
 export async function POST(
   req: NextRequest,
@@ -26,7 +29,7 @@ export async function POST(
     // Get candidate + vacancy
     const { data: cand, error: cErr } = await supabaseAdmin
       .from("ht_candidates")
-      .select("id, name, email, stage, status, vacancy_id, preferred_language, ht_vacancies(title, form_template_key, country)")
+      .select("id, name, email, stage, status, vacancy_id, preferred_language, rejection_sent_at, ht_vacancies(title, form_template_key, country)")
       .eq("id", candidateId)
       .single();
 
@@ -48,6 +51,13 @@ export async function POST(
     else if (cand.stage === 'contratado') outcome = 'hired';
     else if (cand.status === 'withdrew') outcome = 'withdrew';
 
+    if (send && outcome === 'rejected' && !cand.rejection_sent_at) {
+      return NextResponse.json(
+        { error: "No se envió la encuesta NPS: el correo de rechazo todavía no consta como enviado." },
+        { status: 409 },
+      );
+    }
+
     // Check si ya hay encuesta activa no-completa
     const { data: existing } = await supabaseAdmin
       .from("ts_candidate_experience")
@@ -67,7 +77,7 @@ export async function POST(
     } else {
       // Crear nuevo token
       token = crypto.randomBytes(20).toString('hex');
-      const { data: created, error: insErr } = await supabaseAdmin
+      const inserted = await supabaseAdmin
         .from("ts_candidate_experience")
         .insert({
           candidate_id: candidateId,
@@ -75,10 +85,26 @@ export async function POST(
           token,
           outcome,
         })
-        .select()
+        .select("id")
         .single();
-      if (insErr) {
-        return NextResponse.json({ error: insErr.message }, { status: 500 });
+      let created = inserted.data;
+      let insErr = inserted.error;
+      if (insErr && shouldDropVacancyId(insErr)) {
+        const retry = await supabaseAdmin
+          .from("ts_candidate_experience")
+          .insert({
+            candidate_id: candidateId,
+            token,
+            outcome,
+          })
+          .select("id")
+          .single();
+        created = retry.data;
+        insErr = retry.error;
+      }
+      if (insErr || !created) {
+        console.error("send-experience-survey insert", insErr);
+        return NextResponse.json(surveySendBody(), { status: 500 });
       }
       surveyId = created.id;
     }
@@ -127,11 +153,7 @@ export async function POST(
                   <a href="${surveyLink}" style="display: inline-block; background: #0a0a0a; color: #fff; padding: 13px 28px; text-decoration: none; font-weight: 700; font-size: 13px; letter-spacing: 0.3px;">Responder encuesta</a>
                 </div>
                 <p style="margin: 18px 0 0; font-size: 12px; color: #737373;">Si el botón no funciona, copia este link:<br/><span style="color: #0a0a0a; word-break: break-all;">${surveyLink}</span></p>
-                <p style="margin: 24px 0 0; padding-top: 18px; border-top: 1px solid #e8e8e8; font-size: 12px; color: #737373; line-height: 1.6;">
-                  Un abrazo,<br/>
-                  <strong style="color: #0a0a0a;">Kelly Castañeda</strong><br/>
-                  Talent Acquisition and Development Lead · Trading Solutions
-                </p>
+                ${candidateSignatureHtml("es")}
               </div>
             </div>
           `;
@@ -147,10 +169,7 @@ export async function POST(
                   <a href="${surveyLink}" style="display: inline-block; background: #0a0a0a; color: #fff; padding: 13px 28px; text-decoration: none; font-weight: 700; font-size: 13px; letter-spacing: 0.3px;">Answer the survey</a>
                 </div>
                 <p style="margin: 18px 0 0; font-size: 12px; color: #737373;">If the button does not work, copy this link:<br/><span style="color: #0a0a0a; word-break: break-all;">${surveyLink}</span></p>
-                <p style="margin: 24px 0 0; padding-top: 18px; border-top: 1px solid #e8e8e8; font-size: 12px; color: #737373; line-height: 1.6;">
-                  Best regards,<br/>
-                  <strong style="color: #0a0a0a;">Talent Team</strong> · Trading Solutions
-                </p>
+                ${candidateSignatureHtml("en")}
               </div>
             </div>
           `;
@@ -161,7 +180,7 @@ export async function POST(
             to: cand.email,
             subject,
             html,
-            fromName: lang === 'en' ? EN_SIGNATURE_NAME : "Kelly Castañeda",
+            fromName: ATS_FROM_NAME,
             replyTo: "jointheteam@tradingsolutions.com",
           });
 
@@ -176,7 +195,8 @@ export async function POST(
           }
         }
       } catch (e: any) {
-        emailResult = { sent: false, error: e?.message || String(e) };
+        console.error("send-experience-survey mail", e);
+        emailResult = { sent: false, error: "No pudimos enviar el correo." };
       }
     }
 
@@ -190,6 +210,6 @@ export async function POST(
     });
   } catch (err: any) {
     console.error("send-experience-survey error:", err);
-    return NextResponse.json({ error: err?.message || "Error" }, { status: 500 });
+    return NextResponse.json(surveySendBody(), { status: 500 });
   }
 }

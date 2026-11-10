@@ -7,6 +7,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { recordStageEvent } from "@/lib/stage-events";
+import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
+import { validarRechazo } from "@/lib/rejection-rules";
+import { normalizeStage } from "@/lib/stage-labels";
+import { publicStepBody } from "@/lib/candidate-public-error";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -36,7 +40,10 @@ export async function GET(
     .eq("token", token)
     .maybeSingle();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("decision GET", error);
+    return NextResponse.json(publicStepBody(), { status: 500 });
+  }
   if (!data) return NextResponse.json({ error: "Token inválido" }, { status: 404 });
   if (data.expires_at && new Date(data.expires_at) < new Date()) {
     return NextResponse.json({ error: "Esta decisión ya expiró" }, { status: 410 });
@@ -121,6 +128,10 @@ export async function POST(
       return NextResponse.json({ error: "Decisión inválida" }, { status: 400 });
     }
 
+    if (isPreviewTestMode()) {
+      return previewTestJson("POST /api/decision/[token]");
+    }
+
     const updates: any = {
       responded_at: new Date().toISOString(),
       decision: body.decision,
@@ -164,10 +175,23 @@ export async function POST(
         });
       }
     } else if (body.decision === 'no_avanza') {
-      // Marcar rechazado automáticamente
+      const rechazo = validarRechazo({
+        category_key: body.category_key,
+        note: body.reasoning,
+      });
+      if (!rechazo.ok) {
+        return NextResponse.json({ error: rechazo.error }, { status: 400 });
+      }
       await supabaseAdmin
         .from("ht_candidates")
-        .update({ stage: 'rechazado', status: 'rejected', updated_at: new Date().toISOString() })
+        .update({
+          stage: 'rechazado',
+          status: 'rejected',
+          rejection_category: rechazo.category_key,
+          rejection_note_private: rechazo.note,
+          rejected_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", existing.candidate_id);
       stageUpdated = true;
       await recordStageEvent({
@@ -181,6 +205,12 @@ export async function POST(
     } else if (body.decision === 'recommend_other_vacancy' && body.recommended_vacancy_id && body.move_now) {
       // Mover candidato a la otra vacante en stage aplico (o el que indique target_stage)
       const movedToStage = body.target_stage || 'aplico';
+      if (normalizeStage(movedToStage) === 'rechazado') {
+        return NextResponse.json(
+          { error: "Para rechazar hay que elegir «No avanza» e indicar la categoría." },
+          { status: 400 },
+        );
+      }
       await supabaseAdmin
         .from("ht_candidates")
         .update({
@@ -208,7 +238,10 @@ export async function POST(
       .update(updates)
       .eq("id", existing.id);
 
-    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+    if (upErr) {
+      console.error("decision POST update", upErr);
+      return NextResponse.json(publicStepBody(), { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,
@@ -216,6 +249,6 @@ export async function POST(
     });
   } catch (err: any) {
     console.error('decision POST error:', err);
-    return NextResponse.json({ error: err?.message || "Error" }, { status: 500 });
+    return NextResponse.json(publicStepBody(), { status: 500 });
   }
 }

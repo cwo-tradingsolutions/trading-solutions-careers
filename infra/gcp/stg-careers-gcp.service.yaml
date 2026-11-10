@@ -37,6 +37,7 @@ spec:
             limits: { cpu: "1", memory: 1Gi }
           env:
             - { name: POSTGREST_DIRECTO, value: "1" }
+            - { name: STAGING_READ_ONLY, value: "1" }
             - name: SUPABASE_JWT_SECRET
               valueFrom: { secretKeyRef: { name: prod-careers-postgrest-jwt-secret, key: latest } }
             # Tablas que venían de Neon: esquema `neon`, rol careers_app

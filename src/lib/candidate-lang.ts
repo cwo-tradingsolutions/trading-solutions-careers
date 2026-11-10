@@ -8,7 +8,7 @@
  * descarte salían en español.
  *
  * La regla vive acá para que no haya que acordarse de ella en cada ruta:
- *   - Vacantes con form_template_key = 'china' → inglés.
+ *   - Vacantes con form_template_key = 'china' o 'panama_ops' → inglés.
  *   - Aplicaciones de la web a un job_id de China → inglés.
  *   - Cualquier candidato marcado con preferred_language = 'en' → inglés.
  * Todo lo demás sigue en español.
@@ -17,7 +17,7 @@
 export type CandidateLang = "es" | "en";
 
 /** Plantillas de prefiltro cuyo proceso es en inglés. */
-const ENGLISH_TEMPLATES = new Set(["china"]);
+const ENGLISH_TEMPLATES = new Set(["china", "panama_ops"]);
 
 /**
  * job_id de la web (tabla `vacancies` en Neon) que corresponden a vacantes de
@@ -61,9 +61,18 @@ function titleSaysChina(jobTitle?: string | null): boolean {
   return /\bchina\b/i.test(String(jobTitle || ""));
 }
 
+function isPanamaOpsRole(input: LangInput): boolean {
+  if (String(input.formTemplateKey || "").toLowerCase() === "panama_ops") return true;
+  const title = String(input.jobTitle || "");
+  const place = String(input.country || "");
+  const ops = /operations specialist|especialista de operaciones/i.test(title);
+  return ops && /\bpanam[aá]\b/i.test(`${title} ${place}`);
+}
+
 export function resolveCandidateLang(input: LangInput): CandidateLang {
   if (String(input.preferredLanguage || "").toLowerCase() === "en") return "en";
   if (isEnglishTemplate(input.formTemplateKey)) return "en";
+  if (isPanamaOpsRole(input)) return "en";
   if (input.jobId !== undefined && isEnglishJobId(input.jobId)) return "en";
   // Respaldo por país o título · una vacante nueva de China no debería quedar
   // en español solo porque nadie se acordó de agregar su id a la lista.
@@ -73,8 +82,10 @@ export function resolveCandidateLang(input: LangInput): CandidateLang {
 
 /** ¿El proceso corre en huso horario de China? Para fechas y horas. */
 export function isChinaProcess(input: LangInput): boolean {
+  // Solo china (no panama_ops): Panamá usa America/Panama, no Asia/Shanghai.
+  const key = String(input.formTemplateKey || "").toLowerCase();
   return (
-    isEnglishTemplate(input.formTemplateKey) ||
+    key === "china" ||
     (input.jobId !== undefined && isEnglishJobId(input.jobId)) ||
     isChinaLocation(input.country) ||
     titleSaysChina(input.jobTitle)
@@ -82,4 +93,4 @@ export function isChinaProcess(input: LangInput): boolean {
 }
 
 /** Firma de los correos en inglés · el equipo, no una persona. */
-export const EN_SIGNATURE_NAME = "Trading Solutions Talent Team";
+export const EN_SIGNATURE_NAME = "Talent Acquisition Team";

@@ -384,3 +384,74 @@ export function slaStatus(code: string | null | undefined, days: number): 'ok' |
   if (days >= sla) return 'warning';
   return 'ok';
 }
+
+// ─────────────────────────────────────────────────────────────
+// Gates de Kelly · el tablero y los eventos para agentes
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Los 12 gates con los que Kelly lee el proceso (27-oct-2026).
+ *
+ * POR QUÉ NO SON LAS ETAPAS
+ * Las etapas son lo que se escribe en la BD; los gates son cómo se agrupan
+ * para el tablero y para los agentes que consumen `candidate.stage_changed`.
+ * Un gate puede juntar varias etapas (Prefiltro, Médicos/Seguridad) y dos
+ * gates —Psicométricas y Entrevista HM— todavía no tienen code propio: solo
+ * los llenan codes históricos. No se inventa un StageCode nuevo hasta que
+ * Kelly lo nombre; mientras tanto se sigue escribiendo con los codes v4.
+ *
+ * El orden de este arreglo ES el orden del tablero: Docs va después de Oferta.
+ */
+export type KellyGateId =
+  | 'nuevo'
+  | 'prefiltro'
+  | 'bateria_ts'
+  | 'assessment'
+  | 'entrevista_sel'
+  | 'psicometricas'
+  | 'terna'
+  | 'entrevista_hm'
+  | 'medicos_seguridad'
+  | 'oferta'
+  | 'docs'
+  | 'onboarding';
+
+export interface KellyGate {
+  id: KellyGateId;
+  /** 1..12 */
+  n: number;
+  label: string;
+  /** Etapas v4 que caen en este gate */
+  stages: StageCode[];
+  /** Codes históricos que caen acá ANTES de normalizar (sin code v4 propio) */
+  legacy: string[];
+}
+
+export const KELLY_GATES: KellyGate[] = [
+  { id: 'nuevo',             n: 1,  label: 'Nuevo',              stages: ['aplico'], legacy: [] },
+  { id: 'prefiltro',         n: 2,  label: 'Prefiltro',          stages: ['prefiltro_enviado', 'prefiltro_pasado', 'prefiltro_revision'], legacy: [] },
+  { id: 'bateria_ts',        n: 3,  label: 'Batería TS',         stages: ['pruebas'], legacy: [] },
+  { id: 'assessment',        n: 4,  label: 'Assessment',         stages: ['prueba_tecnica'], legacy: [] },
+  { id: 'entrevista_sel',    n: 5,  label: 'Entrevista Sel.',    stages: ['recruiter_interview'], legacy: [] },
+  { id: 'psicometricas',     n: 6,  label: 'Psicométricas',      stages: [], legacy: ['bateria_psicometrica', 'solicitud_enviada_mary'] },
+  { id: 'terna',             n: 7,  label: 'Terna',              stages: ['terna'], legacy: [] },
+  { id: 'entrevista_hm',     n: 8,  label: 'Entrevista HM',      stages: [], legacy: ['hiring_lead_interview'] },
+  { id: 'medicos_seguridad', n: 9,  label: 'Médicos/Seguridad',  stages: ['examenes_medicos', 'estudio_seguridad'], legacy: [] },
+  { id: 'oferta',            n: 10, label: 'Oferta',             stages: ['oferta'], legacy: [] },
+  { id: 'docs',              n: 11, label: 'Docs',               stages: ['documentacion_ingreso'], legacy: [] },
+  { id: 'onboarding',        n: 12, label: 'Onboarding',         stages: ['contratado'], legacy: [] },
+];
+
+const GATE_BY_RAW: Record<string, KellyGate> = Object.fromEntries(
+  KELLY_GATES.flatMap((g) => [...g.stages, ...g.legacy].map((code) => [code, g])),
+);
+
+/**
+ * Gate de Kelly para cualquier code (v4 o histórico).
+ * Primero mira el code crudo —así `hiring_lead_interview` cae en Entrevista HM
+ * y no en Terna— y después el normalizado. Rechazado y codes desconocidos → null.
+ */
+export function kellyGateFromStage(code: string | null | undefined): KellyGate | null {
+  if (!code) return GATE_BY_RAW['aplico'];
+  return GATE_BY_RAW[code] ?? GATE_BY_RAW[normalizeStage(code)] ?? null;
+}

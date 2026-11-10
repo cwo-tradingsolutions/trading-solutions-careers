@@ -99,7 +99,7 @@ export default function RecomendarHojaDeVidaPage() {
               <strong>{candidateName}</strong>. El equipo de Talent Acquisition la revisará y, si hay match con alguna vacante actual o futura, nos pondremos en contacto directamente con la persona.
             </p>
             <p className="text-xs text-gray-500 mt-4">
-              Si querés recomendar a otra persona, podés volver a abrir esta página.
+              Si quieres recomendar a otra persona, puedes volver a abrir esta página.
             </p>
           </div>
         </div>
@@ -120,7 +120,7 @@ export default function RecomendarHojaDeVidaPage() {
               Talent Recommendation
             </div>
             <h1 className="font-bold text-4xl lg:text-5xl tracking-[-0.03em] leading-[0.95]">
-              ¿Conocés talento?<br />Recomendalo.
+              ¿Conoces talento?<br />Recomiéndalo.
             </h1>
             <div className="flex items-center gap-3 mt-5 max-w-md">
               <div className="h-[1px] flex-1 bg-white/30" />
@@ -190,7 +190,7 @@ export default function RecomendarHojaDeVidaPage() {
           {/* SECTION: Recomendador */}
           <SectionTitle className="mt-6">Tu información</SectionTitle>
           <Field label="Tu nombre" required>
-            <Input value={referrerName} onChange={setReferrerName} placeholder="¿Cómo te llamás?" required />
+            <Input value={referrerName} onChange={setReferrerName} placeholder="¿Cómo te llamas?" required />
           </Field>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
             <Field label="Tu email">

@@ -20,7 +20,7 @@ export const ASSESSMENT_STAGES: Record<AssessmentStage, AssessmentStageInfo> = {
     stage: "recruiter_interview",
     label: "Recruiter Assessment · 16 Mandatos del CEO",
     shortLabel: "Recruiter",
-    interviewerLabel: "Kelly Castañeda · Talent Acquisition Lead",
+    interviewerLabel: "Talent Acquisition Team",
     storytellingPersona: "como recruiter",
     visibleFromStage: ["recruiter_interview", "cwo_interview", "touring", "terna", "oferta", "contratado", "rechazado"],
   },

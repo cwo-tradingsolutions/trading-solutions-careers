@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase';
+import { guardarFechasVacante, validarFechasAts } from '@/lib/vacancy-dates-store';
 
 // GET /api/headhunting/vacancies?client_id=xxx
 export async function GET(req: NextRequest) {
@@ -8,8 +9,12 @@ export async function GET(req: NextRequest) {
   if (authError) return authError;
 
   try {
-    const clientId = req.nextUrl.searchParams.get('client_id');
+    // `clientId` se acepta por compatibilidad: el funnel lo mandó así meses y
+    // el filtro se ignoraba en silencio.
+    const clientId = req.nextUrl.searchParams.get('client_id') ?? req.nextUrl.searchParams.get('clientId');
 
+    // `*` incluye hiring_lead_email (el Hiring Lead del área) junto a
+    // owner_recruiter_id. Son personas distintas; el Funnel muestra las dos.
     let query = supabaseAdmin
       .from('ht_vacancies')
       .select(`
@@ -49,6 +54,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const fechas = await validarFechasAts(
+      body.fecha_apertura ?? body.hr_request_date,
+      body.fecha_objetivo ?? body.target_fill_date,
+    );
+    if (!fechas.ok) {
+      return NextResponse.json({ error: fechas.error }, { status: 400 });
+    }
+
     const { data, error } = await supabaseAdmin
       .from('ht_vacancies')
       .insert({
@@ -69,7 +82,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ vacancy: data }, { status: 201 });
+    const guardadas = await guardarFechasVacante(data.id, fechas.apertura, fechas.objetivo);
+    if (!guardadas.ok) {
+      return NextResponse.json({ error: guardadas.error }, { status: 400 });
+    }
+
+    return NextResponse.json({ vacancy: data, aviso_fechas: guardadas.aviso }, { status: 201 });
   } catch (err) {
     console.error('Create vacancy error:', err);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });

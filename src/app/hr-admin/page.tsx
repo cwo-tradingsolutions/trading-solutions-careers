@@ -5,13 +5,13 @@ import RubricasPanel from "@/components/RubricasPanel";
 import NueveBoxPanel from "@/components/NueveBoxPanel";
 import BateriaDashboard from "@/components/BateriaDashboard";
 import { LOGO_TS_SIMBOLO, LOGO_TS_CLASE_EN_OSCURO } from "@/lib/brand";
+import { CanalSelect, errorCanal, FechasVacanteFields, errorFechas } from "@/components/CamposObligatorios";
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   LayoutDashboard,
   Briefcase,
   Kanban,
-  Database,
   Video,
   Bot,
   LineChart,
@@ -51,6 +51,7 @@ import {
   Flag,
   Inbox,
   Mail,
+  MoreHorizontal,
   Send,
   Hourglass,
   XCircle,
@@ -80,30 +81,41 @@ type Tab =
   | "requisiciones"
   | "vacantes"
   | "funnel"
-  | "onboarding"
-  | "cvbank"
   | "rubricas"
-  | "nuevebox"
-  | "plantillas";
+  | "nuevebox";
 
 const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "requisiciones", label: "Requisiciones", icon: Inbox },
   { id: "vacantes", label: "Vacantes", icon: Briefcase },
   { id: "funnel", label: "Funnel", icon: Kanban },
-  { id: "onboarding", label: "Onboarding", icon: ClipboardCheck },
-  { id: "cvbank", label: "CV Bank", icon: Database },
   { id: "rubricas", label: "Rúbricas", icon: ClipboardCheck },
   { id: "nuevebox", label: "Decisiones", icon: Grid3x3 },
-  { id: "plantillas", label: "Plantillas", icon: SettingsIcon },
 ];
 
-const VALID_TABS: Tab[] = ["dashboard", "requisiciones", "vacantes", "funnel", "onboarding", "cvbank", "rubricas", "nuevebox", "plantillas"];
+const VALID_TABS: Tab[] = ["dashboard", "requisiciones", "vacantes", "funnel", "rubricas", "nuevebox"];
+
+/** Bookmarks de tabs que salieron del nav. Abren Funnel; el rediscovery HT y el gate 12 siguen. */
+const RETIRED_TO_FUNNEL = new Set(["onboarding", "cvbank"]);
+
+function readHash(): string {
+  if (typeof window === "undefined") return "";
+  return window.location.hash.replace("#", "");
+}
+
+function redirectRetiredHash(raw: string): Tab | null {
+  if (typeof window === "undefined") return null;
+  if (!RETIRED_TO_FUNNEL.has(raw)) return null;
+  window.history.replaceState(null, "", "#funnel");
+  return "funnel";
+}
 
 function getInitialTab(): Tab {
-  if (typeof window === 'undefined') return 'dashboard';
-  const hash = window.location.hash.replace('#', '') as Tab;
-  return VALID_TABS.includes(hash) ? hash : 'dashboard';
+  if (typeof window === "undefined") return "dashboard";
+  const hash = readHash();
+  const retired = redirectRetiredHash(hash);
+  if (retired) return retired;
+  return VALID_TABS.includes(hash as Tab) ? (hash as Tab) : "dashboard";
 }
 
 export default function HRAdminPage() {
@@ -117,6 +129,15 @@ export default function HRAdminPage() {
   const [gmailAuditOpen, setGmailAuditOpen] = useState(false);
   const [decisionsOpen, setDecisionsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<"metas" | "recordatorios">("metas");
+  const [bancoVac, setBancoVac] = useState<{ id: string; title: string } | null>(null);
+  const [masOpen, setMasOpen] = useState(false);
+  const masRef = React.useRef<HTMLDivElement>(null);
+
+  const openSettings = useCallback((section: "metas" | "recordatorios") => {
+    setSettingsSection(section);
+    setSettingsOpen(true);
+  }, []);
   const [sessionExpired, setSessionExpired] = useState(false);
 
   // Detector global de sesión expirada — interceptamos fetch para detectar 401
@@ -174,12 +195,40 @@ export default function HRAdminPage() {
   // Sync con cambios externos del hash (back/forward del browser, etc.)
   useEffect(() => {
     const onHash = () => {
-      const h = window.location.hash.replace('#', '') as Tab;
-      if (VALID_TABS.includes(h) && h !== tab) setTabState(h);
+      const h = readHash();
+      if (h === "plantillas") {
+        window.history.replaceState(null, "", "#dashboard");
+        setTabState("dashboard");
+        openSettings("recordatorios");
+        return;
+      }
+      const retired = redirectRetiredHash(h);
+      if (retired) {
+        if (retired !== tab) setTabState(retired);
+        return;
+      }
+      if (VALID_TABS.includes(h as Tab) && h !== tab) setTabState(h as Tab);
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
-  }, [tab]);
+  }, [tab, openSettings]);
+
+  useEffect(() => {
+    if (!masOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!masRef.current?.contains(e.target as Node)) setMasOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [masOpen]);
+
+  // #plantillas ya no es tab: abre Settings → Recordatorios (el editor de reglas).
+  useEffect(() => {
+    if (readHash() !== "plantillas") return;
+    window.history.replaceState(null, "", "#dashboard");
+    setTabState("dashboard");
+    openSettings("recordatorios");
+  }, [openSettings]);
 
   // Global Cmd+K / Ctrl+K shortcut to open search
   useEffect(() => {
@@ -222,44 +271,52 @@ export default function HRAdminPage() {
               <kbd className="text-[9px] font-mono bg-white/10 border border-white/15 rounded px-1 py-0.5 ml-1">⌘K</kbd>
             </button>
             <button
-              onClick={() => setImportOpen(true)}
-              className="flex items-center gap-1.5 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
-              title="Importar candidatos desde Excel"
-            >
-              <Download className="w-3.5 h-3.5" style={{ transform: 'rotate(180deg)' }} />
-              <span>Importar</span>
-            </button>
-            <button
-              onClick={() => setGmailAuditOpen(true)}
-              className="flex items-center gap-1.5 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
-              title="Auditar Gmail vs ATS"
-            >
-              <Mail className="w-3.5 h-3.5" />
-              <span>Auditar Gmail</span>
-            </button>
-            <button
               onClick={() => setDecisionsOpen(true)}
               className="flex items-center gap-1.5 text-white/75 hover:text-white hover:bg-white/10 text-[12px] font-medium px-3 py-1.5 rounded-ts-sm transition-colors"
-              title="Pedir decisión a CWO/Hiring Manager"
+              title="Forzar respuesta a CWO/HM"
             >
               <Hand className="w-3.5 h-3.5" />
-              <span>Decisiones</span>
+              <span>Pendientes HM</span>
             </button>
             <button
-              onClick={() => setScheduleOpen(true)}
-              className="flex items-center gap-1.5 bg-ts-accent hover:bg-[var(--ts-accent-hover)] text-white text-[12px] font-medium px-3.5 py-1.5 rounded-ts-sm transition-colors"
-              title="Agendar entrevista"
-            >
-              <Calendar className="w-3.5 h-3.5" />
-              <span>Agendar</span>
-            </button>
-            <button
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => openSettings("metas")}
               className="text-white/70 hover:text-white p-1.5"
-              title="Settings · metas del dashboard"
+              title="Settings · metas y recordatorios"
             >
               <SettingsIcon className="w-[18px] h-[18px]" />
             </button>
+            <div className="relative" ref={masRef}>
+              <button
+                type="button"
+                onClick={() => setMasOpen((v) => !v)}
+                className="text-white/70 hover:text-white p-1.5"
+                title="Más"
+                aria-label="Más"
+                aria-expanded={masOpen}
+              >
+                <MoreHorizontal className="w-[18px] h-[18px]" />
+              </button>
+              {masOpen && (
+                <div className="absolute right-0 top-full mt-1 w-52 rounded-lg border border-gray-200 bg-white text-gray-900 shadow-xl py-1 z-[80]">
+                  <button
+                    type="button"
+                    onClick={() => { setMasOpen(false); setImportOpen(true); }}
+                    className="w-full text-left px-3 py-2 text-[12px] font-medium hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <Download className="w-3.5 h-3.5" style={{ transform: "rotate(180deg)" }} />
+                    Importar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setMasOpen(false); setGmailAuditOpen(true); }}
+                    className="w-full text-left px-3 py-2 text-[12px] font-medium hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    Auditar Gmail
+                  </button>
+                </div>
+              )}
+            </div>
             <a
               href="https://mail.google.com/mail/u/0/#drafts"
               target="_blank"
@@ -277,7 +334,8 @@ export default function HRAdminPage() {
             <button
               onClick={() => setReferralsOpen(true)}
               className="text-white/70 hover:text-white relative p-1.5"
-              title={referralsPending > 0 ? `${referralsPending} hojas de vida pendientes de revisar` : 'Sin notificaciones nuevas'}
+              title={referralsPending > 0 ? `Referidos / HV pendientes · ${referralsPending}` : "Referidos / HV pendientes"}
+              aria-label="Referidos / HV pendientes"
             >
               <Bell className="w-[18px] h-[18px]" />
               {referralsPending > 0 ? (
@@ -334,12 +392,11 @@ export default function HRAdminPage() {
         {tab === "dashboard" && <Dashboard setTab={setTab} />}
         {tab === "requisiciones" && <RequisitionsInbox />}
         {tab === "vacantes" && <Vacantes />}
-        {tab === "funnel" && <PipelineFunnel />}
-        {tab === "onboarding" && <OnboardingTab />}
-        {tab === "cvbank" && <CVBank />}
+        {tab === "funnel" && (
+          <PipelineFunnel onBuscarBanco={(v) => setBancoVac(v)} />
+        )}
         {tab === "rubricas" && <RubricasPanel />}
         {tab === "nuevebox" && <NueveBoxPanel />}
-        {tab === "plantillas" && <ReminderRulesEditor />}
       </main>
 
       {searchOpen && <CandidateSearchModal onClose={() => setSearchOpen(false)} onJumpFunnel={() => { setTab('funnel'); setSearchOpen(false); }} />}
@@ -353,7 +410,19 @@ export default function HRAdminPage() {
       }} />}
       {gmailAuditOpen && <GmailAuditModal onClose={() => setGmailAuditOpen(false)} />}
       {decisionsOpen && <DecisionNudgesModal onClose={() => setDecisionsOpen(false)} />}
-      {settingsOpen && <DashboardSettingsModal onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && (
+        <DashboardSettingsModal
+          initialSection={settingsSection}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
+      {bancoVac && (
+        <CVBankRediscoveryModal
+          vacancyId={bancoVac.id}
+          vacancyTitle={bancoVac.title}
+          onClose={() => setBancoVac(null)}
+        />
+      )}
       {sessionExpired && (
         <div className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
@@ -573,6 +642,7 @@ function CandidatesImportModal({ onClose, onDone }: { onClose: () => void; onDon
   const [submitting, setSubmitting] = useState(false);
   const [finalResult, setFinalResult] = useState<{ inserted: number; existing: number; errors: number } | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [canal, setCanal] = useState("linkedin_recruiter");
 
   // ── Quick import: detecta si el seed pre-cargado tiene apps pendientes ──
   const [quickPreview, setQuickPreview] = useState<{ will_insert: number; already_existing: number; total: number; breakdown: Array<{ vacancy: string; new: number; existed: number }> } | null>(null);
@@ -660,13 +730,15 @@ function CandidatesImportModal({ onClose, onDone }: { onClose: () => void; onDon
   };
 
   const runDryRun = async () => {
+    const canalError = errorCanal(canal);
+    if (canalError) { setSubmitError(canalError); return; }
     setSubmitting(true);
     setSubmitError(null);
     try {
       const r = await fetch('/api/headhunting/candidates/bulk-import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidates: parsed, dry_run: true }),
+        body: JSON.stringify({ candidates: parsed, source: canal, dry_run: true }),
       });
       const j = await r.json();
       if (!r.ok) {
@@ -683,6 +755,8 @@ function CandidatesImportModal({ onClose, onDone }: { onClose: () => void; onDon
   };
 
   const runImport = async () => {
+    const canalError = errorCanal(canal);
+    if (canalError) { setSubmitError(canalError); setStep('preview'); return; }
     setSubmitting(true);
     setSubmitError(null);
     setStep('submitting');
@@ -690,7 +764,7 @@ function CandidatesImportModal({ onClose, onDone }: { onClose: () => void; onDon
       const r = await fetch('/api/headhunting/candidates/bulk-import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidates: parsed, dry_run: false }),
+        body: JSON.stringify({ candidates: parsed, source: canal, dry_run: false }),
       });
       const j = await r.json();
       if (!r.ok) {
@@ -813,6 +887,10 @@ function CandidatesImportModal({ onClose, onDone }: { onClose: () => void; onDon
               </div>
             ) : null}
 
+            <div className="mb-4">
+              <CanalSelect value={canal} onChange={setCanal} />
+              <p className="text-[11px] text-gray-500 mt-1">El Excel de LinkedIn Recruiter trae el canal puesto, pero hay que confirmarlo.</p>
+            </div>
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-4 text-sm">
               <div className="font-bold text-gray-900 mb-1">…o subí un Excel nuevo</div>
               <p className="text-gray-700 leading-relaxed text-xs">
@@ -1159,6 +1237,7 @@ type VacancyOverview = {
     linkedin_active_date: string | null;
     vacancy_started_date: string | null;
     hire_date: string | null;
+    target_fill_date?: string | null;
     notes: string | null;
   };
   metrics: {
@@ -1510,6 +1589,104 @@ function VacanciesOverview({ vacancyFilter = 'all', onlyOpen = false }: { vacanc
   );
 }
 
+function FechasEditorVacanteAts({
+  vacancyId,
+  apertura,
+  objetivo,
+}: {
+  vacancyId: string;
+  apertura: string;
+  objetivo: string;
+}) {
+  const [a, setA] = useState(String(apertura || "").slice(0, 10));
+  const [o, setO] = useState(String(objetivo || "").slice(0, 10));
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <form
+      className="mt-1 space-y-1"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const err = errorFechas(a, o, true);
+        if (err) { setMsg(err); return; }
+        setBusy(true);
+        setMsg(null);
+        try {
+          const r = await fetch(`/api/headhunting/vacancies/${vacancyId}/dates`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fecha_apertura: a, fecha_objetivo: o }),
+          });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) { setMsg(j.error || "No se guardaron las fechas."); return; }
+          setMsg(j.aviso_fechas || "Fechas guardadas. Recargá la vista para verlas.");
+        } catch (err: any) {
+          setMsg(err?.message || "Error de red.");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <FechasVacanteFields apertura={a} objetivo={o} onApertura={setA} onObjetivo={setO} />
+      <button type="submit" disabled={busy} className="text-[10px] font-bold px-2 py-1 rounded bg-black text-white disabled:opacity-50">
+        {busy ? "Guardando…" : "Guardar fechas"}
+      </button>
+      {msg && <div className="text-[10px]">{msg}</div>}
+    </form>
+  );
+}
+
+function FechasEditorVacanteWeb({
+  vacancyId,
+  apertura,
+  objetivo,
+}: {
+  vacancyId: number;
+  apertura: string;
+  objetivo: string;
+}) {
+  const [a, setA] = useState(apertura);
+  const [o, setO] = useState(objetivo);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const falta = !apertura || !objetivo;
+  return (
+    <div className={`rounded-lg border p-3 ${falta ? "bg-amber-50 border-amber-300" : "bg-white border-gray-200"}`}>
+      {falta && <div className="text-xs font-bold text-amber-900 mb-1">Fechas faltantes · se pueden ver igual</div>}
+      <form
+        className="space-y-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const err = errorFechas(a, o, true);
+          if (err) { setMsg(err); return; }
+          setBusy(true);
+          setMsg(null);
+          try {
+            const r = await fetch(`/api/vacancies/${vacancyId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ fecha_apertura: a, fecha_objetivo: o }),
+            });
+            const j = await r.json().catch(() => ({}));
+            if (!r.ok) { setMsg(j.error || "No se guardaron las fechas."); return; }
+            setMsg(j.aviso_fechas || "Fechas guardadas.");
+          } catch (err: any) {
+            setMsg(err?.message || "Error de red.");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <FechasVacanteFields apertura={a} objetivo={o} onApertura={setA} onObjetivo={setO} />
+        <button type="submit" disabled={busy} className="text-xs font-bold px-3 py-1.5 rounded-full bg-black text-white disabled:opacity-50">
+          {busy ? "Guardando…" : "Guardar fechas"}
+        </button>
+        {msg && <div className="text-xs text-gray-700">{msg}</div>}
+      </form>
+    </div>
+  );
+}
+
 function OpenVacancyCard({ v, onResearch, onRediscover, onClose }: { v: VacancyOverview; onResearch: () => void; onRediscover?: () => void; onClose?: () => void }) {
   const m = v.milestones;
   const hasLinkedIn = !!m.linkedin_active_date;
@@ -1657,6 +1834,23 @@ function OpenVacancyCard({ v, onResearch, onRediscover, onClose }: { v: VacancyO
         </div>
       )}
 
+      {(!m.hr_request_date || !m.target_fill_date) && (
+        <div className="bg-amber-50 border border-amber-300 rounded px-2 py-1.5 mb-2 text-[11px] text-amber-900">
+          <div className="font-bold">Fechas faltantes</div>
+          <div>{!m.hr_request_date ? "Sin fecha de apertura. " : ""}{!m.target_fill_date ? "Sin fecha de cierre objetivo." : ""}</div>
+          <FechasEditorVacanteAts
+            vacancyId={v.vacancy_id}
+            apertura={m.hr_request_date || ""}
+            objetivo={m.target_fill_date || ""}
+          />
+        </div>
+      )}
+      {m.hr_request_date && m.target_fill_date && (
+        <div className="text-[10px] text-gray-500 mb-2">
+          Apertura {String(m.hr_request_date).slice(0, 10)} · cierre objetivo {String(m.target_fill_date).slice(0, 10)}
+        </div>
+      )}
+
       {/* LinkedIn warning */}
       {!hasLinkedIn && (
         <div className="bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-2 text-[10px] text-amber-800 flex items-center gap-1.5">
@@ -1716,6 +1910,8 @@ type CVBankMatch = {
   match_concerns: string[] | null;
   recommendation: 'strong' | 'possible' | 'weak' | 'no' | null;
   computed_at: string;
+  reviewed_decision?: 'contact' | 'skip' | 'already_processed' | null;
+  active_on_vacancy?: boolean;
   candidate: {
     id: string;
     name: string;
@@ -1743,14 +1939,19 @@ function CVBankRediscoveryModal({
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emptyPool, setEmptyPool] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'strong' | 'possible'>('all');
 
   const load = useCallback(() => {
     setLoading(true);
     fetch(`/api/headhunting/vacancies/${vacancyId}/rediscover-cv`, { cache: 'no-store' })
-      .then(r => r.json())
-      .then(j => { setMatches(j.matches || []); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(async r => {
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) setError(j.error || 'No se pudieron cargar los matches');
+        setMatches(j.matches || []);
+        setLoading(false);
+      })
+      .catch((e: any) => { setError(e?.message || 'Error de red'); setLoading(false); });
   }, [vacancyId]);
 
   useEffect(() => { load(); }, [load]);
@@ -1758,11 +1959,15 @@ function CVBankRediscoveryModal({
   const runRediscover = async () => {
     setRunning(true);
     setError(null);
+    setEmptyPool(null);
     try {
       const r = await fetch(`/api/headhunting/vacancies/${vacancyId}/rediscover-cv`, { method: 'POST' });
-      const j = await r.json();
+      const j = await r.json().catch(() => ({}));
       if (!r.ok) {
-        setError(j.error || 'Error');
+        setError(j.error || 'Error al cruzar el banco');
+      } else if (j.empty_pool) {
+        setEmptyPool(j.message || 'El banco no tiene candidatos elegibles para esta vacante.');
+        setMatches([]);
       } else {
         load();
       }
@@ -1823,9 +2028,13 @@ function CVBankRediscoveryModal({
               <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
                 <Search className="w-6 h-6 text-gray-400" />
               </div>
-              <h3 className="text-base font-bold text-gray-900 mb-1">Sin búsqueda aún</h3>
+              <h3 className="text-base font-bold text-gray-900 mb-1">
+                {emptyPool ? 'Banco vacío' : 'Sin búsqueda aún'}
+              </h3>
               <p className="text-xs text-gray-500 max-w-sm mx-auto mb-4">
-                Click "Buscar matches" → el AI cruzará el banco de candidatos rechazados/contratados de otras vacantes con los requisitos de <strong>{vacancyTitle}</strong> y devolverá los mejores fits.
+                {emptyPool || (
+                  <>Click Buscar matches: el AI cruzará el banco de candidatos rechazados o contratados de otras vacantes con los requisitos de <strong>{vacancyTitle}</strong> y devolverá los mejores fits.</>
+                )}
               </p>
               <button
                 onClick={runRediscover}
@@ -1877,7 +2086,7 @@ function CVBankRediscoveryModal({
 
               <div className="space-y-2 max-h-[60vh] overflow-y-auto">
                 {visible.map(m => (
-                  <RediscoveryMatchRow key={m.id} match={m} />
+                  <RediscoveryMatchRow key={m.id || m.candidate_id} match={m} vacancyId={vacancyId} onBrought={load} />
                 ))}
               </div>
             </>
@@ -1888,10 +2097,42 @@ function CVBankRediscoveryModal({
   );
 }
 
-function RediscoveryMatchRow({ match }: { match: CVBankMatch }) {
+function RediscoveryMatchRow({ match, vacancyId, onBrought }: { match: CVBankMatch; vacancyId: string; onBrought: () => void }) {
   const [expanded, setExpanded] = useState(false);
+  const [bringing, setBringing] = useState(false);
+  const [brought, setBrought] = useState(match.reviewed_decision === 'contact');
+  const [bringError, setBringError] = useState<string | null>(null);
+  const [already, setAlready] = useState(!!match.active_on_vacancy || match.reviewed_decision === 'already_processed');
   const c = match.candidate;
   if (!c) return null;
+
+  const bring = async () => {
+    setBringing(true);
+    setBringError(null);
+    try {
+      const r = await fetch(`/api/headhunting/vacancies/${vacancyId}/rediscover-cv/bring`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidate_id: match.candidate_id }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.status === 409 || j.error === 'already_active') {
+        setAlready(true);
+        setBringError(j.message || 'Ya está activo en esta vacante');
+        return;
+      }
+      if (!r.ok) {
+        setBringError(j.error || 'No se pudo traer al Funnel');
+        return;
+      }
+      setBrought(true);
+      onBrought();
+    } catch (e: any) {
+      setBringError(e?.message || 'Error de red');
+    } finally {
+      setBringing(false);
+    }
+  };
 
   const recoColor =
     match.recommendation === 'strong' ? { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'STRONG' }
@@ -1958,9 +2199,18 @@ function RediscoveryMatchRow({ match }: { match: CVBankMatch }) {
             )}
           </div>
           <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-100 text-[10px] text-gray-500 flex-wrap">
+            <button
+              type="button"
+              onClick={bring}
+              disabled={bringing || brought || already}
+              className="text-[11px] font-semibold px-3 py-1.5 rounded-full bg-black text-white disabled:bg-gray-200 disabled:text-gray-500"
+            >
+              {already ? 'Ya está en esta vacante' : brought ? 'En el Funnel' : bringing ? 'Trayendo…' : 'Traer al Funnel'}
+            </button>
             <a href={`mailto:${c.email}`} className="text-blue-600 hover:underline inline-flex items-center gap-1">
               <Mail className="w-3 h-3" /> {c.email}
             </a>
+            {bringError && <span className="text-red-700">{bringError}</span>}
             {c.salary_aspiration_cop && (
               <span>· salario aspirado: <strong>COP {c.salary_aspiration_cop.toLocaleString('es-CO')}</strong></span>
             )}
@@ -2604,6 +2854,7 @@ type LiveVacancy = {
   linkedin_url?: string;
   apply_email?: string;
   posted_at?: string;
+  target_close_date?: string | null;
   status?: string;
 };
 
@@ -3121,6 +3372,11 @@ function Vacantes() {
               {/* Detail expandido */}
               {expanded && (
                 <div className="border-t border-gray-200 bg-gray-50 px-4 py-4 space-y-4">
+                  <FechasEditorVacanteWeb
+                    vacancyId={v.id}
+                    apertura={v.posted_at ? String(v.posted_at).slice(0, 10) : ""}
+                    objetivo={v.target_close_date ? String(v.target_close_date).slice(0, 10) : ""}
+                  />
                   {/* Pipeline horizontal */}
                   <PipelineSummary stats={stats} />
 
@@ -3425,7 +3681,7 @@ function Vacantes() {
 
 function SettingsModal({ onClose }: { onClose: () => void }) {
   const [config, setConfig] = useState<{ email_from: string; email_bcc: string; email_reply_to: string; booking_url: string; resend_domain_status: string } | null>(null);
-  const [gmailStatus, setGmailStatus] = useState<{ connected: boolean; email?: string } | null>(null);
+  const [gmailStatus, setGmailStatus] = useState<{ connected: boolean; email?: string; environment?: string; connect_label?: string } | null>(null);
   const [bookingDraft, setBookingDraft] = useState('');
   const [bccDraft, setBccDraft] = useState('');
   const [replyToDraft, setReplyToDraft] = useState('');
@@ -3448,7 +3704,11 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
   async function disconnectGmail() {
     if (!confirm('¿Desconectar Gmail? Los próximos correos volverán a salir desde Resend (Elevare default).')) return;
     await fetch('/api/google/disconnect', { method: 'POST' });
-    setGmailStatus({ connected: false });
+    setGmailStatus((prev) => ({
+      connected: false,
+      environment: prev?.environment,
+      connect_label: prev?.connect_label,
+    }));
   }
 
   async function save() {
@@ -3482,7 +3742,9 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
               <div>
                 <div className="text-xs uppercase font-semibold tracking-wider text-gray-700">Gmail · Conexión directa (recomendado)</div>
                 <div className="text-sm font-bold mt-1">
-                  {gmailStatus?.connected ? `✓ Conectado como ${gmailStatus.email}` : '⚠ No conectado'}
+                  {gmailStatus?.connected
+                    ? `✓ Conectado como ${gmailStatus.email}`
+                    : gmailStatus?.connect_label || '⚠ No conectado'}
                 </div>
               </div>
               {gmailStatus?.connected ? (
@@ -3494,7 +3756,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
                   href="/api/google/auth"
                   className="text-xs px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 font-semibold"
                 >
-                  Conectar Gmail
+                  {gmailStatus?.connect_label || 'Conectar Gmail'}
                 </a>
               )}
             </div>
@@ -3503,6 +3765,11 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
                 <>
                   Los correos del ATS salen <strong>desde tu cuenta {gmailStatus.email}</strong> directamente, con tu firma y branding TS.
                   Cada email queda en tu carpeta <strong>Enviados</strong> de Gmail. Reply-To y BCC funcionan sobre tu cuenta real.
+                </>
+              ) : gmailStatus?.connect_label ? (
+                <>
+                  Este preview no usa la conexión de Google de producción. {gmailStatus.connect_label} guarda un token aparte.
+                  Hasta entonces Gmail y Calendar de este preview quedan apagados.
                 </>
               ) : (
                 <>
@@ -4367,258 +4634,6 @@ function Pipeline() {
           );
         })}
       </div>
-    </>
-  );
-}
-
-/* ======================================================== */
-/* CV Bank                                                  */
-/* ======================================================== */
-function CVBank() {
-  const [pool, setPool] = useState<LiveCandidate[]>([]);
-  const [tokens, setTokens] = useState<LiveToken[]>([]);
-  const [vacs, setVacs] = useState<LiveVacancy[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [activeChip, setActiveChip] = useState("todos");
-  const [matchVacancyId, setMatchVacancyId] = useState<number | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      const [tpR, asR, vacR] = await Promise.all([
-        fetch("/api/talent-pool?limit=1000", { cache: "no-store" }).then((r) => r.json()),
-        fetch("/api/assessments?limit=500", { cache: "no-store" }).then((r) => r.json()),
-        fetch("/api/vacancies", { cache: "no-store" }).then((r) => r.json()),
-      ]);
-      setPool((tpR.data ?? []) as LiveCandidate[]);
-      setTokens((asR.data ?? []) as LiveToken[]);
-      const vacList = (Array.isArray(vacR) ? vacR : vacR.data ?? []) as LiveVacancy[];
-      setVacs(vacList);
-      if (vacList.length > 0) setMatchVacancyId(vacList[0].id);
-      setLoading(false);
-    })();
-  }, []);
-
-  const tokenByEmail = useMemo(() => {
-    const m: Record<string, LiveToken> = {};
-    for (const t of tokens) m[t.candidate_email.toLowerCase()] = t;
-    return m;
-  }, [tokens]);
-
-  // Conteos para los chips
-  const counts = useMemo(() => {
-    const total = pool.length;
-    const fromLI = pool.filter((c) => (c.source ?? "").toLowerCase().includes("linkedin")).length;
-    const fromElevare = pool.filter((c) => (c.source ?? "").toLowerCase().includes("elevare")).length;
-    const fromEmail = pool.filter((c) => (c.source ?? "").toLowerCase().includes("email") || (c.source ?? "").toLowerCase().includes("manual")).length;
-    const baq = pool.filter((c) => `${c.notes ?? ""} ${c.summary ?? ""}`.toLowerCase().includes("barranq")).length;
-    const matchedHigh = pool.filter((c) => {
-      const t = tokenByEmail[c.email.toLowerCase()];
-      return t && t.score && t.score >= 80;
-    }).length;
-    const completedAssessment = pool.filter((c) => {
-      const t = tokenByEmail[c.email.toLowerCase()];
-      return t?.status === "completed";
-    }).length;
-    return { total, fromLI, fromElevare, fromEmail, baq, matchedHigh, completedAssessment };
-  }, [pool, tokenByEmail]);
-
-  const chips = [
-    { id: "todos", label: `Todos · ${counts.total}` },
-    { id: "match80", label: `Match ≥ 80 · ${counts.matchedHigh}` },
-    { id: "evaluados", label: `Candidatos evaluados · ${counts.completedAssessment}` },
-    { id: "linkedin", label: `LinkedIn TS · ${counts.fromLI}` },
-    { id: "elevare", label: `Elevare · ${counts.fromElevare}` },
-    { id: "email", label: `Email/Manual · ${counts.fromEmail}` },
-    { id: "baq", label: `Barranquilla · ${counts.baq}` },
-  ];
-
-  // Filtrado por chip + búsqueda
-  const filtered = useMemo(() => {
-    let list = pool;
-    if (activeChip === "match80")
-      list = list.filter((c) => {
-        const t = tokenByEmail[c.email.toLowerCase()];
-        return t && t.score && t.score >= 80;
-      });
-    else if (activeChip === "evaluados")
-      list = list.filter((c) => tokenByEmail[c.email.toLowerCase()]?.status === "completed");
-    else if (activeChip === "linkedin")
-      list = list.filter((c) => (c.source ?? "").toLowerCase().includes("linkedin"));
-    else if (activeChip === "elevare")
-      list = list.filter((c) => (c.source ?? "").toLowerCase().includes("elevare"));
-    else if (activeChip === "email")
-      list = list.filter((c) => {
-        const s = (c.source ?? "").toLowerCase();
-        return s.includes("email") || s.includes("manual");
-      });
-    else if (activeChip === "baq")
-      list = list.filter((c) => `${c.notes ?? ""} ${c.summary ?? ""}`.toLowerCase().includes("barranq"));
-
-    if (search.trim()) {
-      const s = search.toLowerCase();
-      list = list.filter((c) =>
-        `${c.full_name} ${c.email} ${c.tags ?? ""} ${c.notes ?? ""} ${c.summary ?? ""}`
-          .toLowerCase()
-          .includes(s)
-      );
-    }
-    return list;
-  }, [pool, activeChip, search, tokenByEmail]);
-
-  const matchVac = vacs.find((v) => v.id === matchVacancyId);
-
-  return (
-    <>
-      <PageHead
-        title="CV Bank · Talent Pool"
-        desc={
-          loading
-            ? "Cargando perfiles…"
-            : `${counts.total} perfiles activos · LinkedIn TS, Elevare, Email/Manual · Re-matching contra cualquier vacante`
-        }
-        actions={
-          <>
-            <button className="pill-btn pill-btn-outline text-xs" style={{ padding: "9px 14px" }}>
-              <Download className="w-3.5 h-3.5" /> Export CSV
-            </button>
-            <button className="pill-btn text-xs bg-[#0A66C2] text-white hover:bg-[#084D94]" style={{ padding: "9px 14px" }}>
-              <Linkedin className="w-3.5 h-3.5" /> Importar LinkedIn TS
-            </button>
-          </>
-        }
-      />
-
-      <div className="flex gap-2 mb-3">
-        <div className="flex-1 flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-full">
-          <Search className="w-3.5 h-3.5 text-gray-500" />
-          <input
-            className="flex-1 bg-transparent outline-none text-sm"
-            placeholder="Busca por nombre, email, empresa, skill, idioma…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <select
-          value={matchVacancyId ?? ""}
-          onChange={(e) => setMatchVacancyId(e.target.value ? Number(e.target.value) : null)}
-          className="pill-btn pill-btn-outline text-xs cursor-pointer"
-          style={{ padding: "9px 14px", appearance: "none" }}
-        >
-          {vacs.map((v) => (
-            <option key={v.id} value={v.id}>
-              Match contra: {v.title_es ?? v.title ?? v.slug}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="flex gap-2 flex-wrap mb-4">
-        {chips.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setActiveChip(c.id)}
-            className={`filter-chip ${activeChip === c.id ? "active" : ""}`}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-4 gap-3 mb-5">
-        <KPI label="Total perfiles" value={loading ? "…" : String(counts.total)} delta="En Neon" tone="neutral" />
-        <KPI label="Desde LinkedIn TS" value={String(counts.fromLI)} delta={`${counts.total > 0 ? Math.round((counts.fromLI / counts.total) * 100) : 0}%`} tone="neutral" />
-        <KPI label="Candidatos evaluados" value={String(counts.completedAssessment)} delta="Con score" />
-        <KPI label="Mostrando" value={String(filtered.length)} delta={`de ${counts.total}`} tone="neutral" />
-      </div>
-
-      <h3 className="text-sm font-bold mb-3">
-        {matchVac
-          ? `Match contra · ${matchVac.title_es ?? matchVac.title ?? matchVac.slug}`
-          : "Coincidencias"}{" "}
-        ({filtered.length})
-      </h3>
-      <div className="grid grid-cols-3 gap-3">
-        {filtered.slice(0, 60).map((c) => {
-          const t = tokenByEmail[c.email.toLowerCase()];
-          const score = t?.score ?? null;
-          const init = c.full_name
-            .split(" ")
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((p) => p[0]?.toUpperCase() ?? "")
-            .join("");
-          const src = (c.source ?? "").toLowerCase();
-          const srcLabel = src.includes("linkedin")
-            ? "LinkedIn TS"
-            : src.includes("elevare")
-            ? "Elevare"
-            : src.includes("email") || src.includes("manual")
-            ? "Email"
-            : src || "—";
-          // Sacar primer "rol/empresa" del notes
-          const noteFirst = (c.notes ?? "").split("\n")[0].slice(0, 60);
-          // Detectar inglés del summary/notes
-          const engMatch = `${c.notes ?? ""} ${c.summary ?? ""}`.match(/\b(EN[:\s]*|inglés[:\s]*)?(C[12]|B[12]|A[12]|nativo|bilingüe|advanced)\b/i);
-          const en = engMatch ? engMatch[2].toUpperCase().slice(0, 2) : "—";
-          // Match calculado: si tiene assessment para esta vacante usamos ese score
-          const matchHere = matchVac && t?.vacancy_slug === matchVac.slug ? score : null;
-          return (
-            <div key={c.id} className="bg-white border border-gray-200 rounded-2xl p-4 relative">
-              <span
-                className={`absolute top-2.5 right-2.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                  srcLabel === "LinkedIn TS"
-                    ? "bg-[#E7F1FA] text-[#0A66C2]"
-                    : "bg-gray-100 text-gray-800"
-                }`}
-              >
-                {srcLabel === "LinkedIn TS" && "in · "}
-                {srcLabel}
-              </span>
-              <div className="flex items-center gap-2.5 mb-2">
-                <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center font-bold text-[13px]">
-                  {init || "?"}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold truncate">{c.full_name}</div>
-                  <div className="text-xs text-gray-500 truncate">{noteFirst || c.email}</div>
-                </div>
-              </div>
-              <div className="flex gap-3 text-xs text-gray-500 mt-2">
-                <div>
-                  <b className="block text-black text-[13px] leading-tight">{en}</b>Inglés
-                </div>
-                <div>
-                  <b className="block text-black text-[13px] leading-tight truncate max-w-[80px]">{c.email.split("@")[0]}</b>Email
-                </div>
-              </div>
-              <div className="pt-2.5 mt-2.5 border-t border-gray-100 text-xs text-gray-500">
-                {matchHere !== null ? (
-                  <div className="flex justify-between items-center mt-1">
-                    <span>Match {matchVac?.title_es ?? matchVac?.title}</span>
-                    <Pill color={matchHere >= 85 ? "green" : matchHere >= 75 ? "black" : "amber"}>
-                      {matchHere}
-                    </Pill>
-                  </div>
-                ) : score !== null ? (
-                  <div className="flex justify-between items-center mt-1">
-                    <span className="text-[11px] text-gray-500">Ya completó prueba en otra vacante</span>
-                    <Pill color={score >= 85 ? "green" : score >= 75 ? "black" : "amber"}>
-                      {score}
-                    </Pill>
-                  </div>
-                ) : (
-                  <div className="text-[11px] text-gray-400 italic">Aún no ha sido evaluado</div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {filtered.length > 60 && (
-        <div className="text-center text-xs text-gray-500 mt-4">
-          Mostrando 60 de {filtered.length}. Refina con la búsqueda para ver más.
-        </div>
-      )}
     </>
   );
 }
@@ -5583,14 +5598,14 @@ function ImportCSVModal({
                 onClick={doImport}
                 disabled={!text.trim() || saving}
               >
-                {saving ? "Importando…" : "Importar al CV Bank"}
+                {saving ? "Importando…" : "Importar al banco (Funnel)"}
               </button>
             </div>
           </>
         ) : (
           <div className="space-y-3">
             <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-900">
-              <b>{result.imported}</b> candidatos importados al CV Bank ·{" "}
+              <b>{result.imported}</b> candidatos importados al banco (Funnel) ·{" "}
               {result.skipped > 0 && <span>{result.skipped} omitidos</span>}
             </div>
             {result.errors.length > 0 && (
@@ -5663,6 +5678,7 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
   const [q, setQ] = useState('');
   const [results, setResults] = useState<CandidateSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [filterStage, setFilterStage] = useState<string>('');
   const [filterMinScore, setFilterMinScore] = useState<string>('');
   const [debouncedQ, setDebouncedQ] = useState('');
@@ -5703,6 +5719,7 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
 
   const runSearch = useCallback(async () => {
     setLoading(true);
+    setSearchError(null);
     const params = new URLSearchParams();
     if (debouncedQ) params.set('q', debouncedQ);
     if (filterStage) params.set('stage', filterStage);
@@ -5710,10 +5727,16 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
     params.set('limit', '25');
     try {
       const r = await fetch(`/api/headhunting/candidates/search?${params.toString()}`, { cache: 'no-store' });
-      const j = await r.json();
-      setResults(j.results || []);
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setResults([]);
+        setSearchError(j.error || 'Error de búsqueda');
+      } else {
+        setResults(j.results || []);
+      }
     } catch {
       setResults([]);
+      setSearchError('Error de búsqueda');
     }
     setLoading(false);
   }, [debouncedQ, filterStage, filterMinScore]);
@@ -5799,7 +5822,10 @@ function CandidateSearchModal({ onClose, onJumpFunnel }: { onClose: () => void; 
 
         {/* Results */}
         <div ref={listRef} className="max-h-[60vh] overflow-y-auto">
-          {!loading && results.length === 0 && (
+          {!loading && searchError && (
+            <div className="px-4 py-3 text-xs text-red-700">{searchError}</div>
+          )}
+          {!loading && !searchError && results.length === 0 && (
             <div className="text-center py-12 px-4">
               <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-gray-100 flex items-center justify-center">
                 <Search className="w-5 h-5 text-gray-400" />
@@ -6098,7 +6124,7 @@ function ReferralDetail({ referral, onBack, onAction }: { referral: Referral; on
               onClick={() => onAction('imported_to_cvbank')}
               className="text-xs font-semibold px-4 py-2 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 inline-flex items-center gap-1.5"
             >
-              <UserCheck className="w-3.5 h-3.5" /> Importar al CV Bank
+              <UserCheck className="w-3.5 h-3.5" /> Guardar para rediscovery
             </button>
           </>
         )}
@@ -6176,7 +6202,8 @@ type DashboardConfig = {
   updated_at: string | null;
 };
 
-function DashboardSettingsModal({ onClose }: { onClose: () => void }) {
+function DashboardSettingsModal({ onClose, initialSection = "metas" }: { onClose: () => void; initialSection?: "metas" | "recordatorios" }) {
+  const [section, setSection] = useState<"metas" | "recordatorios">(initialSection);
   const [config, setConfig] = useState<DashboardConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -6240,7 +6267,7 @@ function DashboardSettingsModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-5xl rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header negro estilo TS */}
         <div className="bg-black text-white px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -6249,7 +6276,9 @@ function DashboardSettingsModal({ onClose }: { onClose: () => void }) {
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-[2.5px] font-semibold text-white/55">Settings</div>
-              <div className="text-base font-bold tracking-tight">Metas del Dashboard</div>
+              <div className="text-base font-bold tracking-tight">
+                {section === "recordatorios" ? "Recordatorios" : "Metas del Dashboard"}
+              </div>
             </div>
           </div>
           <button onClick={onClose} className="text-white/60 hover:text-white">
@@ -6257,8 +6286,26 @@ function DashboardSettingsModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <div className="p-6">
-          {loading ? (
+        <div className="flex gap-1 px-6 pt-3 border-b border-gray-200 bg-white">
+          {([
+            ["metas", "Metas"],
+            ["recordatorios", "Recordatorios"],
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setSection(id)}
+              className={`px-3 py-2 text-[12px] font-semibold border-b-2 -mb-px ${section === id ? "border-black text-black" : "border-transparent text-gray-500 hover:text-black"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="p-6 overflow-y-auto">
+          {section === "recordatorios" ? (
+            <ReminderRulesEditor />
+          ) : loading ? (
             <div className="text-sm text-gray-500 py-8 text-center">Cargando configuración…</div>
           ) : (
             <>
@@ -7003,6 +7050,7 @@ function ScheduleInterviewModal({ onClose }: { onClose: () => void }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState<CandidateSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [debouncedQ, setDebouncedQ] = useState('');
   const [picked, setPicked] = useState<CandidateSearchResult | null>(null);
 
@@ -7031,13 +7079,30 @@ function ScheduleInterviewModal({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (step !== 'pick') return;
     setLoading(true);
+    setSearchError(null);
     const params = new URLSearchParams();
     if (debouncedQ) params.set('q', debouncedQ);
     params.set('limit', '15');
+    let cancelled = false;
     fetch(`/api/headhunting/candidates/search?${params.toString()}`, { cache: 'no-store' })
-      .then(r => r.json())
-      .then(j => { setResults(j.results || []); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!r.ok) {
+          setResults([]);
+          setSearchError(j.error || 'Error de búsqueda');
+        } else {
+          setResults(j.results || []);
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setResults([]);
+        setSearchError('Error de búsqueda');
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, [debouncedQ, step]);
 
   const submit = async () => {
@@ -7117,7 +7182,10 @@ function ScheduleInterviewModal({ onClose }: { onClose: () => void }) {
             </div>
             <div className="max-h-[40vh] overflow-y-auto -mx-4">
               {loading && <div className="px-4 py-3 text-xs text-gray-400">Cargando…</div>}
-              {!loading && results.length === 0 && (
+              {!loading && searchError && (
+                <div className="px-4 py-2 text-xs text-red-700">{searchError}</div>
+              )}
+              {!loading && !searchError && results.length === 0 && (
                 <div className="px-4 py-6 text-center text-xs text-gray-500">Sin resultados</div>
               )}
               {results.map(c => (
@@ -7281,808 +7349,7 @@ type FunnelByVacancyData = {
   }[];
 };
 
-function PeopleImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const [step, setStep] = useState<'upload'|'preview'|'submitting'|'done'>('upload');
-  const [rawCsv, setRawCsv] = useState('');
-  const [parsed, setParsed] = useState<ParsedRow[]>([]);
-  const [parseError, setParseError] = useState<string | null>(null);
-  const [defaultIsTp, setDefaultIsTp] = useState(true);
-  const [dryRunResult, setDryRunResult] = useState<{ to_insert: number; to_update: number; errors: number; results: ImportResult[] } | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [finalResult, setFinalResult] = useState<{ inserted: number; updated: number; errors: number } | null>(null);
-  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // CSV parser simple — soporta comas dentro de comillas
-  const parseCsv = (text: string): ParsedRow[] => {
-    const lines = text.split(/\r?\n/).filter(l => l.trim());
-    if (lines.length < 2) throw new Error('El CSV necesita al menos un header y una fila');
-    const parseLine = (line: string): string[] => {
-      const out: string[] = [];
-      let cur = '';
-      let inQ = false;
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (ch === '"') {
-          if (inQ && line[i+1] === '"') { cur += '"'; i++; }
-          else inQ = !inQ;
-        } else if (ch === ',' && !inQ) {
-          out.push(cur); cur = '';
-        } else { cur += ch; }
-      }
-      out.push(cur);
-      return out.map(s => s.trim());
-    };
-    const headers = parseLine(lines[0]).map(h => h.toLowerCase().replace(/\s+/g, '_'));
-    return lines.slice(1).map(line => {
-      const vals = parseLine(line);
-      const row: ParsedRow = {};
-      headers.forEach((h, i) => { if (vals[i] !== undefined) row[h] = vals[i]; });
-      return row;
-    });
-  };
-
-  const handleFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = String(e.target?.result || '');
-      setRawCsv(text);
-      try {
-        const rows = parseCsv(text);
-        if (rows.length === 0) throw new Error('CSV vacío');
-        if (!rows[0].name && !rows[0].nombre) {
-          setParseError('El CSV debe tener una columna "name" o "nombre"');
-          return;
-        }
-        // Normalize "nombre" → "name", "rol" → "role" si vienen en español
-        const normalized = rows.map(r => {
-          const n: ParsedRow = { ...r };
-          if (r.nombre && !r.name) n.name = r.nombre;
-          if (r.rol && !r.role) n.role = r.rol;
-          if (r.area && !r.area) n.area = r.area;
-          if (r.nivel && !r.role_level) n.role_level = r.nivel;
-          if (r.fecha_ingreso && !r.start_date) n.start_date = r.fecha_ingreso;
-          return n;
-        });
-        setParsed(normalized);
-        setParseError(null);
-      } catch (e: any) {
-        setParseError(e?.message || 'Error parseando CSV');
-        setParsed([]);
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const runDryRun = async () => {
-    setSubmitting(true);
-    setSubmitError(null);
-    try {
-      const r = await fetch('/api/people/bulk-import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ people: parsed, default_is_tp: defaultIsTp, dry_run: true }),
-      });
-      const j = await r.json();
-      if (!r.ok) {
-        setSubmitError(j.error || 'Error en validación');
-      } else {
-        setDryRunResult(j);
-        setStep('preview');
-      }
-    } catch (e: any) {
-      setSubmitError(e?.message || 'Error de red');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const runImport = async () => {
-    setSubmitting(true);
-    setSubmitError(null);
-    setStep('submitting');
-    try {
-      const r = await fetch('/api/people/bulk-import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ people: parsed, default_is_tp: defaultIsTp, dry_run: false }),
-      });
-      const j = await r.json();
-      if (!r.ok) {
-        setSubmitError(j.error || 'Error en import');
-        setStep('preview');
-      } else {
-        setFinalResult({ inserted: j.inserted, updated: j.updated, errors: j.errors });
-        setStep('done');
-      }
-    } catch (e: any) {
-      setSubmitError(e?.message || 'Error de red');
-      setStep('preview');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const sampleCsv = `name,email,role,area,role_level,start_date,manager_email,iq,conscientiousness,neuroticism,english_level
-Juan Pérez,juan.perez@tradingsolutions.com,Pricing Senior,Pricing,lead,2022-03-15,boss@tradingsolutions.com,118,80,28,B2
-María Rodríguez,maria.rod@tradingsolutions.com,Customer Documentation,CD,entry,2023-01-10,boss@tradingsolutions.com,115,76,32,B2`;
-
-  const downloadSample = () => {
-    const blob = new Blob([sampleCsv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'tps-template.csv'; a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  return (
-    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-start justify-center pt-[6vh] px-4 overflow-y-auto" onClick={onClose}>
-      <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-3xl my-4 overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="bg-black text-white px-5 py-3 flex items-center justify-between">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider font-bold opacity-80">Importar TPs · People file</div>
-            <div className="text-base font-extrabold leading-tight">
-              {step === 'upload' && '1 · Subí el CSV'}
-              {step === 'preview' && '2 · Revisá antes de importar'}
-              {step === 'submitting' && 'Importando…'}
-              {step === 'done' && '✓ Listo'}
-            </div>
-          </div>
-          <button onClick={onClose} className="text-white/80 hover:text-white text-2xl px-2">×</button>
-        </div>
-
-        {step === 'upload' && (
-          <div className="p-5">
-            {/* Format info */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-xs">
-              <div className="font-bold text-gray-900 mb-1">Formato esperado</div>
-              <p className="text-gray-700 leading-relaxed">
-                CSV con header. Columnas requeridas: <strong>name</strong> · <strong>email</strong>. Recomendadas: <strong>role</strong>, <strong>area</strong>, <strong>role_level</strong> (entry/lead/c_suite), <strong>start_date</strong>, <strong>manager_email</strong>.
-                Cualquier columna extra (iq, conscientiousness, neuroticism, english_level, etc.) va automáticamente al campo psychometric_profile.
-              </p>
-              <button onClick={downloadSample} className="mt-2 text-xs font-bold text-blue-700 hover:underline">📥 Descargar template</button>
-            </div>
-
-            {/* Drag/drop file input */}
-            <label className="block">
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
-                className="hidden"
-                id="csv-input"
-              />
-              <div className="border-2 border-dashed border-gray-300 hover:border-black rounded-lg p-8 text-center cursor-pointer transition-colors">
-                <div className="text-3xl mb-2">📥</div>
-                <div className="text-sm font-bold text-gray-900">Click para elegir CSV</div>
-                <div className="text-[11px] text-gray-500 mt-1">o arrastrá el archivo aquí</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => document.getElementById('csv-input')?.click()}
-                className="hidden"
-              >Pick file</button>
-            </label>
-
-            {/* Or paste text */}
-            <div className="mt-3">
-              <label className="block text-[10px] uppercase font-bold text-gray-500 mb-1">…o pegá el contenido CSV directamente</label>
-              <textarea
-                value={rawCsv}
-                onChange={e => {
-                  setRawCsv(e.target.value);
-                  if (e.target.value.trim()) {
-                    try {
-                      const rows = parseCsv(e.target.value);
-                      setParsed(rows);
-                      setParseError(null);
-                    } catch (er: any) {
-                      setParseError(er.message);
-                      setParsed([]);
-                    }
-                  } else {
-                    setParsed([]);
-                    setParseError(null);
-                  }
-                }}
-                rows={5}
-                placeholder="name,email,role,area,role_level,start_date..."
-                className="w-full border border-gray-300 rounded p-2 text-xs font-mono focus:outline-none focus:border-black"
-              />
-            </div>
-
-            {parseError && <div className="bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700 mt-3">{parseError}</div>}
-
-            {parsed.length > 0 && (
-              <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded p-3 text-xs">
-                <div className="font-bold text-emerald-800">✓ {parsed.length} fila{parsed.length !== 1 ? 's' : ''} parseada{parsed.length !== 1 ? 's' : ''}</div>
-                <div className="text-emerald-700 mt-0.5">Columnas detectadas: {Object.keys(parsed[0]).join(', ')}</div>
-              </div>
-            )}
-
-            {/* TP toggle */}
-            <label className="flex items-center gap-2 mt-4 text-sm">
-              <input
-                type="checkbox"
-                checked={defaultIsTp}
-                onChange={e => setDefaultIsTp(e.target.checked)}
-                className="w-4 h-4"
-              />
-              <span>Marcar a todos como <strong>Top Performers</strong> (recomendado para import inicial)</span>
-            </label>
-
-            <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-gray-100">
-              <button onClick={onClose} className="text-xs font-bold text-gray-500 px-4 py-2">Cancelar</button>
-              <button
-                onClick={runDryRun}
-                disabled={parsed.length === 0 || submitting}
-                className="bg-black hover:bg-gray-800 disabled:bg-gray-300 text-white text-xs font-bold px-5 py-2 rounded-lg"
-              >
-                {submitting ? 'Validando…' : `Validar ${parsed.length} ${parsed.length === 1 ? 'persona' : 'personas'} →`}
-              </button>
-            </div>
-            {submitError && <div className="bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700 mt-3">{submitError}</div>}
-          </div>
-        )}
-
-        {step === 'preview' && dryRunResult && (
-          <div className="p-5">
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              <div className="bg-blue-50 border border-blue-200 rounded p-2 text-center">
-                <div className="text-[10px] uppercase font-bold text-blue-700">Nuevas</div>
-                <div className="text-2xl font-extrabold text-blue-900">{dryRunResult.to_insert}</div>
-              </div>
-              <div className="bg-amber-50 border border-amber-200 rounded p-2 text-center">
-                <div className="text-[10px] uppercase font-bold text-amber-700">Actualizar (email existe)</div>
-                <div className="text-2xl font-extrabold text-amber-900">{dryRunResult.to_update}</div>
-              </div>
-              <div className={`${dryRunResult.errors > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'} border rounded p-2 text-center`}>
-                <div className={`text-[10px] uppercase font-bold ${dryRunResult.errors > 0 ? 'text-red-700' : 'text-gray-500'}`}>Errores</div>
-                <div className={`text-2xl font-extrabold ${dryRunResult.errors > 0 ? 'text-red-900' : 'text-gray-400'}`}>{dryRunResult.errors}</div>
-              </div>
-            </div>
-
-            <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[40vh] overflow-y-auto">
-              <table className="w-full text-xs">
-                <thead className="bg-gray-50 sticky top-0">
-                  <tr>
-                    <th className="text-left px-2 py-1.5 font-bold text-[10px] uppercase">#</th>
-                    <th className="text-left px-2 py-1.5 font-bold text-[10px] uppercase">Email</th>
-                    <th className="text-left px-2 py-1.5 font-bold text-[10px] uppercase">Acción</th>
-                    <th className="text-left px-2 py-1.5 font-bold text-[10px] uppercase">Detalle</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dryRunResult.results.map(r => (
-                    <tr key={r.index} className="border-t border-gray-100">
-                      <td className="px-2 py-1 text-gray-500">{r.index + 1}</td>
-                      <td className="px-2 py-1 truncate max-w-[200px]">{r.email || '—'}</td>
-                      <td className="px-2 py-1">
-                        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                          r.action === 'inserted' ? 'bg-blue-100 text-blue-800' :
-                          r.action === 'updated' ? 'bg-amber-100 text-amber-800' :
-                          r.action === 'error' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-700'
-                        }`}>{r.action}</span>
-                      </td>
-                      <td className="px-2 py-1 text-gray-600 text-[11px]">{r.reason || ''}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-gray-100">
-              <button onClick={() => setStep('upload')} className="text-xs font-bold text-gray-500 px-4 py-2">← Volver</button>
-              <button
-                onClick={runImport}
-                disabled={submitting || (dryRunResult.to_insert === 0 && dryRunResult.to_update === 0)}
-                className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white text-xs font-bold px-5 py-2 rounded-lg"
-              >
-                Confirmar e importar {dryRunResult.to_insert + dryRunResult.to_update} personas
-              </button>
-            </div>
-            {submitError && <div className="bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700 mt-3">{submitError}</div>}
-          </div>
-        )}
-
-        {step === 'submitting' && (
-          <div className="p-10 text-center">
-            <div className="text-5xl mb-3 animate-pulse">📥</div>
-            <div className="text-base font-bold">Importando {parsed.length} personas…</div>
-            <div className="text-xs text-gray-500 mt-1">No cierres esta ventana</div>
-          </div>
-        )}
-
-        {step === 'done' && finalResult && (
-          <div className="p-8 text-center">
-            <div className="text-5xl mb-3">🎉</div>
-            <h3 className="text-2xl font-extrabold mb-2">Import completo</h3>
-            <div className="grid grid-cols-3 gap-2 max-w-md mx-auto mb-4">
-              <div className="bg-emerald-50 rounded p-2">
-                <div className="text-3xl font-extrabold text-emerald-700">{finalResult.inserted}</div>
-                <div className="text-[10px] uppercase font-bold text-emerald-600">Insertadas</div>
-              </div>
-              <div className="bg-amber-50 rounded p-2">
-                <div className="text-3xl font-extrabold text-amber-700">{finalResult.updated}</div>
-                <div className="text-[10px] uppercase font-bold text-amber-600">Actualizadas</div>
-              </div>
-              <div className={`${finalResult.errors > 0 ? 'bg-red-50' : 'bg-gray-50'} rounded p-2`}>
-                <div className={`text-3xl font-extrabold ${finalResult.errors > 0 ? 'text-red-700' : 'text-gray-400'}`}>{finalResult.errors}</div>
-                <div className="text-[10px] uppercase font-bold text-gray-500">Errores</div>
-              </div>
-            </div>
-            <button
-              onClick={onDone}
-              className="bg-black hover:bg-gray-800 text-white font-bold px-5 py-2.5 rounded-lg text-sm"
-            >
-              Ver People file →
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ======================================================== */
-/* Onboarding · People file + 30/60/90                      */
-/* ======================================================== */
-type OnboardingItem = {
-  id: string;
-  person: { id: string; name: string; email: string; role: string; area: string; role_level: string; start_date: string; status: string; manager_email?: string; buddy_email?: string; location?: string };
-  start_date: string;
-  status: 'not_started'|'in_progress'|'completed'|'at_risk';
-  days_since_start: number;
-  current_milestone: 'day1'|'week1'|'day30'|'day60'|'day90';
-  progress: { total: number; done: number; pct: number; byMilestone: Record<string, { total: number; done: number; pct: number }> };
-  health: 'on_track'|'behind'|'at_risk';
-  next_task: { id: string; label: string; owner: string; milestone: string } | null;
-  ramp_up_score: number | null;
-};
-
-type OnboardingTaskUI = {
-  id: string;
-  milestone: 'day1'|'week1'|'day30'|'day60'|'day90';
-  label: string;
-  owner: 'hr'|'manager'|'buddy'|'it'|'employee';
-  done: boolean;
-  done_at: string | null;
-};
-
-const MS_LABEL: Record<string, string> = { day1: 'Día 1', week1: 'Semana 1', day30: 'Día 30', day60: 'Día 60', day90: 'Día 90' };
-const MS_COLOR: Record<string, string> = { day1: '#8B5CF6', week1: '#3B82F6', day30: '#10B981', day60: '#F59E0B', day90: '#EF4444' };
-const OWNER_LABEL: Record<string, string> = { hr: 'HR', manager: 'Manager', buddy: 'Buddy', it: 'IT', employee: 'Empleado' };
-
-function OnboardingTab() {
-  const [items, setItems] = useState<OnboardingItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'active'|'completed'|'all'>('active');
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [importOpen, setImportOpen] = useState(false);
-  const [peopleStats, setPeopleStats] = useState<{ total: number; tps: number } | null>(null);
-
-  const load = useCallback(() => {
-    const qs = filter === 'active' ? '?status=active' : '';
-    fetch(`/api/onboarding${qs}`, { cache: 'no-store' })
-      .then(r => r.json())
-      .then(j => { setItems(j.onboardings || []); setLoading(false); })
-      .catch(() => setLoading(false));
-    // People directory stats
-    fetch('/api/people', { cache: 'no-store' })
-      .then(r => r.json())
-      .then(j => {
-        const all = j.people || [];
-        setPeopleStats({ total: all.length, tps: all.filter((p: any) => p.is_top_performer).length });
-      });
-  }, [filter]);
-
-  useEffect(() => { setLoading(true); load(); }, [load]);
-
-  const counts = useMemo(() => {
-    const all = items;
-    return {
-      total: all.length,
-      day1: all.filter(i => i.current_milestone === 'day1').length,
-      week1: all.filter(i => i.current_milestone === 'week1').length,
-      day30: all.filter(i => i.current_milestone === 'day30').length,
-      day60: all.filter(i => i.current_milestone === 'day60').length,
-      day90: all.filter(i => i.current_milestone === 'day90').length,
-      at_risk: all.filter(i => i.health === 'at_risk').length,
-    };
-  }, [items]);
-
-  return (
-    <div>
-      <TSSectionBanner
-        image={TS_IMG.contact}
-        title="Onboarding"
-        subtitle="Plan 30/60/90 para nuevos hires · integrado con People file"
-        icon="🎉"
-      />
-
-      <div className="mb-4 flex items-end justify-end gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          {peopleStats && (
-            <div className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[11px]">
-              <span className="text-gray-500">People file: </span>
-              <strong className="text-gray-900">{peopleStats.total}</strong>
-              <span className="text-gray-400 mx-1">·</span>
-              <span className="text-black font-bold">{peopleStats.tps} TPs</span>
-            </div>
-          )}
-          <button
-            onClick={() => setImportOpen(true)}
-            className="bg-black hover:bg-gray-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5"
-          >
-            📥 Importar TPs (CSV)
-          </button>
-        </div>
-      </div>
-
-      {/* KPI strip */}
-      <div className="grid grid-cols-2 md:grid-cols-7 gap-2 mb-4">
-        <KpiTile label="Total activos" value={counts.total} accent="#111" />
-        <KpiTile label="Día 1" value={counts.day1} accent={MS_COLOR.day1} />
-        <KpiTile label="Semana 1" value={counts.week1} accent={MS_COLOR.week1} />
-        <KpiTile label="Día 30" value={counts.day30} accent={MS_COLOR.day30} />
-        <KpiTile label="Día 60" value={counts.day60} accent={MS_COLOR.day60} />
-        <KpiTile label="Día 90" value={counts.day90} accent={MS_COLOR.day90} />
-        <KpiTile label="At risk" value={counts.at_risk} accent="#EF4444" />
-      </div>
-
-      {/* Filter pills */}
-      <div className="flex gap-1.5 mb-4">
-        {(['active','completed','all'] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1 text-xs font-bold rounded-full border transition-colors ${
-              filter === f ? 'bg-black text-white border-black' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
-            }`}
-          >
-            {f === 'active' ? 'Activos' : f === 'completed' ? 'Completados' : 'Todos'}
-          </button>
-        ))}
-      </div>
-
-      {loading && <div className="text-sm text-gray-400">Cargando…</div>}
-
-      {!loading && items.length === 0 && (
-        <div className="relative bg-white border border-gray-200 rounded-2xl overflow-hidden">
-          <div
-            className="absolute inset-0 opacity-15 bg-cover bg-center"
-            style={{ backgroundImage: `url(${TS_IMG.contact})` }}
-          />
-          <div className="relative p-12 text-center">
-            <div className="text-4xl mb-3">🎉</div>
-            <div className="text-lg font-bold tracking-tight text-gray-900">Sin onboardings activos</div>
-            <p className="text-sm text-gray-600 mt-2 max-w-md mx-auto">
-              Cuando un candidato pase a "contratado" en el funnel, aparecerá aquí automáticamente con su plan 30/60/90.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {!loading && items.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {items.map(it => (
-            <OnboardingCard key={it.id} item={it} onClick={() => setActiveId(it.id)} />
-          ))}
-        </div>
-      )}
-
-      {activeId && (
-        <OnboardingDetailDrawer
-          id={activeId}
-          onClose={() => setActiveId(null)}
-          onChange={load}
-        />
-      )}
-      {importOpen && (
-        <PeopleImportModal
-          onClose={() => setImportOpen(false)}
-          onDone={() => { setImportOpen(false); load(); }}
-        />
-      )}
-    </div>
-  );
-}
-
-function KpiTile({ label, value, accent }: { label: string; value: number; accent: string }) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-2 relative overflow-hidden">
-      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: accent }} />
-      <div className="text-[9px] uppercase tracking-wider font-bold text-gray-500">{label}</div>
-      <div className="text-2xl font-extrabold mt-0.5">{value}</div>
-    </div>
-  );
-}
-
-function OnboardingCard({ item, onClick }: { item: OnboardingItem; onClick: () => void }) {
-  const healthColor = item.health === 'at_risk' ? '#EF4444' : item.health === 'behind' ? '#F59E0B' : '#10B981';
-  const healthLabel = item.health === 'at_risk' ? 'At risk' : item.health === 'behind' ? 'Atrasado' : 'On track';
-  const mColor = MS_COLOR[item.current_milestone];
-
-  return (
-    <button
-      onClick={onClick}
-      className="text-left bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow relative overflow-hidden"
-    >
-      <div className="absolute top-0 left-0 right-0 h-[4px]" style={{ background: healthColor }} />
-
-      {/* Header */}
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-bold text-gray-900 truncate">{item.person.name}</div>
-          <div className="text-[10px] text-gray-500 truncate">{item.person.role} · {item.person.area || '—'}</div>
-        </div>
-        <span
-          className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase"
-          style={{ background: `${healthColor}1A`, color: healthColor }}
-        >
-          {healthLabel}
-        </span>
-      </div>
-
-      {/* Days + milestone */}
-      <div className="mb-3 p-2 rounded-lg" style={{ background: `${mColor}10` }}>
-        <div className="flex items-baseline justify-between mb-1">
-          <span className="text-[10px] uppercase font-bold" style={{ color: mColor }}>Milestone actual</span>
-          <span className="text-[10px] font-bold" style={{ color: mColor }}>{item.days_since_start}d desde inicio</span>
-        </div>
-        <div className="text-base font-extrabold" style={{ color: mColor }}>{MS_LABEL[item.current_milestone]}</div>
-      </div>
-
-      {/* Progress bar */}
-      <div className="mb-3">
-        <div className="flex justify-between text-[10px] mb-1">
-          <span className="uppercase font-bold text-gray-500">Progreso total</span>
-          <span className="font-bold text-gray-700">{item.progress.done}/{item.progress.total} · {item.progress.pct}%</span>
-        </div>
-        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-          <div className="h-full rounded-full transition-all" style={{ width: `${item.progress.pct}%`, background: healthColor }} />
-        </div>
-      </div>
-
-      {/* Milestones strip */}
-      <div className="flex gap-1 mb-3">
-        {(['day1','week1','day30','day60','day90'] as const).map(m => {
-          const ms = item.progress.byMilestone[m] || { total: 0, done: 0, pct: 0 };
-          const isComplete = ms.pct === 100;
-          return (
-            <div key={m} className="flex-1">
-              <div className={`h-1.5 rounded ${isComplete ? '' : 'bg-gray-100'}`} style={isComplete ? { background: MS_COLOR[m] } : {}} />
-              <div className="text-[8px] text-center text-gray-500 font-bold mt-0.5">{ms.done}/{ms.total}</div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Next task */}
-      {item.next_task && (
-        <div className="bg-gray-50 border border-gray-100 rounded p-2 text-[10px]">
-          <div className="text-[9px] uppercase font-bold text-gray-500 mb-0.5">Próximo</div>
-          <div className="font-semibold text-gray-900 truncate">{item.next_task.label}</div>
-          <div className="text-gray-500 mt-0.5">{OWNER_LABEL[item.next_task.owner] || item.next_task.owner} · {MS_LABEL[item.next_task.milestone]}</div>
-        </div>
-      )}
-    </button>
-  );
-}
-
-function OnboardingDetailDrawer({
-  id,
-  onClose,
-  onChange,
-}: {
-  id: string;
-  onClose: () => void;
-  onChange: () => void;
-}) {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  const load = useCallback(() => {
-    fetch(`/api/onboarding/${id}`, { cache: 'no-store' })
-      .then(r => r.json())
-      .then(j => { setData(j.onboarding); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [id]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const toggleTask = async (taskId: string) => {
-    setSaving(true);
-    const r = await fetch(`/api/onboarding/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ toggle_task_id: taskId }),
-    });
-    const j = await r.json();
-    if (j.success) {
-      setData(j.onboarding);
-      onChange();
-    }
-    setSaving(false);
-  };
-
-  const updateField = async (field: string, value: any) => {
-    setSaving(true);
-    const r = await fetch(`/api/onboarding/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [field]: value }),
-    });
-    const j = await r.json();
-    if (j.success) {
-      setData(j.onboarding);
-      onChange();
-    }
-    setSaving(false);
-  };
-
-  if (loading || !data) {
-    return (
-      <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center" onClick={onClose}>
-        <div className="bg-white p-6 rounded-xl">Cargando…</div>
-      </div>
-    );
-  }
-
-  const tasks: OnboardingTaskUI[] = (data.tasks || []) as OnboardingTaskUI[];
-  const tasksByMs: Record<string, OnboardingTaskUI[]> = {};
-  (['day1','week1','day30','day60','day90'] as const).forEach(m => {
-    tasksByMs[m] = tasks.filter(t => t.milestone === m);
-  });
-
-  const totalDone = tasks.filter(t => t.done).length;
-  const total = tasks.length;
-  const pct = total ? Math.round((totalDone / total) * 100) : 0;
-
-  return (
-    <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex justify-end" onClick={onClose}>
-      <div
-        className="bg-gray-50 w-full max-w-2xl h-full overflow-y-auto shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="sticky top-0 bg-black text-white px-5 py-4 z-10 flex items-center justify-between">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider opacity-80 font-bold">Onboarding</div>
-            <div className="text-lg font-extrabold leading-tight">{data.person?.name}</div>
-            <div className="text-[11px] opacity-70">{data.person?.role} · {data.person?.area || '—'}</div>
-          </div>
-          <button onClick={onClose} className="text-white/70 hover:text-white text-2xl px-2">×</button>
-        </div>
-
-        <div className="p-5 space-y-4">
-          {/* Progress overview */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="flex justify-between items-baseline mb-2">
-              <span className="text-xs uppercase font-bold text-gray-500">Progreso</span>
-              <span className="text-2xl font-extrabold">{pct}%</span>
-            </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-gray-700 to-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
-            </div>
-            <div className="text-[11px] text-gray-500 mt-1">{totalDone}/{total} tareas completadas · started {data.start_date}</div>
-          </div>
-
-          {/* Person info */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4 grid grid-cols-2 gap-3 text-xs">
-            <Info k="Email" v={data.person?.email} />
-            <Info k="Nivel" v={data.person?.role_level === 'c_suite' ? 'C-Suite' : data.person?.role_level} />
-            <Info k="Manager" v={data.person?.manager_email || '—'} />
-            <Info k="Buddy" v={data.person?.buddy_email || '—'} />
-            <Info k="Ubicación" v={data.person?.location || '—'} />
-            <Info k="Status" v={data.status} />
-          </div>
-
-          {/* Tasks by milestone */}
-          {(['day1','week1','day30','day60','day90'] as const).map(m => {
-            const list = tasksByMs[m] || [];
-            if (list.length === 0) return null;
-            const done = list.filter(t => t.done).length;
-            const msColor = MS_COLOR[m];
-            return (
-              <div key={m} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                <div className="px-4 py-2.5 flex justify-between items-center" style={{ background: `${msColor}15` }}>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full" style={{ background: msColor }} />
-                    <span className="text-sm font-extrabold" style={{ color: msColor }}>{MS_LABEL[m]}</span>
-                  </div>
-                  <span className="text-[11px] font-bold" style={{ color: msColor }}>{done}/{list.length}</span>
-                </div>
-                <div className="divide-y divide-gray-100">
-                  {list.map(t => (
-                    <div key={t.id} className="px-4 py-2.5 flex items-start gap-3 hover:bg-gray-50">
-                      <button
-                        onClick={() => !saving && toggleTask(t.id)}
-                        disabled={saving}
-                        className={`w-5 h-5 mt-0.5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                          t.done ? 'bg-emerald-500 border-emerald-600' : 'border-gray-300 hover:border-gray-500'
-                        }`}
-                      >
-                        {t.done && <span className="text-white text-xs font-bold">✓</span>}
-                      </button>
-                      <div className="flex-1 min-w-0">
-                        <div className={`text-sm ${t.done ? 'line-through text-gray-400' : 'text-gray-900 font-medium'}`}>{t.label}</div>
-                        <div className="text-[10px] text-gray-500 mt-0.5 flex items-center gap-1.5">
-                          <span className="bg-gray-100 px-1.5 py-0.5 rounded font-bold">{OWNER_LABEL[t.owner] || t.owner}</span>
-                          {t.done && t.done_at && <span>· {new Date(t.done_at).toLocaleDateString('es-CO')}</span>}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Manager check-ins */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-            <h4 className="text-xs uppercase font-extrabold text-gray-700">Check-ins de manager</h4>
-            <CheckInRow label="30 días" value={data.manager_30d_check_in} onSave={v => updateField('manager_30d_check_in', v)} />
-            <CheckInRow label="60 días" value={data.manager_60d_check_in} onSave={v => updateField('manager_60d_check_in', v)} />
-            <CheckInRow label="90 días · review final" value={data.manager_90d_review} onSave={v => updateField('manager_90d_review', v)} />
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] uppercase font-bold text-gray-500">Ramp-up score (1-5):</span>
-              <select
-                value={data.ramp_up_score || ''}
-                onChange={e => updateField('ramp_up_score', e.target.value ? Number(e.target.value) : null)}
-                className="text-xs border border-gray-300 rounded px-2 py-1"
-              >
-                <option value="">—</option>
-                {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Info({ k, v }: { k: string; v?: string }) {
-  return (
-    <div>
-      <div className="text-[9px] uppercase tracking-wider font-bold text-gray-500">{k}</div>
-      <div className="text-sm font-semibold text-gray-900">{v || '—'}</div>
-    </div>
-  );
-}
-
-function CheckInRow({ label, value, onSave }: { label: string; value: string | null; onSave: (v: string) => void }) {
-  const [editing, setEditing] = useState(false);
-  const [val, setVal] = useState(value || '');
-  return (
-    <div>
-      <div className="text-[11px] uppercase font-bold text-gray-500 mb-1">{label}</div>
-      {editing ? (
-        <div>
-          <textarea
-            value={val}
-            onChange={e => setVal(e.target.value)}
-            rows={2}
-            className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-black"
-            autoFocus
-          />
-          <div className="flex gap-1.5 mt-1">
-            <button onClick={() => { onSave(val); setEditing(false); }} className="text-[11px] font-bold bg-black text-white px-3 py-1 rounded">Guardar</button>
-            <button onClick={() => { setVal(value || ''); setEditing(false); }} className="text-[11px] text-gray-500 px-2">Cancelar</button>
-          </div>
-        </div>
-      ) : (
-        <div onClick={() => setEditing(true)} className="text-xs text-gray-700 hover:bg-gray-50 px-2 py-1.5 rounded cursor-text border border-transparent hover:border-gray-200 min-h-[32px]">
-          {value || <span className="text-gray-400 italic">Click para escribir…</span>}
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ======================================================== */
 /* Agentes IA                                               */

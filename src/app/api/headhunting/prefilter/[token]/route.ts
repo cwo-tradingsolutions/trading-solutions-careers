@@ -14,9 +14,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createDraftViaGmail, isGmailConnected, sendViaGmail } from "@/lib/gmail";
+import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
+import {
+  panamaOpsNoticeLines,
+  panamaPrefilterExpired,
+  scorePanamaOps,
+  type PanamaScore,
+} from "@/lib/panama-ops-prefilter";
 import { recordStageEvent } from "@/lib/stage-events";
-import { resolveCandidateLang, EN_SIGNATURE_NAME } from "@/lib/candidate-lang";
+import { publicStepBody } from "@/lib/candidate-public-error";
+import { enviarBateriaAuto } from "@/lib/bateria/invitar";
+import { batteryAutoSendEnabled, NOTA_BATERIA_PENDIENTE } from "@/lib/battery-auto-send";
+import { resolveCandidateLang } from "@/lib/candidate-lang";
 import { TEMPLATE_ENGLISH_MIN_RANK, TEMPLATE_SALARY_CAP, type TemplateKey } from "@/lib/prefilter-templates";
+import { etiquetaAvisoPrefiltro, textoSalarioAviso } from "@/lib/prefilter-salary";
 
 // Techos por vacancy_id (en COP mensuales)
 const SALARY_CAPS: Record<string, number> = {
@@ -105,6 +117,7 @@ const SEVERIDAD_POR_REGLA: Record<string, Severidad> = {
   licencia_vencida: "duro",
   sin_curso_50_horas: "duro",
   sin_autorizacion_trabajo_china: "duro",
+  sin_autorizacion_trabajo_panama: "duro",
   sin_tarjeta_profesional: "duro",
   ingles_a1_a2: "blando",
   ingles_b1: "blando",
@@ -114,6 +127,7 @@ const SEVERIDAD_POR_REGLA: Record<string, Severidad> = {
   sin_disponibilidad_presencial: "blando",
   sin_experiencia_rol: "blando",
   anos_industria: "blando",
+  anos_freight_panama: "blando",
   // Customer Documentation · todo lo que declara el candidato de si mismo
   sin_experiencia_doc_comex: "blando",
   sin_conciliacion_facturas: "blando",
@@ -220,62 +234,38 @@ function checkEnglishLevel(englishLevel: string | undefined, vacancyId: string, 
  */
 const CHINA_SALARY_CAP_USD = 1500;
 
-/** "USD 2,500/month gross" → 2500. Devuelve null si no hay número legible. */
-function parseSalaryUsd(raw: unknown): number | null {
-  const digits = String(raw ?? "").replace(/[^0-9.]/g, "");
-  if (!digits) return null;
-  const n = Number(digits);
-  return Number.isFinite(n) && n > 0 ? n : null;
+/**
+ * Lee un monto o un rango en USD.
+ * "USD 2,500" y "2.300" → 2500 / 2300 (el punto de miles no es decimal).
+ * "1800-2000" → min 1800, max 2000. "1.500,00" → 1500. Sin número → null.
+ * El tope se compara contra `min`: un rango que empieza bajo el techo no lo supera.
+ */
+function parseSalaryRangeUsd(raw: unknown): { min: number; max: number } | null {
+  const toks = String(raw ?? "").match(/\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?/g) ?? [];
+  const nums = toks.map((t) => {
+    const m = t.match(/^(\d{1,3}(?:[.,]\d{3})+)(?:[.,]\d{1,2})?$/);
+    return m ? Number(m[1].replace(/[.,]/g, "")) : Number(t.replace(",", "."));
+  }).filter((n) => Number.isFinite(n) && n > 0).slice(0, 2);
+  return nums.length ? { min: Math.min(...nums), max: Math.max(...nums) } : null;
 }
 
-const TS_LINKEDIN_URL = "https://www.linkedin.com/company/trading-sol/";
-
-// Auto-detección sencilla ES/EN basada en frecuencia de palabras-función.
-function detectLanguage(...texts: (string | null | undefined)[]): "es" | "en" {
-  const blob = texts.filter(Boolean).join(" ").toLowerCase();
-  if (!blob.trim()) return "es";
-  const ES = [" la ", " el ", " de ", " que ", " y ", " es ", " en ", " un ", " una ", " por ", " para ", " con ", " mi ", " soy ", "á", "é", "í", "ó", "ú", "ñ"];
-  const EN = [" the ", " and ", " is ", " of ", " to ", " for ", " with ", " my ", " i ", " you ", " we ", " in ", " on ", " have ", " am "];
-  let es = 0, en = 0;
-  ES.forEach(w => { if (blob.includes(w)) es++; });
-  EN.forEach(w => { if (blob.includes(w)) en++; });
-  return en > es ? "en" : "es";
-}
-
-function buildRejectionHtmlEs(name: string, clientName: string, vacancyTitle: string): string {
-  const firstName = (name || "").split(" ")[0] || "candidato";
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-  body { font-family: Inter, -apple-system, sans-serif; line-height: 1.6; color: #1a1a1a; padding: 24px; background: #f9f9f9; }
-  .container { max-width: 600px; margin: 0 auto; background: white; padding: 32px; border-radius: 12px; }
-  a { color: #2C64ED; }
-</style></head><body>
-  <div class="container">
-    <p>Hola <strong>${firstName}</strong>,</p>
-    <p>Gracias por tomarte el tiempo de aplicar a la posición de <strong>${vacancyTitle}</strong> en ${clientName}. Después de revisar tu aplicación, hemos decidido avanzar con otros candidatos cuyo perfil se ajusta más a la posición en este momento. Sin embargo, ${clientName} sigue creciendo y nos encantaría mantenernos en contacto.</p>
-    <p>Tu información queda en nuestra base de datos para futuras oportunidades. También te invitamos a seguirnos en LinkedIn para enterarte de nuevas vacantes: <a href="${TS_LINKEDIN_URL}">${TS_LINKEDIN_URL}</a></p>
-    <p>Apreciamos tu interés en ${clientName} y te deseamos mucho éxito en tus próximos pasos.</p>
-    <p>Un abrazo,<br><strong>Kelly Castañeda</strong><br>Talent Acquisition and Development Lead<br>${clientName}</p>
-  </div>
-</body></html>`;
-}
-
-function buildRejectionHtmlEn(name: string, clientName: string, vacancyTitle: string): string {
-  const firstName = (name || "").split(" ")[0] || "candidate";
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-  body { font-family: Inter, -apple-system, sans-serif; line-height: 1.6; color: #1a1a1a; padding: 24px; background: #f9f9f9; }
-  .container { max-width: 600px; margin: 0 auto; background: white; padding: 32px; border-radius: 12px; }
-  a { color: #2C64ED; }
-</style></head><body>
-  <div class="container">
-    <p>Hi <strong>${firstName}</strong>,</p>
-    <p>Thank you for taking the time to apply for the <strong>${vacancyTitle}</strong> position at ${clientName}. After reviewing your application, we have decided to move forward with other candidates whose profile is a closer match for the position at this time. However, ${clientName} is always growing and we'd love to keep in touch.</p>
-    <p>Your information stays in our database for future opportunities. We also invite you to follow us on LinkedIn to stay updated on new openings: <a href="${TS_LINKEDIN_URL}">${TS_LINKEDIN_URL}</a></p>
-    <p>We appreciate your interest in ${clientName} and thank you again. We sincerely wish you all the best in your future endeavors.</p>
-    <p>Best regards,<br><strong>Talent Team</strong><br>${clientName}</p>
-  </div>
-</body></html>`;
+function panamaCandidateMailLine(
+  decision: string,
+  battery: { enviado: boolean; canal?: string; motivo?: string; pendiente?: boolean } | null,
+): string {
+  if (battery?.enviado) {
+    return `A Batería TS email was sent to the candidate (${battery.canal}).`;
+  }
+  if (battery?.pendiente || battery?.motivo === NOTA_BATERIA_PENDIENTE) {
+    return "No email was sent to the candidate. Automatic battery email is off (BATTERY_AUTO_SEND_ENABLED). batería pendiente de envío — send it from the manual button.";
+  }
+  if (decision === "pass" && battery && !battery.enviado) {
+    return `No email was sent to the candidate. The battery email did not go out: ${battery.motivo}.`;
+  }
+  if (decision === "reject") {
+    return "No email was sent to the candidate (knock-out). The decision is recorded for the recruiter.";
+  }
+  return "No email was sent to the candidate.";
 }
 
 export async function GET(
@@ -293,14 +283,22 @@ export async function GET(
     return NextResponse.json({ error: "already_completed" }, { status: 409 });
   }
 
+  // @ts-expect-error supabase relation
+  const getTemplateKey = String(candidate.ht_vacancies?.form_template_key || "");
+  // Ops PA: the link lasts 7 days from send. An expired click does not
+  // extend it and does not delete the candidate.
+  if (getTemplateKey === "panama_ops" && panamaPrefilterExpired(candidate.prefilter_token_expires_at as string | null)) {
+    return NextResponse.json({ error: "expired" }, { status: 410 });
+  }
+
   // Token evergreen · si el candidato hace click, extendemos 7 días más.
   // Razón: drafts de Gmail pueden sentarse días antes de enviar · si el link
   // expira en el camino, candidato recibe link muerto sin culpa. Cada click
   // del candidato vivo re-activa el reloj.
-  if (candidate.prefilter_token_expires_at) {
+  if (getTemplateKey !== "panama_ops" && candidate.prefilter_token_expires_at) {
     const expires = new Date(candidate.prefilter_token_expires_at as string);
     const now = new Date();
-    if (expires < now || (expires.getTime() - now.getTime()) < 3 * 24 * 60 * 60 * 1000) {
+    if (!isPreviewTestMode() && (expires < now || (expires.getTime() - now.getTime()) < 3 * 24 * 60 * 60 * 1000)) {
       const fresh = new Date();
       fresh.setDate(fresh.getDate() + 7);
       await supabaseAdmin
@@ -346,15 +344,21 @@ export async function POST(
   // @ts-expect-error supabase relation
   const templateKey = String(candidate.ht_vacancies?.form_template_key || "comex");
 
+  if (templateKey === "panama_ops" && panamaPrefilterExpired(candidate.prefilter_token_expires_at as string | null)) {
+    return NextResponse.json({ error: "expired" }, { status: 410 });
+  }
+
   let decision: Decision;
   let rejectionReason: { category: string; sub_detail: string } | null = null;
   let meta: Record<string, unknown>;
+  let panama: PanamaScore | null = null;
   const bloqueos: Bloqueo[] = [];
 
   if (templateKey === "china") {
     // ─── Rama CHINA · knock-outs solamente ──────────────────────────
     //   - Consentimiento PIPL es OBLIGATORIO · sin él no se procesa.
-    //   - Salario (salary_usd) es SOLO DATO · nunca descarta.
+    //   - Salario (salary_usd) nunca descarta. Sobre el tope (mínimo del
+    //     rango) entra como bloqueo blando y la decisión pasa a revisión.
     //   - Knock-outs: work_authorized, inglés (>=B2), onsite_available.
     if (!isYes(body.pipl_consent)) {
       return NextResponse.json({ error: "pipl_consent_required" }, { status: 400 });
@@ -398,17 +402,26 @@ export async function POST(
     }
     decision = bloqueos.length ? "review" : "pass";
 
-    // Presupuesto · sobre el tope no se rechaza, se manda a revisión.
-    const salaryUsd = parseSalaryUsd(body.salary_usd);
-    const salaryOverBudget = salaryUsd !== null && salaryUsd > CHINA_SALARY_CAP_USD;
-    if (salaryOverBudget && decision === "pass") {
-      decision = "review";
+    // Presupuesto · se compara el mínimo del rango. Sobre el tope no se
+    // rechaza: queda un bloqueo blando y, si iba a pasar, pasa a revisión.
+    const salaryRange = parseSalaryRangeUsd(body.salary_usd);
+    const salaryOverBudget = salaryRange !== null && salaryRange.min > CHINA_SALARY_CAP_USD;
+    if (salaryOverBudget) {
+      bloqueos.push({
+        regla: "salario_sobre_tope",
+        severidad: "blando",
+        categoria: "pretension_salarial",
+        sub_detail: "salario_sobre_tope",
+        valor: String(body.salary_usd),
+      });
+      if (decision === "pass") decision = "review";
     }
 
     meta = {
       china: true,
       salary_usd_expectation: body.salary_usd ?? null, // dato · no descarta
-      salary_usd_parsed: salaryUsd,
+      salary_usd_parsed: salaryRange?.min ?? null,
+      salary_usd_max: salaryRange?.max ?? null,
       salary_cap_usd: CHINA_SALARY_CAP_USD,
       salary_over_budget: salaryOverBudget,
       english_min_required_rank: CHINA_ENGLISH_MIN_RANK,
@@ -417,6 +430,31 @@ export async function POST(
       work_authorized: workAuthorized,
       onsite_available: onsiteAvailable,
       pipl_consent: true,
+    };
+  } else if (templateKey === "panama_ops") {
+    if (!isYes(body.privacy_consent)) {
+      return NextResponse.json({ error: "privacy_consent_required" }, { status: 400 });
+    }
+    panama = scorePanamaOps(body);
+    decision = panama.decision;
+    for (const reason of panama.reasons) {
+      bloqueos.push({
+        regla: reason.text,
+        severidad: reason.effect === "knockout" ? "duro" : "blando",
+        categoria: reason.category ?? "",
+        sub_detail: reason.sub_detail ?? reason.text,
+        valor: reason.text,
+      });
+    }
+    meta = {
+      panama_ops: true,
+      decision: panama.decision,
+      decision_label: panama.decisionLabel,
+      stage: panama.stage,
+      reasons: panama.reasons,
+      notice: panamaOpsNoticeLines(panama),
+      salary_usd: null,
+      email_candidate: false,
     };
   } else if (templateKey === "sig_sst") {
     // ─── Rama SIG-SST · credenciales de ley + salario + inglés ──────
@@ -683,7 +721,9 @@ export async function POST(
       sub_detail: rejectionReason.sub_detail,
     });
   }
-  if (decision === "reject") decision = "review";
+  // Ops PA hard knock-outs stay rejected. Every other template still
+  // converts an automatic reject into review (Kelly, 29-sep-2026).
+  if (decision === "reject" && templateKey !== "panama_ops") decision = "review";
 
   // La prioridad ordena la mesa de decision. Arriba lo que puede estar mal y
   // cuesta caro: dato blando con una senal que lo contradice. Abajo el hecho
@@ -700,9 +740,12 @@ export async function POST(
     prioridad_revision: prioridadRevision,
   };
 
+  const storedBody = { ...body } as Record<string, unknown>;
+  if (templateKey === "panama_ops") storedBody.salary_usd = null;
+
   const updates: Record<string, unknown> = {
     prefilter_data: {
-      ...body,
+      ...storedBody,
       _meta: meta,
     },
     prefilter_decision: decision,
@@ -715,8 +758,26 @@ export async function POST(
   // nadie ha revisado es lo que dejo a doce personas esperando en silencio.
 
   // Actualizar stage según decisión
-  if (decision === "pass") updates.stage = "prefiltro_pasado";
+  if (panama) {
+    updates.stage = panama.stage;
+    if (panama.decision === "reject") {
+      updates.rejected_at = new Date().toISOString();
+      updates.rejection_note_private = panama.reasons
+        .filter((reason) => reason.effect === "knockout")
+        .map((reason) => reason.text)
+        .join("; ");
+      const catalogued = panama.reasons.find((reason) => reason.effect === "knockout" && reason.category);
+      if (catalogued) {
+        updates.rejection_category = catalogued.category;
+        updates.rejection_sub_detail = catalogued.sub_detail;
+      }
+    }
+  } else if (decision === "pass") updates.stage = "prefiltro_pasado";
   else if (decision === "review") updates.stage = "prefiltro_revision";
+
+  if (isPreviewTestMode()) {
+    return previewTestJson("POST /api/headhunting/prefilter/[token]", { decision });
+  }
 
   const { error: updateErr } = await supabaseAdmin
     .from("ht_candidates")
@@ -724,21 +785,37 @@ export async function POST(
     .eq("id", candidate.id);
 
   if (updateErr) {
-    return NextResponse.json({ error: "save_failed", detail: updateErr.message }, { status: 500 });
+    console.error("prefilter save", updateErr);
+    return NextResponse.json(publicStepBody(), { status: 500 });
   }
 
   // El submit del prefiltro decide la etapa por sí solo. Sin registrar el
   // evento, el candidato que pasa a revisión arranca el contador de días
   // desde cero cada vez que alguien lo edita.
+  const batteryPending = decision === "pass" && !batteryAutoSendEnabled();
   if (updates.stage) {
+    const baseNote = panama ? panamaOpsNoticeLines(panama).join(" · ") : `prefiltro: ${decision}`;
     await recordStageEvent({
       candidateId: candidate.id as string,
       fromStage: (candidate.stage as string) ?? null,
       toStage: updates.stage as string,
       vacancyId: (candidate.vacancy_id as string) ?? null,
       source: "system",
-      note: `prefiltro: ${decision}`,
+      note: batteryPending ? `${baseNote} · ${NOTA_BATERIA_PENDIENTE}` : baseNote,
     });
+  }
+
+  // ─── Prefiltro pasado → Batería TS, sin esperar a nadie ─────────────
+  // Kelly 27-oct: quien pasa el prefiltro recibe la batería de una vez, desde
+  // jointheteam@, y queda en el gate Batería TS. Si no hay canal de correo
+  // (staging), se queda en Prefiltro: moverlo sin invitación sería mentir.
+  let bateriaAuto: Awaited<ReturnType<typeof enviarBateriaAuto>> | null = null;
+  if (decision === "pass") {
+    const origin = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+    bateriaAuto = await enviarBateriaAuto(candidate.id as string, origin);
+    if (!bateriaAuto.enviado) {
+      console.error(`[prefiltro] batería automática no salió para ${candidate.id}: ${bateriaAuto.motivo}`);
+    }
   }
 
   // ─── Notificación a Kelly (no bloqueante) ─────────────────────────
@@ -747,9 +824,26 @@ export async function POST(
     if (gmail.connected) {
       // @ts-expect-error supabase relation
       const vacancyTitle = candidate.ht_vacancies?.title || "vacante";
-      const enRojo = bloqueos.length > 0;
-      const decisionEmoji = enRojo ? "🔴" : "✅";
-      const decisionLabel = enRojo ? "EN ROJO · decide tú" : "PASA";
+      if (panama) {
+        const lines = panamaOpsNoticeLines(panama);
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://trading-solutions-careers.vercel.app";
+        await sendViaGmail({
+          to: "jointheteam@tradingsolutions.com",
+          subject: `[Prefiltro ${panama.decisionLabel}] ${candidate.name} · ${vacancyTitle}`,
+          html: `<!DOCTYPE html><html><body style="font-family: Inter, sans-serif; padding: 16px; color: #1a1a1a;">
+            <p><strong>${candidate.name}</strong> completed the Panama Operations prefilter.</p>
+            <p>Recorded decision: <strong>${lines[0]}</strong></p>
+            ${lines.slice(1).length ? `<ul>${lines.slice(1).map((line) => `<li>${line}</li>`).join("")}</ul>` : "<p>No flags.</p>"}
+            <p>${panamaCandidateMailLine(panama.decision, bateriaAuto)}</p>
+            <p><a href="${baseUrl}/hr-admin?tab=prefiltros">Open HR Admin</a></p>
+          </body></html>`,
+          fromName: ATS_FROM_NAME,
+        });
+        return NextResponse.json({ success: true });
+      }
+      const aviso = etiquetaAvisoPrefiltro(decision, bloqueos);
+      const { label: decisionLabel, emoji: decisionEmoji, enRojo } = aviso;
+      const salarioTxt = textoSalarioAviso(body);
       const listaBloqueos = bloqueos
         .map((b) => `<li>${b.sub_detail.replace(/_/g, " ")} — dato ${b.severidad}${b.valor ? ` (marcó: ${b.valor})` : ""}${b.contradiccion ? ` · <strong>${b.contradiccion}</strong>` : ""}</li>`)
         .join("");
@@ -763,11 +857,12 @@ export async function POST(
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Vacante:</td><td><strong>${vacancyTitle}</strong></td></tr>
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Email:</td><td>${candidate.email}</td></tr>
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Decisión:</td><td><strong>${decisionEmoji} ${decisionLabel}</strong></td></tr>
-            <tr><td style="padding: 4px 12px 4px 0; color: #666;">Salario que pidió:</td><td>${body.salary || "—"}</td></tr>
+            <tr><td style="padding: 4px 12px 4px 0; color: #666;">Salario que pidió:</td><td>${salarioTxt}</td></tr>
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Inglés:</td><td>${body.english_level || "—"}</td></tr>
             <tr><td style="padding: 4px 12px 4px 0; color: #666;">Ciudad:</td><td>${body.city || "—"}</td></tr>
+            ${bateriaAuto ? `<tr><td style="padding: 4px 12px 4px 0; color: #666;">Batería TS:</td><td>${bateriaAuto.enviado ? `enviada automáticamente (${bateriaAuto.canal})` : `<strong>no salió</strong> · ${bateriaAuto.motivo}`}</td></tr>` : ""}
           </table>
-          ${enRojo ? `<div style="background: #FEF2F2; padding: 10px 14px; border-radius: 6px; color: #991B1B; font-size: 13px;"><strong>No se rechazó a nadie.</strong> Quedó en rojo esperando tu decisión:<ul style="margin: 8px 0 0; padding-left: 18px;">${listaBloqueos}</ul></div>` : ""}
+          ${enRojo ? `<div style="background: #FEF2F2; padding: 10px 14px; border-radius: 6px; color: #991B1B; font-size: 13px;"><strong>No se rechazó a nadie.</strong> Quedó en rojo esperando tu decisión:<ul style="margin: 8px 0 0; padding-left: 18px;">${listaBloqueos}</ul></div>` : bloqueos.length ? `<div style="background: #FFFBEB; padding: 10px 14px; border-radius: 6px; color: #92400E; font-size: 13px;"><strong>Revisión.</strong> El salario quedó sobre el tope. No se rechazó a nadie:<ul style="margin: 8px 0 0; padding-left: 18px;">${listaBloqueos}</ul></div>` : ""}
           <p><a href="${baseUrl}/hr-admin?tab=prefiltros" style="color: #2C64ED;">Ver en HR Admin →</a></p>
         </body></html>`,
         fromName: "Trading Solutions ATS",

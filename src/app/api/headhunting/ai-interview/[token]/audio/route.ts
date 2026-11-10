@@ -10,6 +10,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { publicStepBody } from "@/lib/candidate-public-error";
 
 // Forzar runtime Node.js para soportar streaming de body grande
 export const runtime = "nodejs";
@@ -35,7 +36,8 @@ export async function GET(
       .maybeSingle();
 
     if (error) {
-      return NextResponse.json({ error: "db_error", detail: error.message }, { status: 500 });
+      console.error("ai-interview audio lookup", error);
+      return NextResponse.json(publicStepBody(), { status: 500 });
     }
     if (!data?.conversation_id) {
       return NextResponse.json({ error: "no_conversation_id" }, { status: 404 });
@@ -65,8 +67,9 @@ export async function GET(
 
     if (!r.ok) {
       const detail = await r.text().catch(() => "");
+      console.error("ai-interview audio upstream", r.status, detail.slice(0, 200));
       return NextResponse.json(
-        { error: "elevenlabs_fetch_failed", status: r.status, detail: detail.slice(0, 200) },
+        { error: "elevenlabs_fetch_failed", status: r.status },
         { status: 502 }
       );
     }
@@ -125,10 +128,7 @@ export async function GET(
     });
   } catch (err) {
     console.error("audio proxy error:", err);
-    return NextResponse.json(
-      { error: "internal_error", detail: (err as Error).message },
-      { status: 500 }
-    );
+    return NextResponse.json(publicStepBody(), { status: 500 });
   }
 }
 

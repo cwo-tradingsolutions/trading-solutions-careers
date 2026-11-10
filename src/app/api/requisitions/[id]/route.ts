@@ -20,6 +20,7 @@ import {
   diasEnEstado,
 } from "@/lib/requisitions";
 import { modeloDeCompetencias, nivelDeJerarquia, TS_CLIENT_ID } from "@/lib/competency-model";
+import { guardarFechasVacante, validarFechasAts } from "@/lib/vacancy-dates-store";
 
 export const runtime = "nodejs";
 
@@ -152,6 +153,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // cargo y no se parecen para una computadora; «Especialista SIG-SST» e
     // «Integrated Management Systems & HSE Specialist» ni siquiera están en el
     // mismo idioma. Así que no se adivina: se corta y se pregunta.
+    let fechasAprobacion: { apertura: string; objetivo: string | null } | null = null;
+    let errorFechas: string | null = null;
+    if (destino === "aprobada") {
+      const fechas = await validarFechasAts(
+        body.fecha_apertura ?? body.hr_request_date,
+        body.fecha_objetivo ?? body.target_fill_date,
+      );
+      if (fechas.ok) fechasAprobacion = fechas;
+      else errorFechas = fechas.error;
+    }
+
     let vacanteCreada: { id: string; title: string } | null = null;
     if (destino === "aprobada") {
       const modelId = await modeloDeCompetencias();
@@ -241,6 +253,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     if (destino === "aprobada" && !vacanteCreada) {
+      if (!fechasAprobacion) {
+        return NextResponse.json(
+          { error: errorFechas || "Falta la fecha de apertura de la vacante." },
+          { status: 400 },
+        );
+      }
       const modelId = await modeloDeCompetencias();
       const { data: nueva, error: vacErr } = await supabaseAdmin
         .from("ht_vacancies")
@@ -280,6 +298,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     // Sirve igual si la vacante se acaba de crear, si se reusó la que ya
     // tenía la requisición o si se vinculó una que estaba suelta.
+    let avisoFechas: string | null = null;
+    if (destino === "aprobada" && vacanteCreada && fechasAprobacion) {
+      const guardadas = await guardarFechasVacante(
+        vacanteCreada.id,
+        fechasAprobacion.apertura,
+        fechasAprobacion.objetivo,
+      );
+      if (!guardadas.ok) {
+        return NextResponse.json({ error: guardadas.error }, { status: 400 });
+      }
+      avisoFechas = guardadas.aviso;
+    }
     if (destino === "aprobada" && vacanteCreada) {
       cambios.vacancy_id = vacanteCreada.id;
       cambios.approved_at = new Date().toISOString();
@@ -306,6 +336,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       success: true,
       status: destino,
       vacante: vacanteCreada,
+      aviso_fechas: avisoFechas,
       acciones: accionesDisponibles(destino),
     });
   } catch (err: any) {

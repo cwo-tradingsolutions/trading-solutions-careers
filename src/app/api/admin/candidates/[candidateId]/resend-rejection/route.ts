@@ -38,10 +38,10 @@ import {
 } from "@/lib/gmail";
 import {
   buildRejectionHtml,
+  rejectionEmailsEnabled,
+  rejectionSentAt,
   rejectionSubject,
   REJECTION_FROM_NAME,
-  REJECTION_FROM_NAME_EN,
-  EN_REJECTION_BODY,
   REJECTION_REPLY_TO,
 } from "@/lib/rejection-email";
 import { resolveCandidateLang } from "@/lib/candidate-lang";
@@ -102,30 +102,6 @@ export async function POST(
       country: (cand as any).ht_vacancies?.country,
     });
 
-    // El texto que se le escribió al rechazarlo manda; si no hay, se cae al
-    // template de la categoría. Si tampoco hay, no inventamos un mensaje.
-    let messageBody = (cand.rejection_note_public as string | null)?.trim() || "";
-    // Las plantillas de categoría están en español · en inglés no sirven.
-    if (!messageBody && lang === "en") messageBody = EN_REJECTION_BODY;
-    if (!messageBody && cand.rejection_category) {
-      const { data: cat } = await supabaseAdmin
-        .from("ts_rejection_categories")
-        .select("public_message_template")
-        .eq("category_key", cand.rejection_category)
-        .maybeSingle();
-      messageBody = (cat?.public_message_template as string | null)?.trim() || "";
-    }
-    if (!messageBody) {
-      return NextResponse.json(
-        {
-          error:
-            "Este rechazo no tiene mensaje para el candidato ni plantilla de categoría, " +
-            "así que no hay qué enviar. Abrí el candidato y escribí el mensaje primero.",
-        },
-        { status: 422 },
-      );
-    }
-
     const gmail = await isGmailConnected();
     if (!gmail.connected) {
       return NextResponse.json(
@@ -178,13 +154,23 @@ export async function POST(
       }
     }
 
+    if (!rejectionEmailsEnabled()) {
+      return NextResponse.json({
+        success: true,
+        email_suppressed: true,
+        sent: false,
+        message:
+          "Los correos de rechazo están apagados (REJECTION_EMAILS_ENABLED). No se creó borrador ni se envió nada.",
+      });
+    }
+
     const vacancyTitle: string =
       ((cand as any).ht_vacancies?.title as string) ||
       (lang === "en" ? "the position" : "la posición");
     const firstName = (cand.name || "").split(" ")[0] || (lang === "en" ? "there" : "candidato");
-    const html = buildRejectionHtml(firstName, vacancyTitle, messageBody, lang);
+    const html = buildRejectionHtml(firstName, vacancyTitle, lang);
     const subject = rejectionSubject(vacancyTitle, lang);
-    const fromName = lang === "en" ? REJECTION_FROM_NAME_EN : REJECTION_FROM_NAME;
+    const fromName = REJECTION_FROM_NAME;
 
     if (mode === "draft") {
       const res = await createDraftViaGmail({
@@ -222,7 +208,7 @@ export async function POST(
       return NextResponse.json({ error: "No se pudo enviar el correo", detail: res.error }, { status: 502 });
     }
 
-    const sentAt = new Date().toISOString();
+    const sentAt = rejectionSentAt(true);
     const { error: updErr } = await supabaseAdmin
       .from("ht_candidates")
       .update({ rejection_sent_at: sentAt, updated_at: sentAt })

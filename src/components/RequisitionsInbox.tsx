@@ -24,6 +24,7 @@ import {
 } from "@/lib/requisitions";
 import { PREFILTER_TEMPLATES } from "@/lib/prefilter-templates";
 import PublishPanel from "@/components/PublishPanel";
+import { FechasVacanteFields, errorFechas } from "@/components/CamposObligatorios";
 import AvisoMultiIdioma, { type CamposGenerados } from "@/components/AvisoMultiIdioma";
 
 type Requisicion = {
@@ -268,6 +269,8 @@ function Tarjeta({
     responsibilities_en: req.responsibilities_en || "",
     requirements_en: req.requirements_en || "",
     nice_to_have_en: req.nice_to_have_en || "",
+    fecha_apertura: "",
+    fecha_objetivo: "",
   });
   const [nota, setNota] = useState("");
   const [enviando, setEnviando] = useState<string | null>(null);
@@ -378,6 +381,8 @@ function Tarjeta({
         ...perfil,
         salary_cap_cop: perfil.salary_cap_cop ? Number(perfil.salary_cap_cop) : null,
         form_template_key: perfil.form_template_key || null,
+        fecha_apertura: perfil.fecha_apertura || null,
+        fecha_objetivo: perfil.fecha_objetivo || null,
         ...extra,
       }),
     });
@@ -392,6 +397,7 @@ function Tarjeta({
       setProblema([j.error, j.detail].filter(Boolean).join(" · "));
       return false;
     }
+    if (j.aviso_fechas) alert(j.aviso_fechas);
     if (j.vacante) {
       alert(
         `Aprobada. Se creó la vacante "${j.vacante.title}" en el ATS con ${req.lead_email} ` +
@@ -403,6 +409,10 @@ function Tarjeta({
   }
 
   async function mover(accion: AccionRequisicion | "", extra?: Record<string, unknown>) {
+    if (accion === "aprobar" && !extra?.vincular_vacante_id) {
+      const fechas = errorFechas(perfil.fecha_apertura, perfil.fecha_objetivo, true);
+      if (fechas) { setProblema(fechas); return; }
+    }
     setEnviando(accion || "guardar");
     setProblema(null);
     try {
@@ -746,6 +756,16 @@ function Tarjeta({
               {problema}
             </div>
           )}
+
+          <FechasVacanteFields
+            apertura={perfil.fecha_apertura}
+            objetivo={perfil.fecha_objetivo}
+            onApertura={(v) => setPerfil({ ...perfil, fecha_apertura: v })}
+            onObjetivo={(v) => setPerfil({ ...perfil, fecha_objetivo: v })}
+          />
+          <p className="text-[11px] text-gray-500 -mt-2">
+            Obligatorias al crear la vacante. La apertura es la solicitud HR. El cierre objetivo se exige solo si la columna ya existe.
+          </p>
 
           {/* Acciones */}
           <div className="flex flex-wrap gap-2 pt-1">

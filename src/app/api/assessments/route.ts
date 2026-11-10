@@ -12,8 +12,11 @@ import { neon } from "@/lib/sql";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
-import { getResend, EMAIL_FROM, EMAIL_BCC } from "@/lib/resend";
+import { getResend, EMAIL_FROM } from "@/lib/resend";
+import { candidateMailBcc } from "@/lib/candidate-bcc";
+import { publicStepBody } from "@/lib/candidate-public-error";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
+import { candidateSignatureHtml, candidateSignatureText } from "@/lib/ats-from";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,6 +37,9 @@ function generateToken(prefix = "ats"): string {
 
 /* ========== GET /api/assessments ========== */
 export async function GET(req: NextRequest) {
+  const authError = requireAdmin(req);
+  if (authError) return authError;
+
   try {
     const sql = neon(process.env.DATABASE_URL!);
     const { searchParams } = new URL(req.url);
@@ -74,11 +80,8 @@ export async function GET(req: NextRequest) {
       { headers: corsHeaders }
     );
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "unknown_error";
-    return NextResponse.json(
-      { error: "fetch_failed", detail: msg },
-      { status: 500, headers: corsHeaders }
-    );
+    console.error("GET /api/assessments", e);
+    return NextResponse.json(publicStepBody(), { status: 500, headers: corsHeaders });
   }
 }
 
@@ -123,7 +126,7 @@ function buildEmailHtml(opts: {
     </div>
     <p style="text-align:center"><a href="${opts.link}" style="display:inline-block;background:#2C64ED;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600">Start assessment</a></p>
     <p>There are no right or wrong answers — we want to understand how you think.</p>
-    <p>Best regards,<br><strong>Trading Solutions Recruiting</strong></p>
+    ${candidateSignatureHtml("en")}
   </div>
   <div style="padding:18px 32px;text-align:center;color:#999;font-size:12px;border-top:1px solid #eee">Confidential — link is personal and non-transferable.</div>
 </div></body></html>`,
@@ -148,7 +151,7 @@ function buildEmailHtml(opts: {
     </div>
     <p style="text-align:center"><a href="${opts.link}" style="display:inline-block;background:#2C64ED;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600">Iniciar evaluación</a></p>
     <p>No hay respuestas correctas o incorrectas — queremos conocer cómo piensas.</p>
-    <p>Un abrazo,<br><strong>Equipo Trading Solutions</strong></p>
+    ${candidateSignatureHtml("es")}
   </div>
   <div style="padding:18px 32px;text-align:center;color:#999;font-size:12px;border-top:1px solid #eee">Confidencial — el enlace es personal e intransferible.</div>
 </div></body></html>`,
@@ -211,8 +214,8 @@ export async function POST(req: NextRequest) {
     );
     const message = encodeURIComponent(
       language === "en"
-        ? `Hi ${body.candidate_name.split(" ")[0]},\n\nThanks for applying to Trading Solutions. The next step is a short assessment (about 55 minutes, you can pause anytime).\n\nStart here: ${link}\n\nThe link is valid for 30 days.\n\nBest,\nTrading Solutions Recruiting`
-        : `Hola ${body.candidate_name.split(" ")[0]},\n\nGracias por aplicar a Trading Solutions. El siguiente paso es una evaluación corta (~55 minutos, puedes pausar cuando quieras).\n\nEmpieza aquí: ${link}\n\nEl enlace es válido por 30 días.\n\nUn abrazo,\nEquipo Trading Solutions`
+        ? `Hi ${body.candidate_name.split(" ")[0]},\n\nThanks for applying to Trading Solutions. The next step is a short assessment (about 55 minutes, you can pause anytime).\n\nStart here: ${link}\n\nThe link is valid for 30 days.\n\n${candidateSignatureText("en")}`
+        : `Hola ${body.candidate_name.split(" ")[0]},\n\nGracias por aplicar a Trading Solutions. El siguiente paso es una evaluación corta (~55 minutos, puedes pausar cuando quieras).\n\nEmpieza aquí: ${link}\n\nEl enlace es válido por 30 días.\n\n${candidateSignatureText("es")}`
     );
     const mailto = `mailto:${body.candidate_email}?subject=${subject}&body=${message}`;
 
@@ -220,16 +223,15 @@ export async function POST(req: NextRequest) {
     let emailStatus: { sent: boolean; id?: string; error?: string; via?: 'gmail' | 'resend' } = { sent: false };
     if (body.send_email) {
       try {
-        // Pull config dinámica (reply_to, bcc) de recruiter_config
-        let dynamicBcc = EMAIL_BCC;
+        // Kelly: no BCC on candidate mail. Reply-To still comes from config.
+        const dynamicBcc = candidateMailBcc();
         let dynamicReplyTo: string | null = null;
         try {
-          const cfgRows = await sql`SELECT * FROM recruiter_config WHERE id = 1`;
+          const cfgRows = await sql`SELECT email_reply_to FROM recruiter_config WHERE id = 1`;
           if (cfgRows.length > 0) {
-            dynamicBcc = (cfgRows[0].email_bcc as string) || EMAIL_BCC;
             dynamicReplyTo = (cfgRows[0].email_reply_to as string) || null;
           }
-        } catch { /* tabla no existe aún — usa env vars */ }
+        } catch { /* tabla no existe aún — la invitación sale sin Reply-To */ }
 
         const { subject: emailSubject, html } = buildEmailHtml({
           candidate_name: body.candidate_name,
@@ -247,7 +249,7 @@ export async function POST(req: NextRequest) {
             html,
             replyTo: dynamicReplyTo ?? undefined,
             bcc: dynamicBcc ?? undefined,
-            fromName: "Trading Solutions Recruiting",
+            fromName: "Talent Acquisition Team",
           });
           if (result.ok) {
             emailStatus = { sent: true, id: result.gmail_id, via: 'gmail' };
@@ -260,7 +262,7 @@ export async function POST(req: NextRequest) {
           const result = await resend.emails.send({
             from: EMAIL_FROM,
             to: body.candidate_email,
-            bcc: dynamicBcc,
+            ...(dynamicBcc ? { bcc: dynamicBcc } : {}),
             subject: emailSubject,
             html,
             ...(dynamicReplyTo ? { replyTo: dynamicReplyTo } : {}),

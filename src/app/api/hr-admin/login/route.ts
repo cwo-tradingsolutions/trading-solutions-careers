@@ -26,7 +26,7 @@ function timingSafeEqualStr(a: string, b: string): boolean {
 }
 
 export async function POST(req: Request) {
-  const secret = process.env.ADMIN_SECRET;
+  const secret = (process.env.ADMIN_SECRET ?? "").trim();
   if (!secret || secret.length < 6) {
     return NextResponse.json(
       { error: "Servidor sin ADMIN_SECRET configurado" },
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Body inválido" }, { status: 400 });
   }
 
-  const pass = (body.password ?? "").toString();
+  const pass = (body.password ?? "").toString().trim();
   if (!pass) {
     return NextResponse.json({ error: "Clave requerida" }, { status: 400 });
   }

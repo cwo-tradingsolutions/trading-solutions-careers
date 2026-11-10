@@ -4,6 +4,12 @@ import { sql, initDB } from "@/lib/db";
 import { generatePortalToken } from "@/lib/portal-token";
 import { getResend, EMAIL_FROM } from "@/lib/resend";
 import { sendViaGmail, isGmailConnected } from "@/lib/gmail";
+import { candidateSignatureHtml } from "@/lib/ats-from";
+import { applicationStatusEmailsEnabled } from "@/lib/application-status-email";
+import { buildRejectionHtml, REJECTION_REPLY_TO, rejectionEmailsEnabled, rejectionSubject } from "@/lib/rejection-email";
+import { resolveCandidateLang } from "@/lib/candidate-lang";
+import { candidateMailBcc } from "@/lib/candidate-bcc";
+import { publicStepBody } from "@/lib/candidate-public-error";
 
 let dbInitialized = false;
 
@@ -17,7 +23,7 @@ async function ensureDB() {
 // Email automático en transiciones clave de status — el humano sigue
 // decidiendo, pero NO tiene que escribir el correo de cada candidato.
 async function sendStatusTransitionEmail(
-  appRow: { id: number; full_name: string; email: string; job_title: string },
+  appRow: { id: number; full_name: string; email: string; job_title: string; job_id: number | null },
   newStatus: string
 ) {
   if (!appRow.email) return;
@@ -27,14 +33,13 @@ async function sendStatusTransitionEmail(
   const firstName = appRow.full_name.split(" ")[0];
   const portalLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://trading-solutions-careers.vercel.app'}/portal/${generatePortalToken(appRow.id, appRow.email)}`;
 
-  // Pull config dinámica (bcc, reply_to, booking_url)
-  let bcc: string | null = process.env.EMAIL_BCC ?? null;
+  // Kelly: no BCC on candidate mail. Reply-To and the booking link still come from config.
+  const bcc = candidateMailBcc();
   let replyTo: string | null = null;
   let bookingUrl: string | null = null;
   try {
-    const cfgRows = await sql`SELECT email_bcc, email_reply_to, booking_url FROM recruiter_config WHERE id = 1`;
+    const cfgRows = await sql`SELECT email_reply_to, booking_url FROM recruiter_config WHERE id = 1`;
     if (cfgRows.length > 0) {
-      bcc = (cfgRows[0].email_bcc as string) || bcc;
       replyTo = (cfgRows[0].email_reply_to as string) || null;
       bookingUrl = (cfgRows[0].booking_url as string) || null;
     }
@@ -58,18 +63,24 @@ async function sendStatusTransitionEmail(
       </div>
       ${bookingButton}
       <p style="text-align:center;margin-top:16px"><a href="${portalLink}" style="font-size:13px;color:#666;text-decoration:underline">Ver mi proceso</a></p>
-      <p style="margin-top:24px">Un abrazo,<br><strong>Equipo Trading Solutions</strong></p>
+      ${candidateSignatureHtml("es")}
     `);
   } else if (newStatus === "rejected") {
-    subject = `Trading Solutions · Sobre tu aplicación a ${appRow.job_title}`;
-    html = wrap(`
-      <p>Hola ${firstName},</p>
-      <p>Gracias por tu tiempo y por considerarnos para <strong>${appRow.job_title}</strong>. Te escribimos para cerrar este proceso contigo.</p>
-      <p>Después de revisar tu perfil con cuidado, hemos decidido seguir adelante con otros candidatos cuya experiencia se ajusta más a las necesidades específicas de esta vacante.</p>
-      <p>Esto NO refleja un juicio sobre tu valor profesional — el match con un rol es siempre contextual. De hecho guardamos tu información para considerarte en futuras vacantes que se abran. Si quieres, puedes seguir nuestras nuevas publicaciones en <a href="https://www.linkedin.com/company/trading-solutions" style="color:#2C64ED">LinkedIn</a>.</p>
-      <p style="font-size:13px;color:#666">Si tienes alguna duda específica sobre el proceso, simplemente responde este correo.</p>
-      <p style="margin-top:24px">Un abrazo y mucho éxito en lo que viene,<br><strong>Equipo Trading Solutions</strong></p>
-    `);
+    let jobLocation: string | null = null;
+    if (appRow.job_id != null) {
+      try {
+        const locRows = await sql`SELECT location FROM vacancies WHERE id = ${appRow.job_id} LIMIT 1`;
+        if (locRows.length > 0) jobLocation = (locRows[0].location as string) ?? null;
+      } catch { /* el id y el título alcanzan para elegir el idioma */ }
+    }
+    const rejLang = resolveCandidateLang({
+      jobId: appRow.job_id,
+      jobTitle: appRow.job_title,
+      country: jobLocation,
+    });
+    subject = rejectionSubject(appRow.job_title, rejLang);
+    html = buildRejectionHtml(firstName, appRow.job_title, rejLang);
+    replyTo = replyTo || REJECTION_REPLY_TO;
   } else if (newStatus === "hired") {
     subject = `Trading Solutions · ¡Bienvenido al equipo! 🎉`;
     html = wrap(`
@@ -77,7 +88,7 @@ async function sendStatusTransitionEmail(
       <p>¡Bienvenido oficialmente al equipo de Trading Solutions!</p>
       <p>Estamos emocionados de tenerte como parte del equipo de <strong>${appRow.job_title}</strong>. En las próximas horas te contactaremos para coordinar tu onboarding y los primeros pasos.</p>
       <p>Mientras tanto, si tienes preguntas o necesitas algo, simplemente responde este correo.</p>
-      <p>Un abrazo y nos vemos pronto,<br><strong>Equipo Trading Solutions</strong></p>
+      ${candidateSignatureHtml("es")}
     `);
   } else if (newStatus === "offer") {
     subject = `Trading Solutions · Tenemos una oferta para ti`;
@@ -85,7 +96,7 @@ async function sendStatusTransitionEmail(
       <p>Hola ${firstName},</p>
       <p>Después de evaluarte cuidadosamente, queremos ofrecerte la posición de <strong>${appRow.job_title}</strong> en Trading Solutions.</p>
       <p>Te contactaremos en las próximas horas con los detalles formales de la oferta. Mientras tanto, si tienes preguntas, responde este correo.</p>
-      <p>Un abrazo,<br><strong>Equipo Trading Solutions</strong></p>
+      ${candidateSignatureHtml("es")}
     `);
   } else {
     return; // No envío auto para new/reviewing
@@ -147,12 +158,12 @@ export async function PATCH(
 
     // Pull el status anterior + datos para email
     const before = await sql`
-      SELECT id, full_name, email, job_title, status FROM applications WHERE id = ${id} LIMIT 1
+      SELECT id, full_name, email, job_title, job_id, status FROM applications WHERE id = ${id} LIMIT 1
     `;
     if (before.length === 0) {
       return NextResponse.json({ error: "Application not found" }, { status: 404 });
     }
-    const prev = before[0] as { id: number; full_name: string; email: string; job_title: string; status: string };
+    const prev = before[0] as { id: number; full_name: string; email: string; job_title: string; job_id: number | null; status: string };
 
     const result = await sql`
       UPDATE applications
@@ -161,16 +172,24 @@ export async function PATCH(
       RETURNING id, status, updated_at
     `;
 
-    // Trigger email automático SOLO si cambió status y no se pidió saltar
-    if (!skipEmail && prev.status !== status) {
+    // Rejection has its own flag. Interview, offer and hired use
+    // APPLICATION_STATUS_EMAILS_ENABLED, which stays off until it is set.
+    const wantsEmail = !skipEmail && prev.status !== status;
+    const statusMail =
+      status === "interview" || status === "offer" || status === "hired";
+    const emailTriggered = wantsEmail && (
+      status === "rejected"
+        ? rejectionEmailsEnabled()
+        : statusMail && applicationStatusEmailsEnabled()
+    );
+    if (emailTriggered) {
       await sendStatusTransitionEmail(prev, status);
     }
 
-    return NextResponse.json({ success: true, application: result[0], emailTriggered: !skipEmail && prev.status !== status });
+    return NextResponse.json({ success: true, application: result[0], emailTriggered });
   } catch (error: unknown) {
     console.error("Error updating application:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(publicStepBody(), { status: 500 });
   }
 }
 
@@ -178,6 +197,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const authError = requireAdmin(request);
+  if (authError) return authError;
+
   try {
     await ensureDB();
     
@@ -197,7 +219,6 @@ export async function GET(
     return NextResponse.json({ application: result[0] });
   } catch (error: unknown) {
     console.error("Error fetching application:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(publicStepBody(), { status: 500 });
   }
 }

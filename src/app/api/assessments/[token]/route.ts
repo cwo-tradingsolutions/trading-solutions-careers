@@ -5,6 +5,8 @@
  */
 import { neon } from "@/lib/sql";
 import { NextRequest, NextResponse } from "next/server";
+import { isPreviewTestMode, previewTestJson } from "@/lib/preview-mode";
+import { publicStepBody } from "@/lib/candidate-public-error";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,11 +45,8 @@ export async function GET(
     }
     return NextResponse.json({ data: t }, { headers: corsHeaders });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "unknown_error";
-    return NextResponse.json(
-      { error: "fetch_failed", detail: msg },
-      { status: 500, headers: corsHeaders }
-    );
+    console.error("assessments token GET", e);
+    return NextResponse.json(publicStepBody(), { status: 500, headers: corsHeaders });
   }
 }
 
@@ -65,6 +64,9 @@ export async function PATCH(
 ) {
   try {
     const body = (await req.json()) as PatchBody;
+    if (isPreviewTestMode()) {
+      return previewTestJson("PATCH /api/assessments/[token]");
+    }
     const sql = neon(process.env.DATABASE_URL!);
 
     // Update auto-timestamps cuando cambia el status
@@ -91,10 +93,7 @@ export async function PATCH(
     }
     return NextResponse.json({ data: rows[0] }, { headers: corsHeaders });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "unknown_error";
-    return NextResponse.json(
-      { error: "update_failed", detail: msg },
-      { status: 500, headers: corsHeaders }
-    );
+    console.error("assessments token PATCH", e);
+    return NextResponse.json(publicStepBody(), { status: 500, headers: corsHeaders });
   }
 }

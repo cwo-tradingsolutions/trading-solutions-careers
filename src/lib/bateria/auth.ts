@@ -4,7 +4,7 @@ const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 12;
 
 /** Valida la cookie hr_admin_session con el mismo HMAC del middleware. */
 export function isAdminSession(cookieValue: string | undefined): boolean {
-  const secret = process.env.ADMIN_SECRET;
+  const secret = (process.env.ADMIN_SECRET ?? '').trim();
   if (!cookieValue || !secret) return false;
   const parts = cookieValue.split('.');
   if (parts.length !== 2) return false;
@@ -18,7 +18,7 @@ export function isAdminSession(cookieValue: string | undefined): boolean {
 
 export function isAdminRequest(req: { cookies: { get(n: string): { value: string } | undefined }; headers: Headers }): boolean {
   if (isAdminSession(req.cookies.get('hr_admin_session')?.value)) return true;
-  const header = req.headers.get('x-admin-secret');
-  const secret = process.env.ADMIN_SECRET;
+  const header = (req.headers.get('x-admin-secret') ?? '').trim();
+  const secret = (process.env.ADMIN_SECRET ?? '').trim();
   return !!header && !!secret && header === secret;
 }

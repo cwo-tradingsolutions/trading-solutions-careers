@@ -24,6 +24,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { validarCanalReclutador } from "@/lib/candidate-source";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
 
@@ -84,6 +85,10 @@ export async function POST(req: NextRequest) {
     const cands: ImportRow[] = Array.isArray(body.candidates) ? body.candidates : [];
     const defaultStage = body.default_stage || 'aplico';
     const dryRun = body.dry_run === true;
+    const canal = validarCanalReclutador(body.source);
+    if (!canal.ok) {
+      return NextResponse.json({ error: canal.error }, { status: 400 });
+    }
 
     if (cands.length === 0) {
       return NextResponse.json({ error: "Lista 'candidates' vacía" }, { status: 400 });
@@ -183,6 +188,7 @@ export async function POST(req: NextRequest) {
         current_role: c.current_role || null,
         notes: notesArr.join(' · '),
         linkedin_url: c.linkedin_url || null,
+        source: canal.source,
         created_at: c.applied_at ? new Date(c.applied_at).toISOString() : new Date().toISOString(),
       });
 

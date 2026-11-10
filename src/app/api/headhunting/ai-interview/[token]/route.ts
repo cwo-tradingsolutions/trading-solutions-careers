@@ -13,6 +13,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { isPreviewTestMode } from "@/lib/preview-mode";
 
 export async function GET(
   _req: NextRequest,
@@ -40,7 +41,7 @@ export async function GET(
   if (interview.token_expires_at) {
     const expires = new Date(interview.token_expires_at);
     const now = new Date();
-    if (expires < now || (expires.getTime() - now.getTime()) < 3 * 24 * 60 * 60 * 1000) {
+    if (!isPreviewTestMode() && (expires < now || (expires.getTime() - now.getTime()) < 3 * 24 * 60 * 60 * 1000)) {
       const fresh = new Date();
       fresh.setDate(fresh.getDate() + 7);
       await supabaseAdmin
@@ -69,7 +70,7 @@ export async function GET(
         vacancy_title: vacancy?.title || "la vacante",
         vacancy_area: vacancy?.area || "—",
         client_name: client?.name || "Trading Solutions",
-        recruiter_name: "Kelly Castañeda",
+        recruiter_name: "Talent Acquisition Team",
       };
 
       // Request signed URL from ElevenLabs
@@ -88,8 +89,8 @@ export async function GET(
     }
   }
 
-  // Mark as in_progress when first accessed
-  if (interview.status === "invited") {
+  // Mark as in_progress when first accessed. Preview never writes.
+  if (!isPreviewTestMode() && interview.status === "invited") {
     await supabaseAdmin
       .from("ht_ai_interviews")
       .update({ status: "in_progress", started_at: new Date().toISOString() })

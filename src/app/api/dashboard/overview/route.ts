@@ -7,6 +7,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { fetchAllRows } from "@/lib/fetch-all-rows";
 import { supabaseAdmin } from "@/lib/supabase";
 
 const TS_CLIENT_ID = "98b62872-5767-4815-9b49-1394b9527c1f";
@@ -65,12 +66,14 @@ export async function GET(req: NextRequest) {
     (milestones || []).forEach((m: any) => { milestoneByVac[m.vacancy_id] = m; });
 
     // Candidates
-    let candQuery = supabaseAdmin
-      .from("ht_candidates")
-      .select("id, vacancy_id, stage, status, updated_at, created_at")
-      .not("email", "ilike", "%@tradingsolutions.com");
-    if (vacancyFilter) candQuery = candQuery.eq('vacancy_id', vacancyFilter);
-    const { data: cands } = await candQuery;
+    const cands = await fetchAllRows(() => {
+      let candQuery = supabaseAdmin
+        .from("ht_candidates")
+        .select("id, vacancy_id, stage, status, updated_at, created_at")
+        .not("email", "ilike", "%@tradingsolutions.com");
+      if (vacancyFilter) candQuery = candQuery.eq('vacancy_id', vacancyFilter);
+      return candQuery;
+    });
 
     // ─── KPI 1: Hires this quarter & this month ───
     let hiresQuarter = 0, hiresMonth = 0, hiresAllTime = 0;

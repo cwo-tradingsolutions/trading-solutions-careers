@@ -95,7 +95,7 @@ export const jobs: Job[] = [
     // China. Se movió a 10 para romper la colisión (18-ago-2026).
     id: 10,
     slug: "full-stack-developer",
-    linkedinUrl: "https://www.linkedin.com/company/trading-solutions/jobs/",
+    linkedinUrl: "https://www.linkedin.com/company/trading-sol/",
     title: { es: "Full Stack Developer Junior", en: "Junior Full Stack Developer" },
     dept: "Tecnología",
     location: "Barranquilla, Atlántico, Colombia",

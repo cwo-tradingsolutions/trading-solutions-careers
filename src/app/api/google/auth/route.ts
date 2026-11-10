@@ -8,21 +8,24 @@
  *   - gmail.compose: crear drafts (incluye gmail.send implícito) — para que HR
  *     pueda revisar el correo antes de enviar
  *   - email: identificar su correo (jointheteam@tradingsolutions.com)
+ *   - calendar + calendar.events: crear el evento con Google Meet
+ *     (calendar.events se sumó para la invitación a entrevista; el token
+ *     viejo no lo trae hasta que jointheteam@ vuelva a pasar por aquí)
  *
  * Después del consent, Google redirige a /api/google/callback?code=...
+ *
+ * En preview el redirect_uri sale del host del request (o de VERCEL_URL).
+ * No usa NEXT_PUBLIC_APP_URL, que apunta a producción.
  */
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { GOOGLE_OAUTH_SCOPES } from "@/lib/google-scopes";
+import { googleOAuthBaseUrl, googleOAuthRedirectUri } from "@/lib/google-oauth-env";
 
 export const runtime = "nodejs";
 
-const SCOPES = [
-  "https://www.googleapis.com/auth/gmail.compose",  // crear drafts + send
-  "https://www.googleapis.com/auth/gmail.readonly",  // leer inbox para audit (Round 3 #3)
-  "https://www.googleapis.com/auth/userinfo.email",
-  "https://www.googleapis.com/auth/calendar",       // leer/crear eventos · Joint Scheduling
-];
+const SCOPES = GOOGLE_OAUTH_SCOPES;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) {
     return NextResponse.json(
@@ -31,8 +34,21 @@ export async function GET() {
     );
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://trading-solutions-careers.vercel.app";
-  const redirectUri = `${baseUrl}/api/google/callback`;
+  const baseUrl = googleOAuthBaseUrl({
+    vercelEnv: process.env.VERCEL_ENV,
+    appUrl: process.env.NEXT_PUBLIC_APP_URL,
+    forwardedHost: req.headers.get("x-forwarded-host"),
+    host: req.headers.get("host"),
+    forwardedProto: req.headers.get("x-forwarded-proto"),
+    vercelUrl: process.env.VERCEL_URL,
+  });
+  if (!baseUrl) {
+    return NextResponse.json(
+      { error: "No se pudo armar el redirect_uri del preview (falta el host y VERCEL_URL)." },
+      { status: 500 }
+    );
+  }
+  const redirectUri = googleOAuthRedirectUri(baseUrl);
 
   const params = new URLSearchParams({
     client_id: clientId,

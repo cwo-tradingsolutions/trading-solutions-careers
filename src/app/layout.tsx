@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Inter } from "next/font/google";
 import { LanguageProvider } from "@/i18n/context";
-import { translations } from "@/i18n/translations";
+import { htmlLang, isLocale } from "@/i18n/locales";
 import "./globals.css";
 
 /**
- * Open Sauce Two is not vendored here. Inter is the Universe stand-in,
- * with system-ui behind it via --ts-font-sans. Do not claim SF Pro.
+ * Inter stays the Universe face for HR Admin (via --font-inter).
+ * The public Careers shell uses Open Sauce Two, loaded in globals.css
+ * and scoped under .ts-x. Default language is English.
  */
 const inter = Inter({
   subsets: ["latin"],
@@ -15,26 +17,19 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-// Metadatos del portal público (inglés, copy pack Bernabé). HR Admin define
-// los suyos en hr-admin/layout.tsx.
-const meta = translations.en.meta;
-
 export const metadata: Metadata = {
-  title: meta.title,
-  description: meta.description,
-  openGraph: {
-    title: meta.ogTitle,
-    description: meta.ogDescription,
-    type: "website",
-    images: [{ url: "/careers/hero-miami-port.jpg", width: 2000, height: 1250 }],
-  },
+  title: "Careers — Trading Solutions",
+  description:
+    "Your next chapter starts here. Join the boutique freight forwarder operating in more than 150 countries.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const raw = cookies().get("ts-lang")?.value;
+  const locale = isLocale(raw) ? raw : "en";
   return (
-    <html lang="es" className={inter.variable} suppressHydrationWarning>
+    <html lang={htmlLang(locale)} className={inter.variable} suppressHydrationWarning>
       <body className="antialiased font-sans">
-        <LanguageProvider>{children}</LanguageProvider>
+        <LanguageProvider initialLocale={locale}>{children}</LanguageProvider>
       </body>
     </html>
   );

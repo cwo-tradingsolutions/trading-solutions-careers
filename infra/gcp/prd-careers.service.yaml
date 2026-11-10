@@ -66,7 +66,7 @@ spec:
             # Vercel producción): el ATS envía por Gmail conectado. Los correos de
             # aviso internos usan los valores por defecto del código.
             # Remitente decidido por Kelly; requiere tradingsolutions.com verificado en Resend.
-            - { name: EMAIL_FROM, value: "Trading Solutions <jointheteam@tradingsolutions.com>" }
+            - { name: EMAIL_FROM, value: "Talent Acquisition Team <jointheteam@tradingsolutions.com>" }
             - name: EMAIL_BCC
               valueFrom: { secretKeyRef: { name: prd-careers-EMAIL_BCC, key: latest } }
             - name: ELEVENLABS_API_KEY

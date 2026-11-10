@@ -15,6 +15,7 @@
  * El error se loguea para que no desaparezca en silencio.
  */
 import { supabaseAdmin } from "@/lib/supabase";
+import { emitStageChanged } from "@/lib/ats-events";
 
 export type StageEventSource = "ui" | "system" | "backfill";
 
@@ -51,6 +52,10 @@ export async function recordStageEvent(opts: {
   } catch (e: any) {
     console.error(`[stage-events] excepción registrando ${candidateId} → ${toStage}:`, e?.message || e);
   }
+
+  // El evento para los agentes sale aunque el historial haya fallado: el
+  // candidato sí se movió, que es lo que el consumidor necesita saber.
+  await emitStageChanged({ candidateId, toStage, fromStage, vacancyId, source, note });
 }
 
 /**
@@ -85,4 +90,14 @@ export async function recordStageEvents(
   } catch (e: any) {
     console.error("[stage-events] excepción en batch:", e?.message || e);
   }
+
+  await Promise.all(rows.map((r) => emitStageChanged({
+    candidateId: r.candidate_id,
+    toStage: r.to_stage,
+    fromStage: r.from_stage,
+    vacancyId: r.vacancy_id,
+    source: r.source,
+    note: r.note,
+    occurredAt: r.changed_at,
+  })));
 }

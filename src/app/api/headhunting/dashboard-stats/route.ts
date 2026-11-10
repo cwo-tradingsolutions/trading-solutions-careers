@@ -10,6 +10,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { fetchAllRows } from "@/lib/fetch-all-rows";
 import { supabaseAdmin } from "@/lib/supabase";
 // Las etapas salen de la fuente única de verdad. Este archivo tenía sus
 // propias listas con codes pre-v4: contaba candidatos en etapas muertas y
@@ -35,22 +36,25 @@ export async function GET(req: NextRequest) {
     const baseCols = "id, name, email, vacancy_id, stage, status, prefilter_decision, prefilter_invited_at, prefilter_completed_at, created_at, updated_at, ht_vacancies(title)";
     const withSource = `id, name, email, vacancy_id, stage, status, prefilter_decision, prefilter_invited_at, prefilter_completed_at, source, created_at, updated_at, ht_vacancies(title)`;
 
-    async function runQuery(cols: string) {
-      let q = supabaseAdmin.from("ht_candidates").select(cols);
-      if (vacancyFilter) q = q.eq("vacancy_id", vacancyFilter);
-      return q;
+    async function loadAll(cols: string) {
+      return fetchAllRows(() => {
+        let q = supabaseAdmin.from("ht_candidates").select(cols);
+        if (vacancyFilter) q = q.eq("vacancy_id", vacancyFilter);
+        return q;
+      });
     }
 
-    let resp: any = await runQuery(withSource);
-    if (resp.error && /column .*source.* does not exist/i.test(resp.error.message)) {
-      // Retry sin source
-      resp = await runQuery(baseCols);
+    let all: any[];
+    try {
+      all = await loadAll(withSource);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (/column .*source.* does not exist/i.test(message)) {
+        all = await loadAll(baseCols);
+      } else {
+        return NextResponse.json({ error: message }, { status: 500 });
+      }
     }
-    if (resp.error) {
-      return NextResponse.json({ error: resp.error.message }, { status: 500 });
-    }
-
-    const all: any[] = resp.data || [];
 
     // Conteo por stage del Funnel v4 · 13 etapas + terminal
     const COUNTED_STAGES = [...STAGE_ORDER, "rechazado"];

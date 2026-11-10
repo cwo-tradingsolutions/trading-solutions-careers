@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from "react";
+import { FechasVacanteFields, errorFechas } from "@/components/CamposObligatorios";
 
 export default function NuevaVacanteModal({
   onCerrar,
@@ -27,6 +28,8 @@ export default function NuevaVacanteModal({
     preferred_qualifications: "",
     salary_range: "",
     linkedin_url: "",
+    fecha_apertura: "",
+    fecha_objetivo: "",
   });
   const [enviando, setEnviando] = useState(false);
   const [problema, setProblema] = useState<string | null>(null);
@@ -38,6 +41,11 @@ export default function NuevaVacanteModal({
   async function enviar() {
     if (!f.title.trim() || !f.department.trim()) {
       setProblema("El título y el área (departamento) son obligatorios.");
+      return;
+    }
+    const fechas = errorFechas(f.fecha_apertura, f.fecha_objetivo, true);
+    if (fechas) {
+      setProblema(fechas);
       return;
     }
     setEnviando(true);
@@ -58,6 +66,8 @@ export default function NuevaVacanteModal({
           preferred_qualifications: f.preferred_qualifications.trim() || null,
           salary_range: f.salary_range.trim() || null,
           linkedin_url: f.linkedin_url.trim() || null,
+          fecha_apertura: f.fecha_apertura,
+          fecha_objetivo: f.fecha_objetivo,
         }),
       });
       const j = await r.json().catch(() => ({}));
@@ -65,6 +75,7 @@ export default function NuevaVacanteModal({
         setProblema(j?.error || "No se pudo crear la vacante.");
         return;
       }
+      if (j?.aviso_fechas) window.alert(j.aviso_fechas);
       onCreada();
     } catch (e: any) {
       setProblema(e?.message || "Error de red.");
@@ -146,6 +157,18 @@ export default function NuevaVacanteModal({
           <textarea value={f.preferred_qualifications} onChange={(e) => set("preferred_qualifications", e.target.value)} rows={2} className={inp}
             placeholder="Lo que suma pero no descarta." />
         </label>
+
+        <div className="mb-4">
+          <FechasVacanteFields
+            apertura={f.fecha_apertura}
+            objetivo={f.fecha_objetivo}
+            onApertura={(v) => set("fecha_apertura", v)}
+            onObjetivo={(v) => set("fecha_objetivo", v)}
+          />
+          <p className="text-[11px] text-gray-500 mt-1">
+            La apertura se guarda en posted_at. El cierre objetivo solo se exige si la columna target_close_date ya existe.
+          </p>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-1">
           <label className="block">

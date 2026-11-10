@@ -10,6 +10,7 @@
  *      → crea draft en Gmail (canal email)
  *      → registra en ts_reminders_sent
  *   4. Si la iteración > max_iterations sin respuesta → mark_paused
+ *      (mark_rejected está OFF hasta GO Kelly: se pausa igual, no se rechaza)
  *
  * Auth: Vercel Cron envía header `Authorization: Bearer ${CRON_SECRET}`.
  * También aceptamos requireAdmin para correr manualmente desde browser.
@@ -24,8 +25,8 @@ import {
   getLanguage,
 } from "@/lib/reminder-templates";
 import { requireAdmin } from "@/lib/admin-auth";
-import { recordStageEvent } from "@/lib/stage-events";
 import crypto from "crypto";
+import { ATS_FROM_NAME } from "@/lib/ats-from";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -165,9 +166,12 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
-      // ¿Se agotaron iteraciones? → ejecutar acción configurada
+      // ¿Se agotaron iteraciones? → ejecutar acción configurada.
+      // Auto-reject OFF hasta GO Kelly: mark_rejected se trata como pausa
+      // (mismo upsert en ts_candidate_reminders_paused). No se escribe stage=rechazado.
       if (iteration > rule.max_iterations) {
-        if (rule.on_exhausted_action === "mark_paused") {
+        const forced = rule.on_exhausted_action === "mark_rejected";
+        if (rule.on_exhausted_action === "mark_paused" || forced) {
           await supabaseAdmin
             .from("ts_candidate_reminders_paused")
             .upsert({
@@ -176,27 +180,10 @@ export async function GET(req: NextRequest) {
               reason: `Sin respuesta tras ${rule.max_iterations} recordatorios · ${rule.scenario_key}`,
               paused_by: "cron",
             });
-          results.push({ candidate_id: cand.id, status: "exhausted_paused" });
-        } else if (rule.on_exhausted_action === "mark_rejected") {
-          const { error: rejectErr } = await supabaseAdmin
-            .from("ht_candidates")
-            .update({ stage: "rechazado", status: "rejected", updated_at: new Date().toISOString() })
-            .eq("id", cand.id);
-
-          // El auto-rechazo por silencio es justo el caso donde interesa saber
-          // desde qué etapa se cayó el candidato y cuándo: sin el evento el
-          // historial muestra al rechazado como si nunca hubiera avanzado.
-          if (!rejectErr) {
-            await recordStageEvent({
-              candidateId: cand.id,
-              fromStage: cand.stage ?? null,
-              toStage: "rechazado",
-              vacancyId: cand.vacancy_id ?? null,
-              source: "system",
-              note: `auto-rechazo tras ${rule.max_iterations} recordatorios · ${rule.scenario_key}`,
-            });
-          }
-          results.push({ candidate_id: cand.id, status: "exhausted_rejected" });
+          results.push({
+            candidate_id: cand.id,
+            status: forced ? "exhausted_paused_forced" : "exhausted_paused",
+          });
         } else {
           results.push({ candidate_id: cand.id, status: "exhausted_noop" });
         }
@@ -239,7 +226,7 @@ export async function GET(req: NextRequest) {
           to: cand.email,
           subject: rendered.email_subject,
           html: rendered.email_body.replace(/\n/g, "<br>"),
-          fromName: "Kelly Castañeda",
+          fromName: ATS_FROM_NAME,
           replyTo: "jointheteam@tradingsolutions.com",
         });
 

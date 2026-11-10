@@ -12,6 +12,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { fetchAllRows } from "@/lib/fetch-all-rows";
 import { supabaseAdmin } from "@/lib/supabase";
 import { ETAPAS_CERRADAS, vacantesAbiertas } from "@/lib/contactos";
 
@@ -30,13 +31,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ total: 0, esperando_respuesta: 0, sin_ningun_contacto: 0, gmail_sin_revisar: 0, candidatos: [] });
   }
 
-  const { data: cands, error } = await supabaseAdmin
-    .from("ht_candidates")
-    .select("id, name, email, phone, stage, vacancy_id, contactos_sync_at, ht_vacancies(title)")
-    .in("vacancy_id", vacantes)
-    .not("stage", "in", ETAPAS_CERRADAS)
-    .limit(1000);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  let cands: any[];
+  try {
+    cands = await fetchAllRows(() =>
+      supabaseAdmin
+        .from("ht_candidates")
+        .select("id, name, email, phone, stage, vacancy_id, contactos_sync_at, ht_vacancies(title)")
+        .in("vacancy_id", vacantes)
+        .not("stage", "in", ETAPAS_CERRADAS),
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 
   const ids = (cands ?? []).map((c) => c.id);
   const eventos: Ev[] = [];

@@ -27,6 +27,15 @@ type Rule = {
   on_exhausted_action: "mark_paused" | "mark_rejected" | "noop";
 };
 
+/** Auto-rechazo OFF hasta GO de Kelly. La UI muestra pausa y pide Guardar. */
+function sinAutoRechazo(rule: Rule): { rule: Rule; coerced: boolean } {
+  if (rule.on_exhausted_action !== "mark_rejected") return { rule, coerced: false };
+  return { rule: { ...rule, on_exhausted_action: "mark_paused" }, coerced: true };
+}
+
+const AVISO_AUTO_RECHAZO =
+  "Esta regla tenía «marcar como rechazado». Quedó en pausar: Guardar para persistirlo. El auto-rechazo está apagado hasta GO de Kelly.";
+
 export default function ReminderRulesEditor() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -47,10 +56,13 @@ export default function ReminderRulesEditor() {
     try {
       const r = await fetch("/api/admin/reminder-rules");
       const j = await r.json();
-      setRules(j.rules || []);
-      if ((j.rules || []).length > 0 && !activeId) {
-        setActiveId(j.rules[0].id);
-        setDraft(JSON.parse(JSON.stringify(j.rules[0])));
+      const raw = (j.rules || []) as Rule[];
+      setRules(raw);
+      if (raw.length > 0 && !activeId) {
+        const { rule, coerced } = sinAutoRechazo(JSON.parse(JSON.stringify(raw[0])));
+        setActiveId(rule.id);
+        setDraft(rule);
+        if (coerced) setError(AVISO_AUTO_RECHAZO);
       }
     } catch (e: any) {
       setError(e?.message || "Error cargando reglas");
@@ -62,10 +74,11 @@ export default function ReminderRulesEditor() {
   function pickRule(id: string) {
     const r = rules.find(x => x.id === id);
     if (!r) return;
+    const { rule, coerced } = sinAutoRechazo(JSON.parse(JSON.stringify(r)));
     setActiveId(id);
-    setDraft(JSON.parse(JSON.stringify(r)));
+    setDraft(rule);
     setFeedback(null);
-    setError(null);
+    setError(coerced ? AVISO_AUTO_RECHAZO : null);
   }
 
   function updateTemplate(field: keyof Template, value: string) {
@@ -104,9 +117,11 @@ export default function ReminderRulesEditor() {
       if (!j.success) {
         setError(j.error || "Error al guardar");
       } else {
-        setFeedback("Guardado · cambios aplicados");
-        setRules(rules.map(x => (x.id === draft.id ? draft : x)));
-        setTimeout(() => setFeedback(null), 3000);
+        setFeedback(j.warning ? `Guardado · ${j.warning}` : "Guardado · cambios aplicados");
+        const saved = (j.rule || draft) as Rule;
+        setDraft(saved);
+        setRules(rules.map(x => (x.id === draft.id ? saved : x)));
+        setTimeout(() => setFeedback(null), 4000);
       }
     } catch (e: any) {
       setError(e?.message || "Error de red");
@@ -194,7 +209,6 @@ export default function ReminderRulesEditor() {
                   className="mt-1.5 w-full border border-[var(--ts-gray-10)] focus:border-[var(--ts-black)] px-3 py-2 text-[13px] outline-none cursor-pointer"
                 >
                   <option value="mark_paused">Pausar · re-engage manual</option>
-                  <option value="mark_rejected">Marcar como rechazado</option>
                   <option value="noop">No hacer nada</option>
                 </select>
               </div>

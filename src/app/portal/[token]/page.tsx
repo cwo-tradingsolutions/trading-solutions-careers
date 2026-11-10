@@ -38,7 +38,6 @@ const T = {
     current: 'Actual',
     commitments: 'Nuestros compromisos contigo',
     c1: (n: number) => `• Te respondemos en máximo ${n} días hábiles, avances o no`,
-    c2: '• Si no avanzas, te decimos por qué con respeto y honestidad',
     c3: '• Tu información se mantiene confidencial',
     c4pre: '• Si tienes preguntas, escribe a ',
     footer: 'Trading Solutions · Boutique Freight Forwarder · Operación en +10 países',
@@ -57,7 +56,6 @@ const T = {
     current: 'Current',
     commitments: 'What we commit to',
     c1: (n: number) => `• We get back to you within ${n} business days, either way`,
-    c2: "• If you don't move forward, we tell you why, honestly and respectfully",
     c3: '• Your information stays confidential',
     c4pre: '• If you have any questions, write to ',
     footer: 'Trading Solutions · Boutique Freight Forwarder · Operations in 10+ countries',
@@ -185,7 +183,6 @@ export default function PortalPage() {
             <div className="text-xs uppercase tracking-widest text-blue-700 font-semibold mb-2">{t.commitments}</div>
             <ul className="text-sm text-blue-900 space-y-1.5">
               <li>{t.c1(data.sla_promise_days)}</li>
-              <li>{t.c2}</li>
               <li>{t.c3}</li>
               <li>{t.c4pre}<a href="mailto:jointheteam@tradingsolutions.com" className="underline">jointheteam@tradingsolutions.com</a></li>
             </ul>
